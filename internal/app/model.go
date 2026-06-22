@@ -1357,12 +1357,21 @@ func clampScroll(current, total, page int) int {
 }
 
 func graphPageSize(m *model) int {
-	if m.height <= 0 {
-		return 12
+	totalHeight := int(float64(m.height) * 0.70)
+	if totalHeight < 18 {
+		totalHeight = 18
 	}
-	size := m.height/2 - 8
-	if size < 5 {
-		size = 5
+	if totalHeight > m.height-2 {
+		totalHeight = m.height - 2
+	}
+	topHeight := 8
+	if totalHeight > 30 {
+		topHeight = totalHeight / 3
+	}
+	bottomHeight := totalHeight - topHeight
+	size := bottomHeight - 3
+	if size < 3 {
+		size = 3
 	}
 	return size
 }

@@ -11,6 +11,8 @@ import (
 
 var (
 	border      = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
+	baseBox     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+	activeBox   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("205")).Padding(0, 1)
 	title       = lipgloss.NewStyle().Bold(true)
 	muted       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	accent      = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
@@ -25,71 +27,158 @@ var (
 	highlight   = lipgloss.NewStyle().Reverse(true).Bold(true)
 )
 
+func (m model) getBoxStyle(section graphSection) lipgloss.Style {
+	if m.activeSection == section {
+		return activeBox
+	}
+	return baseBox
+}
+
 func (m model) View() string {
-	left := m.renderGraphPane()
-	right := m.renderDetailPane()
-	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	// 1. 15% 마진이 적용된 가용 대시보드 너비/높이 계산 (클램핑 보호)
+	totalWidth := int(float64(m.width) * 0.70)
+	if totalWidth < 80 {
+		totalWidth = 80
+	}
+	if totalWidth > m.width {
+		totalWidth = m.width
+	}
+
+	totalHeight := int(float64(m.height) * 0.70)
+	if totalHeight < 18 {
+		totalHeight = 18
+	}
+	if totalHeight > m.height-2 {
+		totalHeight = m.height - 2
+	}
+
+	leftColWidth := int(float64(totalWidth) * 0.70)
+	rightColWidth := totalWidth - leftColWidth - 2
+
+	topHeight := 8
+	if totalHeight > 30 {
+		topHeight = totalHeight / 3
+	}
+	bottomHeight := totalHeight - topHeight
+
+	// 2. 상단 Local & Remote 박스 (Branches 대박스 없이 독립 배치)
+	localWidth := leftColWidth / 2
+	remoteWidth := leftColWidth - localWidth
+
+	localContent := m.renderSectionContent(sectionCurrent, localWidth-4, topHeight-3)
+	remoteContent := m.renderSectionContent(sectionRemote, remoteWidth-4, topHeight-3)
+
+	localBox := m.getBoxStyle(sectionCurrent).Width(localWidth).Height(topHeight).Render("Local\n" + localContent)
+	remoteBox := m.getBoxStyle(sectionRemote).Width(remoteWidth).Height(topHeight).Render("Remote\n" + remoteContent)
+
+	branchesInner := lipgloss.JoinHorizontal(lipgloss.Top, localBox, remoteBox)
+
+	// 3. 상단 Tags 박스 구성
+	tagsContent := m.renderSectionContent(sectionTags, rightColWidth-4, topHeight-3)
+	tagsBox := m.getBoxStyle(sectionTags).Width(rightColWidth).Height(topHeight).Render("Tags\n" + tagsContent)
+
+	topRow := lipgloss.JoinHorizontal(lipgloss.Top, branchesInner, tagsBox)
+
+	// 4. 하단 Graph 박스 구성
+	graphContent := m.renderGraphContent(leftColWidth-4, bottomHeight-3)
+	graphBox := m.getBoxStyle(sectionGraph).Width(leftColWidth).Height(bottomHeight).Render("Graph\n" + graphContent)
+
+	// 5. 하단 Mode (Detail Pane) 박스 구성
+	detailContent := m.renderDetailContent(rightColWidth-4, bottomHeight-3)
+	detailBox := baseBox.Width(rightColWidth).Height(bottomHeight).Render(detailContent)
+
+	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, graphBox, detailBox)
+
+	// 6. 세로 정렬 및 Place 정중앙 배치
+	body := lipgloss.JoinVertical(lipgloss.Left, topRow, bottomRow)
+
+	centeredBody := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, body)
+
 	footer := muted.Render("tab/shift+tab: section  •  up/down: move  •  ctrl+u/d: page  •  g/G/H: top/bottom/head  •  f: fetch  •  enter/c: checkout  •  n: new branch  •  q: quit")
-	return body + "\n" + footer + "\n"
+
+	return centeredBody + "\n" + footer + "\n"
 }
 
-func (m model) renderGraphPane() string {
-	var content strings.Builder
-	content.WriteString(renderSectionTitle("Graph", m.activeSection == sectionGraph))
-	content.WriteString(renderGraphViewport(m))
-	content.WriteString(renderSectionBlock("Branches", m, sectionCurrent))
-	content.WriteString(renderSectionBlock("Remote", m, sectionRemote))
-	content.WriteString(renderSectionBlock("Tags", m, sectionTags))
-	return border.Width(max(56, paneWidth(m.width, 0.74))).Render(content.String())
+func (m model) renderSectionContent(section graphSection, width, height int) string {
+	items := sectionTargets(m.repoStatus, section)
+	if len(items) == 0 {
+		return muted.Render("  (empty)")
+	}
+	cursor := m.sectionCursor[section]
+	var b strings.Builder
+	for i, item := range items {
+		if i >= height {
+			break
+		}
+		prefix := "  "
+		if i == cursor && m.activeSection == section {
+			prefix = "> "
+		}
+		b.WriteString(prefix + formatTargetItem(item) + "\n")
+	}
+	return b.String()
 }
 
-func (m model) renderDetailPane() string {
+func (m model) renderGraphContent(width, height int) string {
+	rows := graphRows(m.repoStatus)
+	if len(rows) == 0 {
+		return muted.Render("  (no graph to show yet)\n")
+	}
+	start := clampScroll(m.graphScroll, len(rows), graphPageSize(&m))
+	end := start + graphPageSize(&m)
+	if end > len(rows) {
+		end = len(rows)
+	}
+	var b strings.Builder
+	b.WriteString("  " + muted.Render(fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))) + "\n")
+	graphActive := m.activeSection == sectionGraph
+	for i := start; i < end; i++ {
+		b.WriteString(renderGraphLine(rows[i], graphActive && i == m.sectionCursor[sectionGraph], graphActive, m.graphLaneCursor, m.repoStatus.LocalBranches) + "\n")
+		if i+1 < len(rows) {
+			for _, line := range renderGraphConnectorLines(rows[i], rows[i+1]) {
+				b.WriteString(line + "\n")
+			}
+		}
+	}
+	return b.String()
+}
+
+func (m model) renderDetailContent(width, height int) string {
 	var content strings.Builder
-	content.WriteString(title.Render("Mode") + "\n\n")
-	content.WriteString(renderStatus(m.status) + "\n\n")
+	content.WriteString(title.Render("Mode") + "\n")
+	content.WriteString(renderStatusCompact(m.status) + "\n\n")
+
 	content.WriteString(title.Render("Repo") + "\n")
-	content.WriteString(fmt.Sprintf("branch: %s\n", emptyDash(m.repoStatus.Branch)))
-	content.WriteString(fmt.Sprintf("head:   %s\n", shorten(m.repoStatus.Head, 12)))
-	content.WriteString(fmt.Sprintf("upstream: %s\n", emptyDash(m.repoStatus.Upstream)))
-	content.WriteString(fmt.Sprintf("remote: %s\n", emptyDash(m.repoStatus.Remote)))
+	content.WriteString(fmt.Sprintf("branch: %-12s • head: %s\n", shorten(m.repoStatus.Branch, 10), shorten(m.repoStatus.Head, 7)))
+	content.WriteString(fmt.Sprintf("upstr:  %-12s • remo: %s\n", shorten(emptyDash(m.repoStatus.Upstream), 10), shorten(emptyDash(m.repoStatus.Remote), 10)))
+
 	focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 	if focus.Hash != "" {
-		content.WriteString(fmt.Sprintf("focus: %s\n", focusLineSummary(focus)))
+		content.WriteString(fmt.Sprintf("focus:  %s\n", shorten(focusLineSummary(focus), width-2)))
 	}
-	content.WriteString(fmt.Sprintf("section: %s\n", sectionName(m.activeSection)))
+	content.WriteString(fmt.Sprintf("active: %s\n", sectionName(m.activeSection)))
 	if m.status.Selected != "" {
-		content.WriteString(fmt.Sprintf("selected: %s\n", m.status.Selected))
+		content.WriteString(fmt.Sprintf("select: %s\n", shorten(m.status.Selected, width-2)))
 	}
 	if m.branchOpen {
-		content.WriteString("\n")
-		content.WriteString(title.Render("New Branch") + "\n")
-		content.WriteString(fmt.Sprintf("base: %s\n", emptyDash(m.branchBase)))
-		content.WriteString(muted.Render("> ") + m.branchDraft + "\n")
+		content.WriteString(fmt.Sprintf("new br: %s (base: %s)\n", m.branchDraft, shorten(m.branchBase, 7)))
 	}
-	content.WriteString("\n")
-	content.WriteString(title.Render("Actions") + "\n")
-	content.WriteString(renderActionHelp(m.status))
-	return border.Width(max(34, paneWidth(m.width, 0.38))).Render(content.String())
+	content.WriteString("\n" + title.Render("Actions") + "\n")
+	content.WriteString(renderActionHelpCompact(m.status))
+	return content.String()
 }
 
-func renderStatus(s state.Status) string {
+func renderStatusCompact(s state.Status) string {
+	msg := shorten(s.Message, 30)
 	switch s.Mode {
 	case state.ModeBrowse:
-		return ok.Render("Browse") + "\n" + s.Message + "\n" + muted.Render("Use tab to change section.")
+		return ok.Render("Browse") + " | " + msg
 	case state.ModeLoading:
-		return accent.Render("Loading") + "\n" + s.Message
-	case state.ModeEmpty:
-		return warn.Render("Empty") + "\n" + s.Message
-	case state.ModeError:
-		return warn.Render("Error") + "\n" + s.Message
+		return accent.Render("Loading") + " | " + msg
 	case state.ModeBlocked:
-		return warn.Render("Blocked") + "\n" + s.Message + "\n" + muted.Render(s.Detail)
-	case state.ModeTargetPick:
-		return accent.Render(strings.ToUpper(string(s.Action))) + "\n" + s.Message + "\n" + renderTargets(s)
-	case state.ModeOutcomePreview:
-		return accent.Render(strings.ToUpper(string(s.Action))) + "\n" + s.Message + "\n" + muted.Render(s.Detail)
+		return warn.Render("Blocked") + " | " + msg
 	default:
-		return s.Message
+		return msg
 	}
 }
 
@@ -140,91 +229,20 @@ func formatTargetItem(t state.TargetItem) string {
 	}
 }
 
-func renderActionHelp(s state.Status) string {
+func renderActionHelpCompact(s state.Status) string {
 	switch s.Mode {
 	case state.ModeBrowse:
-		return "up/down: move graph pointer\nf: fetch remotes\nenter/c: checkout\nn: new branch\np: pull\nm: merge\ne: rebase\ns: reset\nH: jump to HEAD\n"
+		return "• up/down: move   • f: fetch       • enter/c: checkout\n• n: new branch    • p: pull        • m: merge\n• e: rebase        • s: reset       • H: jump to HEAD"
 	case state.ModeTargetPick:
-		return "up/down: choose target\nenter: preview\nesc: back\n"
+		return "• up/down: choose target            • enter: preview\n• esc: back"
 	case state.ModeOutcomePreview:
 		if s.CanExecute {
-			return "enter: execute\nesc: back\n"
+			return "• enter: execute                    • esc: back"
 		}
-		return "esc: back\n"
-	case state.ModeBlocked:
-		return "esc: back\nr: refresh\n"
+		return "• esc: back"
 	default:
-		return "r: refresh\n"
+		return "• r: refresh"
 	}
-}
-
-func renderGraphViewport(m model) string {
-	rows := graphRows(m.repoStatus)
-	if len(rows) == 0 {
-		return muted.Render("(no graph to show yet)") + "\n\n"
-	}
-	start := clampScroll(m.graphScroll, len(rows), graphPageSize(&m))
-	end := start + graphPageSize(&m)
-	if end > len(rows) {
-		end = len(rows)
-	}
-	var b strings.Builder
-	b.WriteString(muted.Render(fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))) + "\n")
-	graphActive := m.activeSection == sectionGraph
-	for i := start; i < end; i++ {
-		b.WriteString(renderGraphLine(rows[i], graphActive && i == m.sectionCursor[sectionGraph], graphActive, m.graphLaneCursor, m.repoStatus.LocalBranches) + "\n")
-		if i+1 < len(rows) {
-			for _, line := range renderGraphConnectorLines(rows[i], rows[i+1]) {
-				b.WriteString(line + "\n")
-			}
-		}
-	}
-	b.WriteString("\n")
-	return b.String()
-}
-
-func renderSectionBlock(label string, m model, section graphSection) string {
-	items := sectionTargets(m.repoStatus, section)
-	var b strings.Builder
-	b.WriteString(renderSectionTitle(label, m.activeSection == section))
-	if len(items) == 0 {
-		b.WriteString(muted.Render("  (empty)") + "\n\n")
-		return b.String()
-	}
-	cursor := m.sectionCursor[section]
-	for i, item := range items {
-		prefix := "  "
-		if i == cursor {
-			prefix = "> "
-		}
-		b.WriteString(prefix + formatTargetItem(item) + "\n")
-	}
-	b.WriteString("\n")
-	return b.String()
-}
-
-func renderSectionTitle(label string, active bool) string {
-	if active {
-		return warn.Render(label) + "\n"
-	}
-	return title.Render(label) + "\n"
-}
-
-func renderRefSection(label string, refs []string, kind state.TargetKind, cursor, offset int) string {
-	if len(refs) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString(muted.Render(label+":") + "\n")
-	for i, ref := range refs {
-		prefix := "  "
-		if cursor == offset+i {
-			prefix = "> "
-		}
-		b.WriteString(prefix + formatTargetItem(state.TargetItem{Kind: kind, Name: ref, Ref: ref}) + "\n")
-	}
-	b.WriteString("\n")
-	return b.String()
 }
 
 func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string) string {
