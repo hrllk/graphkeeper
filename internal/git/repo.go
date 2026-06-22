@@ -44,6 +44,7 @@ type Status struct {
 
 type Runner struct {
 	Timeout time.Duration
+	Dir     string
 }
 
 type GraphCommit struct {
@@ -62,7 +63,7 @@ func Open(root string) (*Repo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Repo{root: abs, runner: Runner{Timeout: 3 * time.Second}}, nil
+	return &Repo{root: abs, runner: Runner{Timeout: 3 * time.Second, Dir: abs}}, nil
 }
 
 func (r *Repo) Status(ctx context.Context) (Status, error) {
@@ -341,6 +342,9 @@ func (r *Runner) Run(args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
+	if r.Dir != "" {
+		cmd.Dir = r.Dir
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

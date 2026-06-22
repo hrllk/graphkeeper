@@ -393,7 +393,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case executedMsg:
 		if msg.err != nil {
-			m.status = state.New().WithBlocked(state.BlockUnknown, "Execution failed.", msg.err.Error())
+			reason := state.BlockUnknown
+			message := "Execution failed."
+			detail := msg.err.Error()
+			if msg.action == state.ActionCheckout {
+				message = "Checkout failed."
+				if strings.Contains(detail, "local changes") || strings.Contains(detail, "overwritten by checkout") {
+					reason = state.BlockDirtyTree
+					message = "Checkout blocked by local changes."
+					detail = "Your local changes would be overwritten by checkout. Commit or stash them before switching."
+				}
+			}
+			m.status = state.New().WithBlocked(reason, message, detail)
 			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
 			return m, nil
 		}
