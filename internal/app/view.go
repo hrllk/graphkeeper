@@ -14,7 +14,7 @@ var (
 	title       = lipgloss.NewStyle().Bold(true)
 	muted       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	accent      = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-	warn        = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
+	warn        = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 	ok          = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	headMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	branchMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
@@ -112,11 +112,19 @@ func formatTargetItem(t state.TargetItem) string {
 	switch t.Kind {
 	case state.TargetKindLocal:
 		if t.Current {
-			return accent.Render("*") + " current " + t.Name
+			return ok.Render("l->" + t.Name)
 		}
-		return "local  " + t.Name
+		return "l->" + t.Name
 	case state.TargetKindRemote:
-		return "remote " + t.Name
+		name := t.Name
+		if strings.HasPrefix(name, "origin/") {
+			name = strings.TrimPrefix(name, "origin/")
+		}
+		label := "o->" + name
+		if t.Default {
+			label += " (default)"
+		}
+		return label
 	case state.TargetKindTag:
 		return "tag    " + t.Name
 	default:

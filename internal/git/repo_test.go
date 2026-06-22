@@ -33,3 +33,10 @@ func TestIsNoCommits(t *testing.T) {
 		t.Fatal("expected unrelated error to not be treated as no-commits")
 	}
 }
+
+func TestFilterRemoteBranchesDropsSymbolicHead(t *testing.T) {
+	got := filterRemoteBranches([]string{"origin/HEAD", "origin/main", "origin/tmp3"})
+	if len(got) != 2 || got[0] != "origin/main" || got[1] != "origin/tmp3" {
+		t.Fatalf("unexpected filtered remote branches: %v", got)
+	}
+}

@@ -52,6 +52,7 @@ type TargetItem struct {
 	Name    string
 	Ref     string
 	Current bool
+	Default bool
 }
 
 type Status struct {

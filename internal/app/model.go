@@ -997,7 +997,16 @@ func sectionTargets(rs git.Status, section graphSection) []state.TargetItem {
 	case sectionRemote:
 		items := make([]state.TargetItem, 0, len(rs.RemoteBranches))
 		for _, name := range rs.RemoteBranches {
-			items = append(items, state.TargetItem{Kind: state.TargetKindRemote, Name: name, Ref: name})
+			branchName := name
+			if strings.HasPrefix(branchName, "origin/") {
+				branchName = strings.TrimPrefix(branchName, "origin/")
+			}
+			items = append(items, state.TargetItem{
+				Kind:    state.TargetKindRemote,
+				Name:    name,
+				Ref:     name,
+				Default: branchName != "" && branchName == rs.DefaultBranch,
+			})
 		}
 		return items
 	case sectionTags:
