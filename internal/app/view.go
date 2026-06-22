@@ -55,11 +55,7 @@ func (m model) View() string {
 	leftColWidth := int(float64(totalWidth) * 0.70)
 	rightColWidth := totalWidth - leftColWidth - 2
 
-	topHeight := 8
-	if totalHeight > 30 {
-		topHeight = totalHeight / 3
-	}
-	bottomHeight := totalHeight - topHeight
+	topHeight, bottomHeight := splitDashboardHeights(totalHeight)
 	graphHeight, detailHeight := splitPaneHeights(bottomHeight)
 	graphWidth, detailWidth := splitPaneWidths(totalWidth)
 
@@ -94,9 +90,9 @@ func (m model) View() string {
 	// 6. 세로 정렬 및 Place 정중앙 배치
 	body := lipgloss.JoinVertical(lipgloss.Left, topRow, bottomRow)
 
-	centeredBody := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, body)
+	centeredBody := lipgloss.Place(m.width, m.height-2, lipgloss.Center, lipgloss.Center, body)
 
-	footer := muted.Render("tab/shift+tab: section  •  up/down: move  •  ctrl+u/d: page  •  g/G/H: top/bottom/head  •  f: fetch  •  enter/c: checkout  •  n: new branch  •  q: quit")
+	footer := muted.Render("global: tab/shift+tab section  •  up/down/j/k move  •  f fetch  •  q quit")
 
 	return centeredBody + "\n" + footer + "\n"
 }
@@ -180,7 +176,7 @@ func (m model) renderDetailContent(width, height int) string {
 	}
 	lines = append(lines, "")
 	lines = append(lines, title.Render("Actions"))
-	lines = append(lines, strings.Split(renderActionHelpCompact(m.status), "\n")...)
+	lines = append(lines, renderActionHelpLines(m)...)
 	return fitBlockLines(lines, height)
 }
 
@@ -245,19 +241,40 @@ func formatTargetItem(t state.TargetItem) string {
 	}
 }
 
-func renderActionHelpCompact(s state.Status) string {
-	switch s.Mode {
+func renderActionHelpLines(m model) []string {
+	switch m.status.Mode {
 	case state.ModeBrowse:
-		return "• up/down: move   • f: fetch       • enter/c: checkout\n• n: new branch    • p: pull        • m: merge\n• e: rebase        • s: reset       • H: jump to HEAD"
-	case state.ModeTargetPick:
-		return "• up/down: choose target            • enter: preview\n• esc: back"
-	case state.ModeOutcomePreview:
-		if s.CanExecute {
-			return "• enter: execute                    • esc: back"
+		lines := make([]string, 0, 5)
+		switch m.activeSection {
+		case sectionGraph:
+			lines = append(lines, "• m: merge         • r: rebase")
+			lines = append(lines, "• s: reset         • ctrl+u/d: scroll")
+			lines = append(lines, "• g: top          • G: bottom")
+			lines = append(lines, "• H: jump to HEAD")
+			lines = append(lines, "• n: new branch")
+		case sectionCurrent, sectionRemote:
+			lines = append(lines, "• space: checkout")
+			if m.activeSection == sectionCurrent && pullReady(m.repoStatus) {
+				lines = append(lines, "• p: pull")
+			}
+			if m.activeSection == sectionCurrent {
+				lines = append(lines, "• n: new branch")
+			}
+		case sectionTags:
+			lines = append(lines, "• no section actions")
+		default:
+			lines = append(lines, "• no section actions")
 		}
-		return "• esc: back"
+		return lines
+	case state.ModeTargetPick:
+		return []string{"• up/down: choose target            • enter: preview", "• esc: back"}
+	case state.ModeOutcomePreview:
+		if m.status.CanExecute {
+			return []string{"• enter: execute                    • esc: back"}
+		}
+		return []string{"• esc: back"}
 	default:
-		return "• r: refresh"
+		return []string{"• r: refresh"}
 	}
 }
 
@@ -547,6 +564,22 @@ func splitPaneWidths(total int) (int, int) {
 	left := total / 2
 	right := total - left
 	return left, right
+}
+
+func splitDashboardHeights(total int) (int, int) {
+	if total <= 0 {
+		return 0, 0
+	}
+	top := total / 5
+	if top < 1 {
+		top = 1
+	}
+	bottom := total - top
+	if bottom < 1 {
+		bottom = 1
+		top = total - bottom
+	}
+	return top, bottom
 }
 
 func splitPaneHeights(total int) (int, int) {

@@ -188,6 +188,16 @@ func TestSplitPaneHeightsAreBalanced(t *testing.T) {
 	}
 }
 
+func TestSplitDashboardHeightsUseWeightedLayout(t *testing.T) {
+	top, bottom := splitDashboardHeights(100)
+	if top+bottom != 100 {
+		t.Fatalf("expected dashboard heights to sum to total, got %d and %d", top, bottom)
+	}
+	if top != 20 || bottom != 80 {
+		t.Fatalf("expected 2:8 layout split, got %d and %d", top, bottom)
+	}
+}
+
 func TestGraphPageSizeMatchesGraphPaneHeight(t *testing.T) {
 	m := model{height: 80}
 	got := graphPageSize(&m)
@@ -198,11 +208,7 @@ func TestGraphPageSizeMatchesGraphPaneHeight(t *testing.T) {
 	if totalHeight > m.height-2 {
 		totalHeight = m.height - 2
 	}
-	topHeight := 8
-	if totalHeight > 30 {
-		topHeight = totalHeight / 3
-	}
-	bottomHeight := totalHeight - topHeight
+	_, bottomHeight := splitDashboardHeights(totalHeight)
 	graphHeight, _ := splitPaneHeights(bottomHeight)
 	want := graphHeight - 3
 	if want < 3 {
@@ -248,6 +254,63 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 	}
 }
 
+func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
+	graph := renderActionHelpLines(model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+	})
+	if !containsLine(graph, "• m: merge         • r: rebase") || !containsLine(graph, "• s: reset         • ctrl+u/d: scroll") {
+		t.Fatalf("expected graph actions to include merge/rebase/reset, got %v", graph)
+	}
+	if containsLine(graph, "• space: checkout") {
+		t.Fatalf("expected graph actions to exclude checkout, got %v", graph)
+	}
+
+	remote := renderActionHelpLines(model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionRemote,
+	})
+	if !containsLine(remote, "• space: checkout") {
+		t.Fatalf("expected remote actions to include checkout, got %v", remote)
+	}
+	if containsLine(remote, "• m: merge         • r: rebase") || containsLine(remote, "• s: reset         • ctrl+u/d: scroll") {
+		t.Fatalf("expected remote actions to exclude graph-only actions, got %v", remote)
+	}
+}
+
+func TestRTriggersRebaseOnlyInGraphSection(t *testing.T) {
+	graph := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+		commitLimit:   initialGraphCommitLimit,
+	}
+	gotModel, cmd := graph.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected r to trigger rebase from graph section")
+	}
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected rebase to set loading mode, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Fetching branches before rebase..." {
+		t.Fatalf("expected rebase loading message, got %q", got.status.Message)
+	}
+
+	current := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionCurrent,
+		commitLimit:   initialGraphCommitLimit,
+	}
+	gotModel, cmd = current.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected r to be ignored outside graph section")
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode to remain unchanged, got %s", got.status.Mode)
+	}
+}
+
 func TestFetchKeyDoesNotForceLoadingMode(t *testing.T) {
 	m := model{
 		status:        state.New().WithBrowse(),
@@ -284,6 +347,109 @@ func TestFetchKeyWorksFromAnyBrowseSection(t *testing.T) {
 	if got.status.Message != "Fetching remotes..." {
 		t.Fatalf("expected fetch message to be visible, got %q", got.status.Message)
 	}
+}
+
+func TestSpaceDoesNotCheckoutFromGraphSection(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+		commitLimit:   initialGraphCommitLimit,
+		repoStatus: git.Status{
+			Root:          "/repo",
+			Branch:        "main",
+			Head:          "head",
+			LocalBranches: []string{"main"},
+			GraphCommits:  []git.GraphCommit{{Hash: "head"}},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected space to be disabled in graph section")
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode to remain unchanged, got %s", got.status.Mode)
+	}
+}
+
+func TestSpaceChecksOutFromRemoteSection(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionRemote,
+		commitLimit:   initialGraphCommitLimit,
+		repoStatus: git.Status{
+			Root:           "/repo",
+			Branch:         "main",
+			Head:           "head",
+			RemoteBranches: []string{"origin/main"},
+			LocalBranches:  []string{"main"},
+			DefaultBranch:  "main",
+			Tracking:       map[string]git.BranchTracking{"main": {}},
+			HasCommits:     true,
+			Remote:         "origin",
+			GraphCommits:   []git.GraphCommit{{Hash: "head"}},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected space to checkout from remote section")
+	}
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected checkout to set loading mode, got %s", got.status.Mode)
+	}
+}
+
+func TestEnterDoesNotCheckoutInBrowseMode(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionRemote,
+		commitLimit:   initialGraphCommitLimit,
+		repoStatus: git.Status{
+			Root:           "/repo",
+			Branch:         "main",
+			Head:           "head",
+			RemoteBranches: []string{"origin/main"},
+			LocalBranches:  []string{"main"},
+			Remote:         "origin",
+			HasCommits:     true,
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected enter to stop triggering browse checkout")
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode to remain unchanged, got %s", got.status.Mode)
+	}
+}
+
+func containsLine(lines []string, want string) bool {
+	for _, line := range lines {
+		if line == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestFetchedMsgKeepsPassiveBrowseState(t *testing.T) {

@@ -509,9 +509,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "r":
-			m.status = m.status.WithLoading("Refreshing repository state...")
-			return m, loadRepoState(m.repo, m.commitLimit)
 		case "f":
 			if m.status.Mode == state.ModeBrowse {
 				m.status.Message = "Fetching remotes..."
@@ -525,13 +522,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.status = actionPull(m.repoStatus)
 		case "m":
-			m.status = state.New().WithLoading("Fetching branches before merge...")
-			return m, prepareAction(m.repo, state.ActionMerge, m.commitLimit)
-		case "e":
-			m.status = state.New().WithLoading("Fetching branches before rebase...")
-			return m, prepareAction(m.repo, state.ActionRebase, m.commitLimit)
+			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
+				m.status = state.New().WithLoading("Fetching branches before merge...")
+				return m, prepareAction(m.repo, state.ActionMerge, m.commitLimit)
+			}
+		case "r":
+			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
+				m.status = state.New().WithLoading("Fetching branches before rebase...")
+				return m, prepareAction(m.repo, state.ActionRebase, m.commitLimit)
+			}
 		case "s":
-			if m.status.Mode == state.ModeBrowse {
+			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
 				focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 				if focus.Hash == "" {
 					m.status = state.New().WithBlocked(state.BlockUnknown, "No reset target.", "Move the pointer onto a commit line.")
@@ -541,8 +542,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status.Selected = focus.Hash
 				return m, nil
 			}
-			m.status = state.New().WithLoading("Fetching branches before reset...")
-			return m, prepareAction(m.repo, state.ActionReset, m.commitLimit)
 		case "esc":
 			switch {
 			case m.status.Mode == state.ModeOutcomePreview && m.status.Action != state.ActionPull:
@@ -627,7 +626,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m = pageBrowseGraph(m, 1)
 				return maybeLoadMoreGraph(m)
 			}
-		case "enter":
+		case "space", " ":
 			if m.status.Mode == state.ModeTargetPick {
 				action := m.status.Action
 				target := selectedTarget(m.status)
@@ -639,20 +638,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, previewSelection(m.repo, m.repoStatus, action, target)
 			}
 			if m.status.Mode == state.ModeBrowse {
-				if m.activeSection == sectionGraph {
-					focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
-					if target := checkoutTargetFromFocus(focus); target != "" {
+				if m.activeSection == sectionCurrent || m.activeSection == sectionRemote {
+					if target := activeSectionTarget(m); target != "" {
 						m.status = state.New().WithLoading("Checking out " + target + "...")
 						return m, executeCheckout(m.repo, target, initialGraphCommitLimit)
 					}
-					m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a branch decoration.")
+					m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a local or remote branch.")
 					return m, nil
 				}
-				if target := activeSectionTarget(m); target != "" {
-					m.status = state.New().WithLoading("Checking out " + target + "...")
-					return m, executeCheckout(m.repo, target, initialGraphCommitLimit)
+				if m.activeSection == sectionGraph {
+					return m, nil
 				}
-				m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a local or remote branch.")
+				m.status = state.New().WithBlocked(state.BlockUnknown, "Checkout unavailable in this section.", "Use the Local or Remote sections to switch branches.")
 			}
 			if m.status.Mode == state.ModeOutcomePreview && m.status.CanExecute {
 				action := m.status.Action
@@ -664,23 +661,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case state.ActionMerge, state.ActionRebase, state.ActionReset:
 					return m, executeAction(m.repo, action, target, m.commitLimit)
 				}
-			}
-		case "c":
-			if m.status.Mode == state.ModeBrowse {
-				if m.activeSection == sectionGraph {
-					focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
-					if target := checkoutTargetFromFocus(focus); target != "" {
-						m.status = state.New().WithLoading("Checking out " + target + "...")
-						return m, executeCheckout(m.repo, target, initialGraphCommitLimit)
-					}
-					m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a branch decoration.")
-					return m, nil
-				}
-				if target := activeSectionTarget(m); target != "" {
-					m.status = state.New().WithLoading("Checking out " + target + "...")
-					return m, executeCheckout(m.repo, target, initialGraphCommitLimit)
-				}
-				m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a local or remote branch.")
 			}
 		case "n":
 			if m.status.Mode == state.ModeBrowse && (m.activeSection == sectionCurrent || m.activeSection == sectionGraph) {
@@ -1454,11 +1434,7 @@ func graphPageSize(m *model) int {
 	if totalHeight > m.height-2 {
 		totalHeight = m.height - 2
 	}
-	topHeight := 8
-	if totalHeight > 30 {
-		topHeight = totalHeight / 3
-	}
-	bottomHeight := totalHeight - topHeight
+	_, bottomHeight := splitDashboardHeights(totalHeight)
 	graphHeight, _ := splitPaneHeights(bottomHeight)
 	size := graphHeight - 3
 	if size < 3 {
