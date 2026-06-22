@@ -485,11 +485,11 @@ func TestRenderGraphConnectorLinesShowsParentShiftWithoutFullCollapse(t *testing
 		DisplayWidth: 3,
 	}
 	got := renderGraphConnectorLines(current, next)
-	if len(got) != 1 {
-		t.Fatalf("expected one parent shift connector, got %v", got)
+	if len(got) != 2 {
+		t.Fatalf("expected parent shift connector to keep vertical context before diagonal, got %v", got)
 	}
-	if !strings.Contains(got[0], "| | /") {
-		t.Fatalf("expected shifted parent lane connector, got %q", got[0])
+	if !strings.Contains(got[0], "| | |") || !strings.Contains(got[1], "| | /") {
+		t.Fatalf("expected shifted parent lane connector, got %v", got)
 	}
 }
 
@@ -525,8 +525,12 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 		t.Fatalf("expected efb164e immediately after 37f0954, got index=%d rows=%v", parentIdx, rows)
 	}
 	parentConnector := renderGraphConnectorLines(rows[parentIdx], rows[parentIdx+1])
-	if len(parentConnector) != 1 || !strings.Contains(parentConnector[0], "/") {
+	if len(parentConnector) != 2 || !strings.Contains(parentConnector[0], "| | |") || !strings.Contains(parentConnector[1], "| | /") {
 		t.Fatalf("expected 37f0954 parent edge to efb164e to render a diagonal connector, got %v", parentConnector)
+	}
+	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil)
+	if strings.Contains(parentLine, "| * |") {
+		t.Fatalf("expected efb164e row to hide the converged duplicate lane, got %q", parentLine)
 	}
 
 	rootIdx := findGraphRowByHash(rows, "4ba1faf")

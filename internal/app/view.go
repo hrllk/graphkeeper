@@ -265,6 +265,8 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 		switch {
 		case i == lane:
 			cell = "*"
+		case shouldHideConvergedDuplicateLane(row, i, lane):
+			cell = " "
 		case beforeActive || afterActive:
 			cell = "|"
 		}
@@ -291,8 +293,8 @@ func renderGraphConnectorLines(current, next graphRow) []string {
 	if shouldCollapseRowDisplay(next) {
 		return collapseConnectorLines(current)
 	}
-	if line, ok := parentShiftConnectorLine(current, next); ok {
-		return []string{line}
+	if lines := parentShiftConnectorLines(current, next); len(lines) > 0 {
+		return lines
 	}
 	return nil
 }
@@ -322,10 +324,10 @@ func collapseConnectorLines(current graphRow) []string {
 	return lines
 }
 
-func parentShiftConnectorLine(current, next graphRow) (string, bool) {
+func parentShiftConnectorLines(current, next graphRow) []string {
 	width := max(len(current.After), graphRowWidth(next))
 	if width <= 1 {
-		return "", false
+		return nil
 	}
 	targetLane := displayLane(next, width)
 	for sourceLane := len(current.After) - 1; sourceLane >= 0; sourceLane-- {
@@ -345,9 +347,30 @@ func parentShiftConnectorLine(current, next graphRow) (string, bool) {
 		} else {
 			cells[sourceLane] = "\\"
 		}
-		return renderGraphSpacer(cells), true
+		full := make([]string, width)
+		for i := range full {
+			if i < len(current.After) {
+				full[i] = "|"
+			} else {
+				full[i] = " "
+			}
+		}
+		return []string{renderGraphSpacer(full), renderGraphSpacer(cells)}
 	}
-	return "", false
+	return nil
+}
+
+func shouldHideConvergedDuplicateLane(row graphRow, idx, displayLane int) bool {
+	if idx == displayLane || idx >= len(row.Before) {
+		return false
+	}
+	if row.Before[idx].Hash == "" || row.Before[idx].Hash != row.Commit.Hash {
+		return false
+	}
+	if idx < len(row.After) && row.After[idx].Hash != "" {
+		return false
+	}
+	return true
 }
 
 func renderGraphSpacer(cells []string) string {
