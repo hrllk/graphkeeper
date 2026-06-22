@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -41,6 +42,12 @@ const (
 	sectionTags
 )
 
+const (
+	initialGraphCommitLimit = 40
+	graphLoadIncrement      = 40
+	graphLoadThreshold      = 10
+)
+
 func New(repo *git.Repo) (tea.Model, error) {
 	m := model{
 		repo:          repo,
@@ -54,7 +61,7 @@ func New(repo *git.Repo) (tea.Model, error) {
 			sectionTags:    0,
 		},
 		graphLaneCursor: 0,
-		commitLimit:     40,
+		commitLimit:     initialGraphCommitLimit,
 	}
 	return m, nil
 }
@@ -302,14 +309,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		neededLimit := msg.Height * 2
-		if neededLimit < 40 {
-			neededLimit = 40
-		}
-		if neededLimit > m.commitLimit {
-			m.commitLimit = neededLimit
-			return m, refreshRepoState(m.repo, m.commitLimit)
-		}
 		return m, nil
 	case loadedMsg:
 		if msg.err != nil {
@@ -420,10 +419,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.repoStatus = msg.status
 		if msg.action == state.ActionCheckout {
+			m.commitLimit = initialGraphCommitLimit
 			rows := graphRows(msg.status)
 			if len(rows) > 0 {
 				m.sectionCursor[sectionGraph] = 0
 				m.graphScroll = 0
+				m.graphLaneCursor = graphPointerLane(rows[0])
 			}
 			syncBrowseState(&m, msg.status)
 			m.status = deriveStatus(msg.status)
@@ -567,13 +568,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status = moveTarget(m.status, 1)
 			} else if m.status.Mode == state.ModeBrowse {
 				m = moveBrowseCursor(m, 1)
-				if m.activeSection == sectionGraph {
-					rows := graphRows(m.repoStatus)
-					if m.sectionCursor[sectionGraph] >= m.commitLimit-10 && len(rows) == m.commitLimit {
-						m.commitLimit += 40
-						return m, refreshRepoState(m.repo, m.commitLimit)
-					}
-				}
+				return maybeLoadMoreGraph(m)
 			}
 		case "left", "h":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
@@ -607,6 +602,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.graphLaneCursor = graphPointerLane(rows[last])
 				}
 				m.awaitingGoTop = false
+				return maybeLoadMoreGraph(m)
 			}
 		case "H":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
@@ -626,6 +622,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+d":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
 				m = pageBrowseGraph(m, 1)
+				return maybeLoadMoreGraph(m)
 			}
 		case "enter":
 			if m.status.Mode == state.ModeTargetPick {
@@ -643,14 +640,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 					if target := checkoutTargetFromFocus(focus); target != "" {
 						m.status = state.New().WithLoading("Checking out " + target + "...")
-						return m, executeCheckout(m.repo, target, m.commitLimit)
+						return m, executeCheckout(m.repo, target, initialGraphCommitLimit)
 					}
 					m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a branch decoration.")
 					return m, nil
 				}
 				if target := activeSectionTarget(m); target != "" {
 					m.status = state.New().WithLoading("Checking out " + target + "...")
-					return m, executeCheckout(m.repo, target, m.commitLimit)
+					return m, executeCheckout(m.repo, target, initialGraphCommitLimit)
 				}
 				m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a local or remote branch.")
 			}
@@ -671,14 +668,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 					if target := checkoutTargetFromFocus(focus); target != "" {
 						m.status = state.New().WithLoading("Checking out " + target + "...")
-						return m, executeCheckout(m.repo, target, m.commitLimit)
+						return m, executeCheckout(m.repo, target, initialGraphCommitLimit)
 					}
 					m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a branch decoration.")
 					return m, nil
 				}
 				if target := activeSectionTarget(m); target != "" {
 					m.status = state.New().WithLoading("Checking out " + target + "...")
-					return m, executeCheckout(m.repo, target, m.commitLimit)
+					return m, executeCheckout(m.repo, target, initialGraphCommitLimit)
 				}
 				m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a local or remote branch.")
 			}
@@ -802,6 +799,7 @@ func graphRows(rs git.Status) []graphRow {
 	children := buildChildrenMap(commits)
 	preferred := firstParentSet(commits, rs.Head)
 	seeds := buildLaneSeeds(commits, rs)
+	familyPriority := buildFamilyPriority(commits, rs)
 	active := initialGraphLanes(commits, rs)
 	for _, commit := range commits {
 		active = ensureLaneSeed(active, commit.Hash, seeds[commit.Hash], preferred[commit.Hash], rs.Branch)
@@ -813,7 +811,7 @@ func graphRows(rs git.Status) []graphRow {
 		}
 		lane := chooseDisplayLane(active, matches, rs.Branch)
 		before := append([]laneRef(nil), active...)
-		after := advanceGraphLanes(before, matches, commit, rs.Branch)
+		after := advanceGraphLanes(before, matches, commit, rs.Branch, familyPriority)
 		childRefs := append([]string(nil), children[commit.Hash]...)
 		row := graphRow{
 			Commit:       commit,
@@ -846,13 +844,16 @@ func initialGraphLanes(commits []graphNode, rs git.Status) []laneRef {
 			}
 		}
 	}
-	if !headPresent || remoteTip == "" || remoteTip == rs.Head {
+	if !headPresent {
 		return make([]laneRef, 0, 8)
 	}
-	return []laneRef{
+	lanes := []laneRef{
 		{Hash: rs.Head, Family: rs.Branch, Side: laneLocal},
-		{Hash: remoteTip, Family: rs.Branch, Side: laneRemote},
 	}
+	if remoteTip != "" && remoteTip != rs.Head {
+		lanes = append(lanes, laneRef{Hash: remoteTip, Family: rs.Branch, Side: laneRemote})
+	}
+	return lanes
 }
 
 func buildLaneSeeds(commits []graphNode, rs git.Status) map[string]laneRef {
@@ -870,6 +871,33 @@ func buildLaneSeeds(commits []graphNode, rs git.Status) map[string]laneRef {
 		seeds[commit.Hash] = ref
 	}
 	return seeds
+}
+
+func buildFamilyPriority(commits []graphNode, rs git.Status) map[string]int {
+	localSet := make(map[string]struct{}, len(rs.LocalBranches))
+	for _, branch := range rs.LocalBranches {
+		localSet[branch] = struct{}{}
+	}
+	priority := make(map[string]int, len(rs.LocalBranches)+len(rs.RemoteBranches))
+	next := 0
+	if rs.Branch != "" {
+		priority[rs.Branch] = next
+		next++
+	}
+	for _, commit := range commits {
+		for _, decoration := range commit.Decorations {
+			ref, ok := laneSeedFromDecoration(decoration, localSet)
+			if !ok || ref.Family == "" {
+				continue
+			}
+			if _, exists := priority[ref.Family]; exists {
+				continue
+			}
+			priority[ref.Family] = next
+			next++
+		}
+	}
+	return priority
 }
 
 func preferredLaneSeed(commit graphNode, currentBranch string, localSet map[string]struct{}) (laneRef, bool) {
@@ -1010,7 +1038,7 @@ func lastIndexOf(values []laneRef, target string) int {
 	return -1
 }
 
-func advanceGraphLanes(active []laneRef, matches []int, commit graphNode, currentBranch string) []laneRef {
+func advanceGraphLanes(active []laneRef, matches []int, commit graphNode, currentBranch string, familyPriority map[string]int) []laneRef {
 	if len(matches) == 0 {
 		return append([]laneRef(nil), active...)
 	}
@@ -1045,7 +1073,23 @@ func advanceGraphLanes(active []laneRef, matches []int, commit graphNode, curren
 			next = append(next, laneRef{Hash: parent, Side: laneOther})
 		}
 	}
-	return prioritizeLaneRefs(next, currentBranch)
+	return prioritizeLaneRefs(compactLaneRefs(next), currentBranch, familyPriority)
+}
+
+func compactLaneRefs(active []laneRef) []laneRef {
+	if len(active) <= 1 {
+		return active
+	}
+	seen := make(map[laneRef]struct{}, len(active))
+	compacted := make([]laneRef, 0, len(active))
+	for _, ref := range active {
+		if _, ok := seen[ref]; ok {
+			continue
+		}
+		seen[ref] = struct{}{}
+		compacted = append(compacted, ref)
+	}
+	return compacted
 }
 
 func ensureLaneSeed(active []laneRef, hash string, seed laneRef, preferred bool, currentBranch string) []laneRef {
@@ -1096,20 +1140,48 @@ func choosePrimaryMatch(active []laneRef, matches []int, currentBranch string) l
 	return active[chooseDisplayLane(active, matches, currentBranch)]
 }
 
-func prioritizeLaneRefs(active []laneRef, currentBranch string) []laneRef {
+func prioritizeLaneRefs(active []laneRef, currentBranch string, familyPriority map[string]int) []laneRef {
 	if len(active) <= 1 || currentBranch == "" {
 		return active
 	}
-	preferred := make([]laneRef, 0, len(active))
-	others := make([]laneRef, 0, len(active))
-	for _, ref := range active {
-		if ref.Family == currentBranch {
-			preferred = append(preferred, ref)
-			continue
+	ordered := append([]laneRef(nil), active...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		left := ordered[i]
+		right := ordered[j]
+		leftRank := lanePriorityRank(left, currentBranch, familyPriority)
+		rightRank := lanePriorityRank(right, currentBranch, familyPriority)
+		if leftRank != rightRank {
+			return leftRank < rightRank
 		}
-		others = append(others, ref)
+		leftSide := laneSidePriority(left.Side)
+		rightSide := laneSidePriority(right.Side)
+		if leftSide != rightSide {
+			return leftSide < rightSide
+		}
+		return false
+	})
+	return ordered
+}
+
+func lanePriorityRank(ref laneRef, currentBranch string, familyPriority map[string]int) int {
+	if ref.Family == currentBranch {
+		return 0
 	}
-	return append(preferred, others...)
+	if rank, ok := familyPriority[ref.Family]; ok {
+		return rank
+	}
+	return 1 << 20
+}
+
+func laneSidePriority(side laneSide) int {
+	switch side {
+	case laneLocal:
+		return 0
+	case laneRemote:
+		return 1
+	default:
+		return 2
+	}
 }
 
 func pendingChildren(children []string, current string) []string {
@@ -1325,6 +1397,21 @@ func pageBrowseGraph(m model, pages int) model {
 		m.graphLaneCursor = graphPointerLane(rows[cursor])
 	}
 	return m
+}
+
+func maybeLoadMoreGraph(m model) (model, tea.Cmd) {
+	if m.activeSection != sectionGraph {
+		return m, nil
+	}
+	rows := graphRows(m.repoStatus)
+	if len(rows) != m.commitLimit {
+		return m, nil
+	}
+	if m.sectionCursor[sectionGraph] < m.commitLimit-graphLoadThreshold {
+		return m, nil
+	}
+	m.commitLimit += graphLoadIncrement
+	return m, refreshRepoState(m.repo, m.commitLimit)
 }
 
 func moveGraphScroll(current, total, delta int) int {

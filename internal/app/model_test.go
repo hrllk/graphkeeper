@@ -1,8 +1,11 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/git-graph-tui/internal/git"
 	"hrllk/git-graph-tui/internal/state"
@@ -137,6 +140,135 @@ func TestMoveGraphPointerClamps(t *testing.T) {
 	}
 }
 
+func TestInitialGraphLanesSeedsCurrentBranchWithoutRemoteTip(t *testing.T) {
+	got := initialGraphLanes([]graphNode{
+		{Hash: "head", Parents: []string{"base"}, Decorations: []string{"HEAD -> tmp1", "tmp1"}},
+		{Hash: "base"},
+	}, git.Status{
+		Branch: "tmp1",
+		Head:   "head",
+	})
+	if len(got) != 1 {
+		t.Fatalf("expected current branch lane without remote tip, got %v", got)
+	}
+	if got[0] != (laneRef{Hash: "head", Family: "tmp1", Side: laneLocal}) {
+		t.Fatalf("unexpected current branch lane: %v", got[0])
+	}
+}
+
+func TestWindowResizeDoesNotIncreaseInitialGraphLoadLimit(t *testing.T) {
+	m := model{commitLimit: initialGraphCommitLimit}
+	gotModel, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 80})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected resize to keep graph load lazy")
+	}
+	if got.commitLimit != initialGraphCommitLimit {
+		t.Fatalf("expected initial graph load limit to stay %d, got %d", initialGraphCommitLimit, got.commitLimit)
+	}
+}
+
+func TestCheckoutResetsGraphLoadState(t *testing.T) {
+	m := model{
+		commitLimit:     initialGraphCommitLimit + graphLoadIncrement,
+		activeSection:   sectionGraph,
+		graphScroll:     12,
+		graphLaneCursor: 3,
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   15,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+	status := git.Status{
+		Branch:        "tmp1",
+		Head:          "head",
+		LocalBranches: []string{"tmp1"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: "head", Parents: []string{"base"}, Decorations: []string{"HEAD -> tmp1", "tmp1"}},
+			{Hash: "base"},
+		},
+	}
+	gotModel, _ := m.Update(executedMsg{action: state.ActionCheckout, target: "tmp1", status: status})
+	got := gotModel.(model)
+	if got.commitLimit != initialGraphCommitLimit {
+		t.Fatalf("expected checkout to reset graph load limit, got %d", got.commitLimit)
+	}
+	if got.graphScroll != 0 || got.sectionCursor[sectionGraph] != 0 {
+		t.Fatalf("expected checkout to reset graph cursor and scroll, got cursor=%d scroll=%d", got.sectionCursor[sectionGraph], got.graphScroll)
+	}
+	if got.graphLaneCursor != 0 {
+		t.Fatalf("expected checkout to reset lane cursor to current branch lane, got %d", got.graphLaneCursor)
+	}
+}
+
+func TestMaybeLoadMoreGraphIncrementsNearLoadedBoundary(t *testing.T) {
+	commits := make([]git.GraphCommit, initialGraphCommitLimit)
+	for i := range commits {
+		hash := fmt.Sprintf("c%02d", i)
+		commits[i] = git.GraphCommit{Hash: hash}
+		if i+1 < len(commits) {
+			commits[i].Parents = []string{fmt.Sprintf("c%02d", i+1)}
+		}
+	}
+	m := model{
+		activeSection: sectionGraph,
+		commitLimit:   initialGraphCommitLimit,
+		repoStatus:    git.Status{GraphCommits: commits},
+		sectionCursor: map[graphSection]int{sectionGraph: initialGraphCommitLimit - graphLoadThreshold},
+	}
+	got, cmd := maybeLoadMoreGraph(m)
+	if cmd == nil {
+		t.Fatal("expected lazy graph load command")
+	}
+	if got.commitLimit != initialGraphCommitLimit+graphLoadIncrement {
+		t.Fatalf("expected graph load limit to increment by %d, got %d", graphLoadIncrement, got.commitLimit)
+	}
+}
+
+func TestBuildFamilyPriorityUsesCurrentThenTopoDecorations(t *testing.T) {
+	got := buildFamilyPriority([]graphNode{
+		{Hash: "t3", Decorations: []string{"tmp3"}},
+		{Hash: "t2", Decorations: []string{"tmp2"}},
+		{Hash: "origin-main", Decorations: []string{"origin/main"}},
+		{Hash: "head", Decorations: []string{"HEAD -> tmp1", "tmp1"}},
+	}, git.Status{
+		Branch:         "tmp1",
+		LocalBranches:  []string{"tmp1", "tmp2", "tmp3", "main"},
+		RemoteBranches: []string{"origin/main"},
+	})
+	if got["tmp1"] != 0 {
+		t.Fatalf("expected current branch priority 0, got %d", got["tmp1"])
+	}
+	if !(got["tmp3"] < got["tmp2"] && got["tmp2"] < got["main"]) {
+		t.Fatalf("expected non-current families to follow topo decoration order, got %v", got)
+	}
+}
+
+func TestPrioritizeLaneRefsUsesFamilyPriority(t *testing.T) {
+	got := prioritizeLaneRefs([]laneRef{
+		{Hash: "h2", Family: "tmp2", Side: laneLocal},
+		{Hash: "r1", Family: "tmp1", Side: laneRemote},
+		{Hash: "h3", Family: "tmp3", Side: laneLocal},
+		{Hash: "h1", Family: "tmp1", Side: laneLocal},
+	}, "tmp1", map[string]int{"tmp1": 0, "tmp3": 1, "tmp2": 2})
+	want := []laneRef{
+		{Hash: "h1", Family: "tmp1", Side: laneLocal},
+		{Hash: "r1", Family: "tmp1", Side: laneRemote},
+		{Hash: "h3", Family: "tmp3", Side: laneLocal},
+		{Hash: "h2", Family: "tmp2", Side: laneLocal},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d lanes, got %v", len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected lane order at %d: got %v want %v (all got %v)", i, got[i], want[i], got)
+		}
+	}
+}
+
 func TestGraphRowsExpandOnMerge(t *testing.T) {
 	rows := graphRows(git.Status{
 		GraphCommits: []git.GraphCommit{
@@ -161,14 +293,14 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 }
 
 func TestAdvanceGraphLanesClampsLaneBounds(t *testing.T) {
-	got := advanceGraphLanes([]laneRef{{Hash: "c1", Family: "main", Side: laneLocal}}, []int{0}, graphNode{Hash: "c1", Parents: []string{"p1", "p2"}}, "")
+	got := advanceGraphLanes([]laneRef{{Hash: "c1", Family: "main", Side: laneLocal}}, []int{0}, graphNode{Hash: "c1", Parents: []string{"p1", "p2"}}, "", nil)
 	if len(got) == 0 {
 		t.Fatal("expected lanes to be created safely")
 	}
 }
 
 func TestAdvanceGraphLanesAllowsRootCommit(t *testing.T) {
-	got := advanceGraphLanes([]laneRef{{Hash: "root"}}, []int{0}, graphNode{Hash: "root"}, "")
+	got := advanceGraphLanes([]laneRef{{Hash: "root"}}, []int{0}, graphNode{Hash: "root"}, "", nil)
 	if len(got) != 0 {
 		t.Fatalf("expected root commit to clear active lane, got %v", got)
 	}
@@ -179,9 +311,21 @@ func TestAdvanceGraphLanesCollapsesDuplicateCurrentLanes(t *testing.T) {
 		{Hash: "base", Family: "tmp3", Side: laneLocal},
 		{Hash: "base", Family: "tmp3", Side: laneRemote},
 		{Hash: "base", Family: "main", Side: laneLocal},
-	}, []int{0, 1, 2}, graphNode{Hash: "base", Parents: []string{"parent"}}, "tmp3")
+	}, []int{0, 1, 2}, graphNode{Hash: "base", Parents: []string{"parent"}}, "tmp3", map[string]int{"tmp3": 0, "main": 1})
 	if len(got) != 1 || got[0].Hash != "parent" {
 		t.Fatalf("expected collapsed lanes to continue as single parent, got %v", got)
+	}
+}
+
+func TestCompactLaneRefsOnlyRemovesExactDuplicates(t *testing.T) {
+	got := compactLaneRefs([]laneRef{
+		{Hash: "base", Family: "tmp3", Side: laneLocal},
+		{Hash: "base", Family: "tmp3", Side: laneLocal},
+		{Hash: "base", Family: "tmp2", Side: laneLocal},
+		{Hash: "base", Family: "tmp3", Side: laneRemote},
+	})
+	if len(got) != 3 {
+		t.Fatalf("expected only exact duplicate lanes to compact, got %v", got)
 	}
 }
 
@@ -283,10 +427,10 @@ func TestRenderGraphConnectorLinesSkipsStableTransition(t *testing.T) {
 func TestRenderGraphConnectorLinesUsesSingleLineForTwoLaneCollapse(t *testing.T) {
 	current := graphRow{After: []laneRef{{Hash: "base", Side: laneLocal}, {Hash: "base", Side: laneRemote}}}
 	next := graphRow{
-		Commit:  graphNode{Hash: "base"},
-		Before:  []laneRef{{Hash: "base", Side: laneLocal}, {Hash: "base", Side: laneRemote}},
-		After:   []laneRef{{Hash: "parent", Side: laneLocal}},
-		Lane:    0,
+		Commit: graphNode{Hash: "base"},
+		Before: []laneRef{{Hash: "base", Side: laneLocal}, {Hash: "base", Side: laneRemote}},
+		After:  []laneRef{{Hash: "parent", Side: laneLocal}},
+		Lane:   0,
 	}
 	got := renderGraphConnectorLines(current, next)
 	if len(got) != 1 {
@@ -294,6 +438,24 @@ func TestRenderGraphConnectorLinesUsesSingleLineForTwoLaneCollapse(t *testing.T)
 	}
 	if !strings.Contains(got[0], "| /") {
 		t.Fatalf("expected compact connector line, got %q", got[0])
+	}
+}
+
+func TestRenderGraphConnectorLinesLimitsMultiLaneCollapseToOneLine(t *testing.T) {
+	current := graphRow{After: []laneRef{{Hash: "base"}, {Hash: "base"}, {Hash: "base"}, {Hash: "base"}}}
+	next := graphRow{
+		Commit: graphNode{Hash: "base"},
+		Before: []laneRef{
+			{Hash: "base"},
+			{Hash: "base"},
+			{Hash: "base"},
+			{Hash: "base"},
+		},
+		After: []laneRef{{Hash: "parent"}},
+	}
+	got := renderGraphConnectorLines(current, next)
+	if len(got) != 1 {
+		t.Fatalf("expected multi-lane collapse connector to stay one line, got %v", got)
 	}
 }
 

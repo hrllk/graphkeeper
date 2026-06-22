@@ -122,7 +122,7 @@ topology 기반 정렬을 위해 branch별 distance를 계산한다.
 
 초기 lane:
 
-1. current branch local
+1. current branch local. remote tip이 없거나 local과 remote가 같은 commit이어도 반드시 seed한다.
 2. current branch remote, 존재하고 local과 hash가 다를 때
 3. topo priority에 따른 다른 local branch tip
 

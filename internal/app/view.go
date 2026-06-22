@@ -299,24 +299,12 @@ func collapseConnectorLines(current graphRow) []string {
 	if width <= 1 {
 		return nil
 	}
-	if width == 2 {
-		return []string{renderGraphSpacer([]string{"|", "/"})}
+	cells := make([]string, width)
+	for i := range cells {
+		cells[i] = "|"
 	}
-	lines := make([]string, 0, width)
-	full := make([]string, width)
-	for i := range full {
-		full[i] = "|"
-	}
-	lines = append(lines, renderGraphSpacer(full))
-	for w := width; w >= 2; w-- {
-		cells := make([]string, w)
-		for i := range cells {
-			cells[i] = "|"
-		}
-		cells[w-1] = "/"
-		lines = append(lines, renderGraphSpacer(cells))
-	}
-	return lines
+	cells[width-1] = "/"
+	return []string{renderGraphSpacer(cells)}
 }
 
 func renderGraphSpacer(cells []string) string {
