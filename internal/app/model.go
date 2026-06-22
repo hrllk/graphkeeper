@@ -983,7 +983,14 @@ func sectionTargets(rs git.Status, section graphSection) []state.TargetItem {
 	case sectionCurrent:
 		items := make([]state.TargetItem, 0, 1+len(rs.LocalBranches))
 		if rs.Branch != "" {
-			items = append(items, state.TargetItem{Kind: state.TargetKindLocal, Name: rs.Branch, Ref: rs.Branch, Current: true})
+			track := rs.Tracking[rs.Branch]
+			items = append(items, state.TargetItem{
+				Kind:      state.TargetKindLocal,
+				Name:      rs.Branch,
+				Ref:       rs.Branch,
+				Current:   true,
+				NeedsPull: track.Behind > 0 && track.Ahead == 0,
+			})
 		} else if rs.Head != "" {
 			items = append(items, state.TargetItem{Kind: state.TargetKindLocal, Name: "HEAD", Ref: rs.Head, Current: true})
 		}
@@ -991,7 +998,13 @@ func sectionTargets(rs git.Status, section graphSection) []state.TargetItem {
 			if name == rs.Branch {
 				continue
 			}
-			items = append(items, state.TargetItem{Kind: state.TargetKindLocal, Name: name, Ref: name})
+			track := rs.Tracking[name]
+			items = append(items, state.TargetItem{
+				Kind:      state.TargetKindLocal,
+				Name:      name,
+				Ref:       name,
+				NeedsPull: track.Behind > 0 && track.Ahead == 0,
+			})
 		}
 		return items
 	case sectionRemote:

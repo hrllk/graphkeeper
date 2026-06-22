@@ -98,6 +98,7 @@ func TestSectionTargetsIncludesCurrentBranch(t *testing.T) {
 	items := sectionTargets(git.Status{
 		Branch:         "main",
 		LocalBranches:  []string{"main", "develop"},
+		Tracking:       map[string]git.BranchTracking{"main": {Behind: 2}, "develop": {Behind: 1, Ahead: 1}},
 		RemoteBranches: []string{"origin/main"},
 		Tags:           []string{"v1.0.0"},
 	}, sectionCurrent)
@@ -109,6 +110,12 @@ func TestSectionTargetsIncludesCurrentBranch(t *testing.T) {
 	}
 	if !items[0].Current {
 		t.Fatal("expected current branch to be flagged")
+	}
+	if !items[0].NeedsPull {
+		t.Fatal("expected current branch to show pull flag when origin is ahead")
+	}
+	if items[1].NeedsPull {
+		t.Fatal("expected diverged branch to avoid simple pull flag")
 	}
 }
 

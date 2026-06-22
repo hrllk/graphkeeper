@@ -112,9 +112,17 @@ func formatTargetItem(t state.TargetItem) string {
 	switch t.Kind {
 	case state.TargetKindLocal:
 		if t.Current {
-			return ok.Render("l->" + t.Name)
+			label := ok.Render("l->" + t.Name)
+			if t.NeedsPull {
+				label += " " + warn.Render("[pull]")
+			}
+			return label
 		}
-		return "l->" + t.Name
+		label := "l->" + t.Name
+		if t.NeedsPull {
+			label += " " + warn.Render("[pull]")
+		}
+		return label
 	case state.TargetKindRemote:
 		name := t.Name
 		if strings.HasPrefix(name, "origin/") {

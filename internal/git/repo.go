@@ -28,6 +28,7 @@ type Status struct {
 	GraphCommits   []GraphCommit
 	Branches       []string
 	LocalBranches  []string
+	Tracking       map[string]BranchTracking
 	RemoteBranches []string
 	Tags           []string
 	Remotes        []string
@@ -47,6 +48,11 @@ type GraphCommit struct {
 	Hash        string
 	Parents     []string
 	Decorations []string
+}
+
+type BranchTracking struct {
+	Ahead  int
+	Behind int
 }
 
 func Open(root string) (*Repo, error) {
@@ -70,6 +76,7 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 	remoteBranches, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/remotes")
 	filteredRemoteBranches := filterRemoteBranches(remoteBranches)
 	defaultBranch := r.defaultRemoteBranch(ctx)
+	tracking := r.branchTracking(ctx, localBranches, filteredRemoteBranches)
 	tags, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/tags")
 	graphCommits, graphErr := r.graphCommits(ctx, localBranches, filteredRemoteBranches)
 	if graphErr != nil && !isNoCommits(graphErr) {
@@ -94,6 +101,7 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 		GraphCommits:   graphCommits,
 		Branches:       branches,
 		LocalBranches:  localBranches,
+		Tracking:       tracking,
 		RemoteBranches: filteredRemoteBranches,
 		Tags:           tags,
 		Remotes:        remotes,
@@ -102,6 +110,29 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 		NoRemote:       noRemote,
 		WorktreeDirty:  worktreeDirty,
 	}, nil
+}
+
+func (r *Repo) branchTracking(ctx context.Context, localBranches, remoteBranches []string) map[string]BranchTracking {
+	remoteSet := make(map[string]struct{}, len(remoteBranches))
+	for _, branch := range remoteBranches {
+		remoteSet[branch] = struct{}{}
+	}
+	tracking := make(map[string]BranchTracking, len(localBranches))
+	for _, branch := range localBranches {
+		remoteRef := "origin/" + branch
+		if _, ok := remoteSet[remoteRef]; !ok {
+			continue
+		}
+		ahead, behind, err := r.Divergence(ctx, branch, remoteRef)
+		if err != nil {
+			continue
+		}
+		tracking[branch] = BranchTracking{
+			Ahead:  ahead,
+			Behind: behind,
+		}
+	}
+	return tracking
 }
 
 func (r *Repo) graphCommits(ctx context.Context, localBranches, remoteBranches []string) ([]GraphCommit, error) {
