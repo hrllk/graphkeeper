@@ -168,6 +168,77 @@ func TestWindowResizeDoesNotIncreaseInitialGraphLoadLimit(t *testing.T) {
 	}
 }
 
+func TestFetchKeyDoesNotForceLoadingMode(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+		commitLimit:   initialGraphCommitLimit,
+	}
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected fetch key to trigger background refresh")
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected fetch to keep browse mode, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Fetching remotes..." {
+		t.Fatalf("expected fetch message to be visible, got %q", got.status.Message)
+	}
+}
+
+func TestFetchKeyWorksFromAnyBrowseSection(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionCurrent,
+		commitLimit:   initialGraphCommitLimit,
+	}
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected fetch key to trigger refresh outside graph section")
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected fetch to keep browse mode, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Fetching remotes..." {
+		t.Fatalf("expected fetch message to be visible, got %q", got.status.Message)
+	}
+}
+
+func TestFetchedMsgKeepsPassiveBrowseState(t *testing.T) {
+	m := model{
+		status:      state.New().WithBrowse(),
+		commitLimit: initialGraphCommitLimit,
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+	status := git.Status{
+		Root:          "/repo",
+		Branch:        "tmp1",
+		Head:          "head",
+		Upstream:      "origin/tmp1",
+		Remote:        "origin",
+		LocalBranches: []string{"tmp1"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: "head", Parents: []string{"base"}, Decorations: []string{"HEAD -> tmp1", "tmp1"}},
+			{Hash: "base"},
+		},
+	}
+	gotModel, _ := m.Update(fetchedMsg{status: status})
+	got := gotModel.(model)
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected fetched update to return to browse mode, got %s", got.status.Mode)
+	}
+	if got.repoStatus.Branch != "tmp1" {
+		t.Fatalf("expected repo status to update, got %q", got.repoStatus.Branch)
+	}
+}
+
 func TestCheckoutResetsGraphLoadState(t *testing.T) {
 	m := model{
 		commitLimit:     initialGraphCommitLimit + graphLoadIncrement,

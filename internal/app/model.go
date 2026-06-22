@@ -345,7 +345,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.repoStatus = msg.status
 		syncBrowseState(&m, msg.status)
-		m.status = state.New().WithOutcome(state.ActionPull, "Fetch completed.", "Remote pointers were updated from origin.", false)
+		if m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeBlocked || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError {
+			m.status = deriveStatus(msg.status)
+		}
 		telemetry.Log("app", "fetch_repo", map[string]string{
 			"branch": msg.status.Branch,
 			"head":   msg.status.Head,
@@ -511,8 +513,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = m.status.WithLoading("Refreshing repository state...")
 			return m, loadRepoState(m.repo, m.commitLimit)
 		case "f":
-			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
-				m.status = state.New().WithLoading("Fetching remotes...")
+			if m.status.Mode == state.ModeBrowse {
+				m.status.Message = "Fetching remotes..."
+				m.status.Detail = "Refreshing remote refs and branch tracking in the background."
 				return m, fetchRepoState(m.repo, m.commitLimit)
 			}
 		case "p":
