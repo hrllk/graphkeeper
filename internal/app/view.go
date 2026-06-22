@@ -291,6 +291,9 @@ func renderGraphConnectorLines(current, next graphRow) []string {
 	if shouldCollapseRowDisplay(next) {
 		return collapseConnectorLines(current)
 	}
+	if line, ok := parentShiftConnectorLine(current, next); ok {
+		return []string{line}
+	}
 	return nil
 }
 
@@ -299,12 +302,52 @@ func collapseConnectorLines(current graphRow) []string {
 	if width <= 1 {
 		return nil
 	}
-	cells := make([]string, width)
-	for i := range cells {
-		cells[i] = "|"
+	if width == 2 {
+		return []string{renderGraphSpacer([]string{"|", "/"})}
 	}
-	cells[width-1] = "/"
-	return []string{renderGraphSpacer(cells)}
+	lines := make([]string, 0, width)
+	full := make([]string, width)
+	for i := range full {
+		full[i] = "|"
+	}
+	lines = append(lines, renderGraphSpacer(full))
+	for w := width; w >= 2; w-- {
+		cells := make([]string, w)
+		for i := range cells {
+			cells[i] = "|"
+		}
+		cells[w-1] = "/"
+		lines = append(lines, renderGraphSpacer(cells))
+	}
+	return lines
+}
+
+func parentShiftConnectorLine(current, next graphRow) (string, bool) {
+	width := max(len(current.After), graphRowWidth(next))
+	if width <= 1 {
+		return "", false
+	}
+	targetLane := displayLane(next, width)
+	for sourceLane := len(current.After) - 1; sourceLane >= 0; sourceLane-- {
+		if current.After[sourceLane].Hash != next.Commit.Hash || sourceLane == targetLane {
+			continue
+		}
+		cells := make([]string, width)
+		for i := range cells {
+			if i < len(current.After) {
+				cells[i] = "|"
+			} else {
+				cells[i] = " "
+			}
+		}
+		if sourceLane > targetLane {
+			cells[sourceLane] = "/"
+		} else {
+			cells[sourceLane] = "\\"
+		}
+		return renderGraphSpacer(cells), true
+	}
+	return "", false
 }
 
 func renderGraphSpacer(cells []string) string {

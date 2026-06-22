@@ -441,7 +441,7 @@ func TestRenderGraphConnectorLinesUsesSingleLineForTwoLaneCollapse(t *testing.T)
 	}
 }
 
-func TestRenderGraphConnectorLinesLimitsMultiLaneCollapseToOneLine(t *testing.T) {
+func TestRenderGraphConnectorLinesShowsProgressiveMultiLaneCollapse(t *testing.T) {
 	current := graphRow{After: []laneRef{{Hash: "base"}, {Hash: "base"}, {Hash: "base"}, {Hash: "base"}}}
 	next := graphRow{
 		Commit: graphNode{Hash: "base"},
@@ -454,8 +454,91 @@ func TestRenderGraphConnectorLinesLimitsMultiLaneCollapseToOneLine(t *testing.T)
 		After: []laneRef{{Hash: "parent"}},
 	}
 	got := renderGraphConnectorLines(current, next)
+	if len(got) != 4 {
+		t.Fatalf("expected multi-lane collapse connector to show progressive convergence, got %v", got)
+	}
+	if !strings.Contains(got[0], "| | | |") || !strings.Contains(got[len(got)-1], "| /") {
+		t.Fatalf("expected collapse connector to converge to the left lane, got %v", got)
+	}
+}
+
+func TestRenderGraphConnectorLinesShowsParentShiftWithoutFullCollapse(t *testing.T) {
+	current := graphRow{
+		After: []laneRef{
+			{Hash: "tmp1-head", Family: "tmp1", Side: laneLocal},
+			{Hash: "efb164e", Family: "tmp3", Side: laneLocal},
+			{Hash: "efb164e", Family: "tmp3", Side: laneRemote},
+		},
+	}
+	next := graphRow{
+		Commit: graphNode{Hash: "efb164e"},
+		Before: []laneRef{
+			{Hash: "tmp1-head", Family: "tmp1", Side: laneLocal},
+			{Hash: "efb164e", Family: "tmp3", Side: laneLocal},
+			{Hash: "efb164e", Family: "tmp3", Side: laneRemote},
+		},
+		After: []laneRef{
+			{Hash: "tmp1-head", Family: "tmp1", Side: laneLocal},
+			{Hash: "a458b4b", Family: "tmp3", Side: laneLocal},
+		},
+		Lane:         1,
+		DisplayWidth: 3,
+	}
+	got := renderGraphConnectorLines(current, next)
 	if len(got) != 1 {
-		t.Fatalf("expected multi-lane collapse connector to stay one line, got %v", got)
+		t.Fatalf("expected one parent shift connector, got %v", got)
+	}
+	if !strings.Contains(got[0], "| | /") {
+		t.Fatalf("expected shifted parent lane connector, got %q", got[0])
+	}
+}
+
+func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
+	rows := graphRows(git.Status{
+		Branch:         "tmp1",
+		Head:           "5df093e",
+		LocalBranches:  []string{"tmp1", "tmp2", "tmp3", "main", "develop"},
+		RemoteBranches: []string{"origin/tmp3", "origin/main"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: "1507a22", Parents: []string{"dee56f4"}, Decorations: []string{"tmp3"}},
+			{Hash: "dee56f4", Parents: []string{"efb164e"}},
+			{Hash: "7d23746", Parents: []string{"37f0954"}, Decorations: []string{"origin/tmp3"}},
+			{Hash: "37f0954", Parents: []string{"efb164e"}},
+			{Hash: "efb164e", Parents: []string{"a458b4b"}},
+			{Hash: "a458b4b", Parents: []string{"5525707"}},
+			{Hash: "b219ab5", Parents: []string{"5525707"}, Decorations: []string{"tmp2"}},
+			{Hash: "5df093e", Parents: []string{"5525707"}, Decorations: []string{"HEAD -> tmp1", "tmp1"}},
+			{Hash: "a39d548", Parents: []string{"3999588"}, Decorations: []string{"main", "develop"}},
+			{Hash: "3999588", Parents: []string{"920e141"}, Decorations: []string{"origin/main"}},
+			{Hash: "920e141", Parents: []string{"7265269"}},
+			{Hash: "7265269", Parents: []string{"633942e"}},
+			{Hash: "633942e", Parents: []string{"93985b9"}},
+			{Hash: "93985b9", Parents: []string{"460aefd"}},
+			{Hash: "460aefd", Parents: []string{"4ba1faf"}},
+			{Hash: "4ba1faf", Parents: []string{"5525707"}},
+			{Hash: "5525707"},
+		},
+	})
+
+	parentIdx := findGraphRowByHash(rows, "37f0954")
+	if parentIdx < 0 || parentIdx+1 >= len(rows) || rows[parentIdx+1].Commit.Hash != "efb164e" {
+		t.Fatalf("expected efb164e immediately after 37f0954, got index=%d rows=%v", parentIdx, rows)
+	}
+	parentConnector := renderGraphConnectorLines(rows[parentIdx], rows[parentIdx+1])
+	if len(parentConnector) != 1 || !strings.Contains(parentConnector[0], "/") {
+		t.Fatalf("expected 37f0954 parent edge to efb164e to render a diagonal connector, got %v", parentConnector)
+	}
+
+	rootIdx := findGraphRowByHash(rows, "4ba1faf")
+	if rootIdx < 0 || rootIdx+1 >= len(rows) || rows[rootIdx+1].Commit.Hash != "5525707" {
+		t.Fatalf("expected 5525707 immediately after 4ba1faf, got index=%d rows=%v", rootIdx, rows)
+	}
+	rootConnector := renderGraphConnectorLines(rows[rootIdx], rows[rootIdx+1])
+	if len(rootConnector) < 2 {
+		t.Fatalf("expected common root convergence to render progressive connector lines, got %v", rootConnector)
+	}
+	if !strings.Contains(rootConnector[len(rootConnector)-1], "| /") {
+		t.Fatalf("expected common root convergence to finish on left lane, got %v", rootConnector)
 	}
 }
 
