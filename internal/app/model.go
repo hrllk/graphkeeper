@@ -27,6 +27,7 @@ type model struct {
 	branchBase      string
 	width           int
 	height          int
+	commitLimit     int
 	err             error
 }
 
@@ -53,12 +54,13 @@ func New(repo *git.Repo) (tea.Model, error) {
 			sectionTags:    0,
 		},
 		graphLaneCursor: 0,
+		commitLimit:     40,
 	}
 	return m, nil
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(loadRepoState(m.repo), scheduleRefresh())
+	return tea.Batch(loadRepoState(m.repo, m.commitLimit), scheduleRefresh())
 }
 
 type loadedMsg struct {
@@ -132,9 +134,9 @@ type laneRef struct {
 	Side   laneSide
 }
 
-func loadRepoState(repo *git.Repo) tea.Cmd {
+func loadRepoState(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
-		status, err := repo.Status(context.Background())
+		status, err := repo.Status(context.Background(), limit)
 		return loadedMsg{status: status, err: err}
 	}
 }
@@ -145,39 +147,39 @@ func scheduleRefresh() tea.Cmd {
 	})
 }
 
-func refreshRepoState(repo *git.Repo) tea.Cmd {
+func refreshRepoState(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
-		status, err := repo.Status(context.Background())
+		status, err := repo.Status(context.Background(), limit)
 		return refreshedMsg{status: status, err: err}
 	}
 }
 
-func fetchRepoState(repo *git.Repo) tea.Cmd {
+func fetchRepoState(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if err := repo.Fetch(context.Background()); err != nil {
 			return fetchedMsg{err: err}
 		}
-		status, err := repo.Status(context.Background())
+		status, err := repo.Status(context.Background(), limit)
 		return fetchedMsg{status: status, err: err}
 	}
 }
 
-func prepareAction(repo *git.Repo, action state.Action) tea.Cmd {
+func prepareAction(repo *git.Repo, action state.Action, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if err := repo.Fetch(context.Background()); err != nil {
 			return preparedMsg{action: action, err: err}
 		}
-		status, err := repo.Status(context.Background())
+		status, err := repo.Status(context.Background(), limit)
 		return preparedMsg{action: action, status: status, err: err}
 	}
 }
 
-func pullCheck(repo *git.Repo) tea.Cmd {
+func pullCheck(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if err := repo.Fetch(context.Background()); err != nil {
 			return pullCheckedMsg{err: err}
 		}
-		status, err := repo.Status(context.Background())
+		status, err := repo.Status(context.Background(), limit)
 		if err != nil {
 			return pullCheckedMsg{err: err}
 		}
@@ -208,12 +210,12 @@ func pullCheck(repo *git.Repo) tea.Cmd {
 	}
 }
 
-func executePull(repo *git.Repo) tea.Cmd {
+func executePull(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if _, err := repo.Run("pull", "--ff-only"); err != nil {
 			return executedMsg{action: state.ActionPull, err: err}
 		}
-		status, err := repo.Status(context.Background())
+		status, err := repo.Status(context.Background(), limit)
 		return executedMsg{action: state.ActionPull, status: status, err: err}
 	}
 }
@@ -244,7 +246,7 @@ func previewSelection(repo *git.Repo, rs git.Status, action state.Action, target
 	}
 }
 
-func executeAction(repo *git.Repo, action state.Action, target string) tea.Cmd {
+func executeAction(repo *git.Repo, action state.Action, target string, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if target == "" {
 			return executedMsg{action: action, err: fmt.Errorf("target is empty")}
@@ -263,17 +265,17 @@ func executeAction(repo *git.Repo, action state.Action, target string) tea.Cmd {
 		if err != nil {
 			return executedMsg{action: action, target: target, err: err}
 		}
-		status, statusErr := repo.Status(context.Background())
+		status, statusErr := repo.Status(context.Background(), limit)
 		return executedMsg{action: action, target: target, status: status, err: statusErr}
 	}
 }
 
-func createBranch(repo *git.Repo, name, base string) tea.Cmd {
+func createBranch(repo *git.Repo, name, base string, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if name == "" {
 			return createdBranchMsg{err: fmt.Errorf("branch name is empty")}
 		}
-		status, err := repo.Status(context.Background())
+		status, err := repo.Status(context.Background(), limit)
 		if err != nil {
 			return createdBranchMsg{name: name, base: base, err: err}
 		}
@@ -290,7 +292,7 @@ func createBranch(repo *git.Repo, name, base string) tea.Cmd {
 		if _, err := repo.Run("switch", "-c", name, base); err != nil {
 			return createdBranchMsg{name: name, base: base, err: err}
 		}
-		status, err = repo.Status(context.Background())
+		status, err = repo.Status(context.Background(), limit)
 		return createdBranchMsg{name: name, base: base, status: status, err: err}
 	}
 }
@@ -300,6 +302,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		neededLimit := msg.Height * 2
+		if neededLimit < 40 {
+			neededLimit = 40
+		}
+		if neededLimit > m.commitLimit {
+			m.commitLimit = neededLimit
+			return m, refreshRepoState(m.repo, m.commitLimit)
+		}
 		return m, nil
 	case loadedMsg:
 		if msg.err != nil {
@@ -318,7 +328,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		return m, nil
 	case tickMsg:
-		return m, tea.Batch(scheduleRefresh(), refreshRepoState(m.repo))
+		return m, tea.Batch(scheduleRefresh(), refreshRepoState(m.repo, m.commitLimit))
 	case refreshedMsg:
 		if msg.err != nil {
 			return m, nil
@@ -477,7 +487,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.branchOpen = false
 				m.branchDraft = ""
 				m.status = state.New().WithLoading("Creating branch...")
-				return m, createBranch(m.repo, name, base)
+				return m, createBranch(m.repo, name, base, m.commitLimit)
 			case "backspace":
 				if len(m.branchDraft) > 0 {
 					runes := []rune(m.branchDraft)
@@ -499,24 +509,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "r":
 			m.status = m.status.WithLoading("Refreshing repository state...")
-			return m, loadRepoState(m.repo)
+			return m, loadRepoState(m.repo, m.commitLimit)
 		case "f":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
 				m.status = state.New().WithLoading("Fetching remotes...")
-				return m, fetchRepoState(m.repo)
+				return m, fetchRepoState(m.repo, m.commitLimit)
 			}
 		case "p":
 			if pullReady(m.repoStatus) {
 				m.status = state.New().WithLoading("Fetching upstream before pull...")
-				return m, pullCheck(m.repo)
+				return m, pullCheck(m.repo, m.commitLimit)
 			}
 			m.status = actionPull(m.repoStatus)
 		case "m":
 			m.status = state.New().WithLoading("Fetching branches before merge...")
-			return m, prepareAction(m.repo, state.ActionMerge)
+			return m, prepareAction(m.repo, state.ActionMerge, m.commitLimit)
 		case "e":
 			m.status = state.New().WithLoading("Fetching branches before rebase...")
-			return m, prepareAction(m.repo, state.ActionRebase)
+			return m, prepareAction(m.repo, state.ActionRebase, m.commitLimit)
 		case "s":
 			if m.status.Mode == state.ModeBrowse {
 				focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
@@ -529,7 +539,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.status = state.New().WithLoading("Fetching branches before reset...")
-			return m, prepareAction(m.repo, state.ActionReset)
+			return m, prepareAction(m.repo, state.ActionReset, m.commitLimit)
 		case "esc":
 			switch {
 			case m.status.Mode == state.ModeOutcomePreview && m.status.Action != state.ActionPull:
@@ -558,6 +568,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status = moveTarget(m.status, 1)
 			} else if m.status.Mode == state.ModeBrowse {
 				m = moveBrowseCursor(m, 1)
+				if m.activeSection == sectionGraph {
+					rows := graphRows(m.repoStatus)
+					if m.sectionCursor[sectionGraph] >= m.commitLimit-10 && len(rows) == m.commitLimit {
+						m.commitLimit += 40
+						return m, refreshRepoState(m.repo, m.commitLimit)
+					}
+				}
 			}
 		case "left", "h":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
@@ -616,14 +633,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 					if target := checkoutTargetFromFocus(focus); target != "" {
 						m.status = state.New().WithLoading("Checking out " + target + "...")
-						return m, executeCheckout(m.repo, target)
+						return m, executeCheckout(m.repo, target, m.commitLimit)
 					}
 					m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a branch decoration.")
 					return m, nil
 				}
 				if target := activeSectionTarget(m); target != "" {
 					m.status = state.New().WithLoading("Checking out " + target + "...")
-					return m, executeCheckout(m.repo, target)
+					return m, executeCheckout(m.repo, target, m.commitLimit)
 				}
 				m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a local or remote branch.")
 			}
@@ -633,9 +650,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status = state.New().WithLoading("Running action...")
 				switch action {
 				case state.ActionPull:
-					return m, executePull(m.repo)
+					return m, executePull(m.repo, m.commitLimit)
 				case state.ActionMerge, state.ActionRebase, state.ActionReset:
-					return m, executeAction(m.repo, action, target)
+					return m, executeAction(m.repo, action, target, m.commitLimit)
 				}
 			}
 		case "c":
@@ -644,14 +661,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 					if target := checkoutTargetFromFocus(focus); target != "" {
 						m.status = state.New().WithLoading("Checking out " + target + "...")
-						return m, executeCheckout(m.repo, target)
+						return m, executeCheckout(m.repo, target, m.commitLimit)
 					}
 					m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a branch decoration.")
 					return m, nil
 				}
 				if target := activeSectionTarget(m); target != "" {
 					m.status = state.New().WithLoading("Checking out " + target + "...")
-					return m, executeCheckout(m.repo, target)
+					return m, executeCheckout(m.repo, target, m.commitLimit)
 				}
 				m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a local or remote branch.")
 			}
@@ -1465,7 +1482,7 @@ func checkoutTargetFromFocus(node graphNode) string {
 	return ""
 }
 
-func executeCheckout(repo *git.Repo, target string) tea.Cmd {
+func executeCheckout(repo *git.Repo, target string, limit int) tea.Cmd {
 	return func() tea.Msg {
 		_, err := repo.Run("switch", target)
 		if err != nil && strings.Contains(target, "/") {
@@ -1475,7 +1492,7 @@ func executeCheckout(repo *git.Repo, target string) tea.Cmd {
 		if err != nil {
 			return executedMsg{action: state.ActionCheckout, target: target, err: err}
 		}
-		status, statusErr := repo.Status(context.Background())
+		status, statusErr := repo.Status(context.Background(), limit)
 		return executedMsg{action: state.ActionCheckout, target: target, status: status, err: statusErr}
 	}
 }

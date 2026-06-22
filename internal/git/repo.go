@@ -66,7 +66,7 @@ func Open(root string) (*Repo, error) {
 	return &Repo{root: abs, runner: Runner{Timeout: 3 * time.Second, Dir: abs}}, nil
 }
 
-func (r *Repo) Status(ctx context.Context) (Status, error) {
+func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	branch, err := r.currentBranch(ctx)
 	if err != nil {
 		return Status{}, err
@@ -81,7 +81,7 @@ func (r *Repo) Status(ctx context.Context) (Status, error) {
 	defaultBranch := r.defaultRemoteBranch(ctx)
 	tracking := r.branchTracking(ctx, localBranches, filteredRemoteBranches)
 	tags, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/tags")
-	graphCommits, graphErr := r.graphCommits(ctx, localBranches, filteredRemoteBranches)
+	graphCommits, graphErr := r.graphCommits(ctx, localBranches, filteredRemoteBranches, limit)
 	if graphErr != nil && !isNoCommits(graphErr) {
 		return Status{ErrorMessage: graphErr.Error()}, graphErr
 	}
@@ -158,12 +158,16 @@ func parseTrackingInfo(track string) (ahead, behind int) {
 	return ahead, behind
 }
 
-func (r *Repo) graphCommits(ctx context.Context, localBranches, remoteBranches []string) ([]GraphCommit, error) {
+func (r *Repo) graphCommits(ctx context.Context, localBranches, remoteBranches []string, limit int) ([]GraphCommit, error) {
 	refs := graphRefs(localBranches, remoteBranches)
 	if len(refs) == 0 {
 		return nil, nil
 	}
-	args := append([]string{"log", "--format=%H%x1f%P%x1f%D", "--topo-order"}, refs...)
+	args := []string{"log", "--format=%H%x1f%P%x1f%D", "--topo-order"}
+	if limit > 0 {
+		args = append(args, fmt.Sprintf("--max-count=%d", limit))
+	}
+	args = append(args, refs...)
 	lines, err := r.gitLines(ctx, args...)
 	if err != nil {
 		return nil, err
