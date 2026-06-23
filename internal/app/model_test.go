@@ -399,8 +399,13 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 		status:        state.New().WithBrowse(),
 		activeSection: sectionGraph,
 	})
-	if !containsLine(graph, "• m: merge         • r: rebase") || !containsLine(graph, "• s: reset         • ctrl+u/d: scroll") {
-		t.Fatalf("expected graph actions to include merge/rebase/reset, got %v", graph)
+	// merge/rebase labels must be present (may be styled disabled when no local lane)
+	graphJoined := strings.Join(graph, " ")
+	if !strings.Contains(graphJoined, "m: merge") || !strings.Contains(graphJoined, "r: rebase") {
+		t.Fatalf("expected graph actions to include merge/rebase labels, got %v", graph)
+	}
+	if !containsLine(graph, "• s: reset         • ctrl+u/d: scroll") {
+		t.Fatalf("expected graph actions to include reset/scroll, got %v", graph)
 	}
 	if !containsLine(graph, "• gg: top         • G: bottom") {
 		t.Fatalf("expected graph actions to use gg shortcut, got %v", graph)
@@ -416,12 +421,14 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	if !containsLine(remote, "• space: checkout") {
 		t.Fatalf("expected remote actions to include checkout, got %v", remote)
 	}
-	if containsLine(remote, "• m: merge         • r: rebase") || containsLine(remote, "• s: reset         • ctrl+u/d: scroll") {
+	remoteJoined := strings.Join(remote, " ")
+	if strings.Contains(remoteJoined, "m: merge") || strings.Contains(remoteJoined, "s: reset") {
 		t.Fatalf("expected remote actions to exclude graph-only actions, got %v", remote)
 	}
 }
 
 func TestRTriggersRebaseOnlyInGraphSection(t *testing.T) {
+	// With no graph rows / no local lane -> 'r' should block with error message
 	graph := model{
 		status:        state.New().WithBrowse(),
 		activeSection: sectionGraph,
@@ -429,16 +436,14 @@ func TestRTriggersRebaseOnlyInGraphSection(t *testing.T) {
 	}
 	gotModel, cmd := graph.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	got := gotModel.(model)
-	if cmd == nil {
-		t.Fatal("expected r to trigger rebase from graph section")
+	if cmd != nil {
+		t.Fatal("expected r to not trigger async cmd when not on local lane")
 	}
-	if got.status.Mode != state.ModeLoading {
-		t.Fatalf("expected rebase to set loading mode, got %s", got.status.Mode)
-	}
-	if got.status.Message != "Fetching branches before rebase..." {
-		t.Fatalf("expected rebase loading message, got %q", got.status.Message)
+	if got.status.Mode != state.ModeBlocked {
+		t.Fatalf("expected rebase to block when not on local lane, got %s", got.status.Mode)
 	}
 
+	// Outside graph section 'r' should be ignored entirely
 	current := model{
 		status:        state.New().WithBrowse(),
 		activeSection: sectionCurrent,
@@ -957,6 +962,9 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	}
 	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", NeedsPull: true}); !strings.Contains(got, "⬇") {
 		t.Fatalf("expected upstream-ahead branches to use a down-arrow badge, got %q", got)
+	}
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", NeedsPush: true}); !strings.Contains(got, "⬆") {
+		t.Fatalf("expected local-ahead branches to use an up-arrow badge, got %q", got)
 	}
 	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", Current: true}); !strings.Contains(got, "l->main") {
 		t.Fatalf("expected current local target to keep branch text visible, got %q", got)

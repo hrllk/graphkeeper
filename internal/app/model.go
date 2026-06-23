@@ -577,6 +577,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				})
 				return m, nil
 			}
+			if msg.action == state.ActionMerge && msg.status.MergeInProgress {
+				m.repoStatus = msg.status
+				syncBrowseState(&m, msg.status)
+				m.status = state.New().WithBrowse()
+				m.status.Message = "Merge stopped with conflicts."
+				m.status.Detail = "Resolve conflicts, then press 'a' to abort or commit to complete."
+				telemetry.Log("app", "execute_conflicted", map[string]string{
+					"action": string(msg.action),
+					"head":   msg.status.Head,
+				})
+				return m, nil
+			}
+			if msg.action == state.ActionRebase && msg.status.RebaseInProgress {
+				m.repoStatus = msg.status
+				syncBrowseState(&m, msg.status)
+				m.status = state.New().WithBrowse()
+				m.status.Message = "Rebase stopped with conflicts."
+				m.status.Detail = "Resolve conflicts, then press 'a' to abort or continue rebase."
+				telemetry.Log("app", "execute_conflicted", map[string]string{
+					"action": string(msg.action),
+					"head":   msg.status.Head,
+				})
+				return m, nil
+			}
 			reason := state.BlockUnknown
 			message := "Execution failed."
 			detail := msg.err.Error()
@@ -755,6 +779,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					target := m.status.Selected
 					m.status = state.New().WithLoading("Running hard reset...")
 					return m, executeAction(m.repo, action, target, m.commitLimit)
+				} else if action == state.ActionMerge {
+					target := m.status.Selected
+					m.status = state.New().WithLoading("Running merge...")
+					return m, executeAction(m.repo, action, target, m.commitLimit)
+				} else if action == state.ActionRebase {
+					target := m.status.Selected
+					m.status = state.New().WithLoading("Running rebase...")
+					return m, executeAction(m.repo, action, target, m.commitLimit)
 				}
 				m.status = deriveStatus(m.repoStatus)
 				return m, nil
@@ -826,13 +858,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = actionPull(m.repoStatus)
 		case "m":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
-				m.status = state.New().WithLoading("Fetching branches before merge...")
-				return m, prepareAction(m.repo, state.ActionMerge, m.commitLimit)
+				if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+					m.status = state.New().WithBlocked(state.BlockUnknown,
+						"Merge not available.",
+						"Move the lane cursor onto a local branch to enable merge.")
+					return m, nil
+				}
+				focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+				if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
+					return m, nil
+				}
+				titleMsg := "Merge into current branch?"
+				detailMsg := fmt.Sprintf("This will merge commit %s into %s.\nA merge commit will be created if histories have diverged.\n\nContinue? (y: yes  •  n: no)",
+					shorten(focus.Hash, 7), m.repoStatus.Branch)
+				m.status = m.status.WithConfirm(state.ActionMerge, titleMsg, detailMsg)
+				m.status.Title = titleMsg
+				m.status.Selected = focus.Hash
+				return m, nil
 			}
 		case "r":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
-				m.status = state.New().WithLoading("Fetching branches before rebase...")
-				return m, prepareAction(m.repo, state.ActionRebase, m.commitLimit)
+				if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+					m.status = state.New().WithBlocked(state.BlockUnknown,
+						"Rebase not available.",
+						"Move the lane cursor onto a local branch to enable rebase.")
+					return m, nil
+				}
+				focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+				if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
+					return m, nil
+				}
+				titleMsg := "Rebase onto this commit?"
+				detailMsg := fmt.Sprintf("This will rebase %s onto commit %s.\nLocal commits will be replayed on top of the target.\n\n⚠️ Conflicts may occur during rebase.\n\nContinue? (y: yes  •  n: no)",
+					m.repoStatus.Branch, shorten(focus.Hash, 7))
+				m.status = m.status.WithConfirm(state.ActionRebase, titleMsg, detailMsg)
+				m.status.Title = titleMsg
+				m.status.Selected = focus.Hash
+				return m, nil
 			}
 		case "s":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
@@ -1734,6 +1796,7 @@ func sectionTargets(rs git.Status, section graphSection) []state.TargetItem {
 				Ref:             rs.Branch,
 				Current:         true,
 				NeedsPull:       track.Behind > 0 && track.Ahead == 0,
+				NeedsPush:       track.Ahead > 0,
 				NoUpstream:      known && upstream == "",
 				MergeConflicted: rs.MergeInProgress,
 			})
@@ -1751,6 +1814,7 @@ func sectionTargets(rs git.Status, section graphSection) []state.TargetItem {
 				Name:       name,
 				Ref:        name,
 				NeedsPull:  track.Behind > 0 && track.Ahead == 0,
+				NeedsPush:  track.Ahead > 0,
 				NoUpstream: known && upstream == "",
 			})
 		}
@@ -2089,6 +2153,61 @@ func graphPointerLane(row graphRow) int {
 	}
 	return row.Lane
 }
+
+// isLocalGraphPointer returns true when the current graph cursor is pointing
+// at a local-branch lane. Merge and Rebase from Graph are only allowed in this state.
+func isLocalGraphPointer(rs git.Status, cursor int, laneCursor int) bool {
+	rows := graphRows(rs)
+	if cursor < 0 || cursor >= len(rows) {
+		return false
+	}
+	row := rows[cursor]
+	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
+		return false
+	}
+
+	// Build local branch set for fast lookup
+	localSet := make(map[string]struct{}, len(rs.LocalBranches))
+	for _, b := range rs.LocalBranches {
+		localSet[b] = struct{}{}
+	}
+
+	// raw-graph mode: check decorations to see if this commit has any local branch
+	// This matches the same logic used in compactDecorationInfo to render "l->name"
+	if row.Graph != "" {
+		for _, dec := range row.Commit.Decorations {
+			dec = strings.TrimSpace(dec)
+			// HEAD -> <branch> is always local
+			if strings.HasPrefix(dec, "HEAD -> ") {
+				return true
+			}
+			// A decoration that is in localBranches (not origin/*, not tag:*)
+			if dec == "" || strings.HasPrefix(dec, "origin/") || strings.HasPrefix(dec, "tag: ") {
+				continue
+			}
+			if !strings.Contains(dec, "/") {
+				// bare name — if it's in local branches, it's a local lane
+				if _, ok := localSet[dec]; ok {
+					return true
+				}
+				// even if not in the set, an unqualified name is treated local (new branch edge case)
+				return true
+			}
+		}
+		return false
+	}
+
+	// legacy lane mode: check laneRef at the lane cursor position
+	if laneCursor >= 0 && laneCursor < len(row.Before) {
+		return row.Before[laneCursor].Side == laneLocal
+	}
+	if laneCursor >= 0 && laneCursor < len(row.After) {
+		return row.After[laneCursor].Side == laneLocal
+	}
+	// fallback: treat single-lane commits on the pointer lane as local
+	return row.Lane == laneCursor
+}
+
 
 func clampCursor(current, total int) int {
 	if total <= 0 {

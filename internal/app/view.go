@@ -272,6 +272,9 @@ func formatTargetItem(t state.TargetItem) string {
 			if t.NeedsPull {
 				label += " " + warn.Render("⬇")
 			}
+			if t.NeedsPush {
+				label += " " + warn.Render("⬆")
+			}
 			if t.NoUpstream {
 				label += " " + warn.Render("(no-up)")
 			}
@@ -283,6 +286,9 @@ func formatTargetItem(t state.TargetItem) string {
 		label := "l->" + t.Name
 		if t.NeedsPull {
 			label += " " + warn.Render("⬇")
+		}
+		if t.NeedsPush {
+			label += " " + warn.Render("⬆")
 		}
 		if t.NoUpstream {
 			label += " " + warn.Render("(no-up)")
@@ -316,7 +322,14 @@ func renderActionHelpLines(m model) []string {
 		lines := make([]string, 0, 5)
 		switch m.activeSection {
 		case sectionGraph:
-			lines = append(lines, "• m: merge         • r: rebase")
+			isLocal := isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor)
+			mergeLabel := "• m: merge"
+			rebaseLabel := "• r: rebase"
+			if isLocal {
+				lines = append(lines, mergeLabel+"         "+rebaseLabel)
+			} else {
+				lines = append(lines, disabled.Render(mergeLabel)+"         "+disabled.Render(rebaseLabel)+" "+muted.Render("(local lane only)"))
+			}
 			lines = append(lines, "• s: reset         • ctrl+u/d: scroll")
 			lines = append(lines, "• gg: top         • G: bottom")
 			lines = append(lines, "• H: jump to HEAD")

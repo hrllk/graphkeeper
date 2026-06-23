@@ -61,6 +61,7 @@ type TargetItem struct {
 	Current         bool
 	Default         bool
 	NeedsPull       bool
+	NeedsPush       bool
 	NoUpstream      bool
 	MergeConflicted bool
 }
