@@ -18,7 +18,7 @@ var (
 	accent      = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 	warn        = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 	ok          = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-	headMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+	headMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("118")).Bold(true)
 	branchMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
 	pointerMark = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
 	localColor  = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
@@ -139,7 +139,7 @@ func (m model) renderGraphContent(width, height int) string {
 	graphActive := m.activeSection == sectionGraph
 	rawGraph := len(rows) > 0 && rows[0].Graph != ""
 	if len(lines) < height {
-		lines = append(lines, "  "+muted.Render(fmt.Sprintf("%-8s %-10s %s", "commit", "branches", "graph")))
+		lines = append(lines, "  "+muted.Render(fmt.Sprintf("%-8s %-10s %-7s %-10s %s", "commit", "branches", "graph", "when", "title")))
 	}
 	for i := start; i < end; i++ {
 		if len(lines) >= height {
@@ -230,9 +230,9 @@ func formatTargetItem(t state.TargetItem) string {
 	switch t.Kind {
 	case state.TargetKindLocal:
 		if t.Current {
-			label := ok.Render("l->" + t.Name)
+			label := headMark.Render("l->" + t.Name)
 			if t.NeedsPull {
-				label += " " + warn.Render("[pull]")
+				label += " " + warn.Render("⬇")
 			}
 			if t.NoUpstream {
 				label += " " + warn.Render("(no-up)")
@@ -241,7 +241,7 @@ func formatTargetItem(t state.TargetItem) string {
 		}
 		label := "l->" + t.Name
 		if t.NeedsPull {
-			label += " " + warn.Render("[pull]")
+			label += " " + warn.Render("⬇")
 		}
 		if t.NoUpstream {
 			label += " " + warn.Render("(no-up)")
@@ -313,40 +313,20 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 	hash := fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
 	refInfo := compactDecorationInfo(row.Commit.Decorations, localBranches)
 	refs := fmt.Sprintf("%-10s", refInfo.Text)
+	graphCell := graphCells(row, graphActive, selected, laneCursor)
+	when := fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
+	title := fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
 	isHead := hasHeadDecoration(row.Commit.Decorations)
-	width := graphRowWidth(row)
-	lane := displayLane(row, width)
-	cursorLane := laneCursor
-	if width > 0 && cursorLane >= width {
-		cursorLane = width - 1
-	}
-	pointerFocused := graphActive && selected && cursorLane == lane
-	cells := make([]string, 0, width)
-	for i := 0; i < width; i++ {
-		cell := " "
-		beforeActive := i < len(row.Before)
-		afterActive := i < len(row.After)
-		switch {
-		case i == lane:
-			cell = "*"
-		case shouldHideConvergedDuplicateLane(row, i, lane):
-			cell = " "
-		case beforeActive || afterActive:
-			cell = "|"
-		}
-		if isHead && i == lane {
-			cell = headMark.Render(cell)
-		} else if pointerFocused && i == lane {
-			cell = pointerMark.Render(cell)
-		}
-		cells = append(cells, cell)
-	}
+	pointerFocused := graphActive && selected
 	if isHead {
 		refs = headMark.Render(refs)
 	} else if pointerFocused && refInfo.HasBranch {
 		refs = branchMark.Render(refs)
 	}
-	line := hash + " " + refs + " " + strings.Join(cells, " ")
+	if graphActive && selected {
+		hash = pointerMark.Render(hash)
+	}
+	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	if selected {
 		return "> " + line
 	}
@@ -355,7 +335,7 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 
 func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string) string {
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
-		line := fmt.Sprintf("%-8s %-10s %s", "", "", row.Graph)
+		line := fmt.Sprintf("%-8s %-10s %-7s %-10s %s", "", "", row.Graph, "", "")
 		if selected {
 			return "> " + line
 		}
@@ -370,6 +350,72 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 	}
 	pointerFocused := graphActive && selected && cursorLane == lane
 	hash := fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
+	if pointerFocused {
+		hash = pointerMark.Render(hash)
+	}
+	refInfo := compactDecorationInfo(row.Commit.Decorations, localBranches)
+	refs := fmt.Sprintf("%-10s", refInfo.Text)
+	if refInfo.HasLocalHead {
+		refs = headMark.Render(refs)
+	} else if pointerFocused && refInfo.HasBranch {
+		refs = branchMark.Render(refs)
+	}
+	graphCell := graphLineCell(row, graphActive, selected, laneCursor)
+	when := fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
+	title := fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
+	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
+	if selected {
+		return "> " + line
+	}
+	return "  " + line
+}
+
+func graphCells(row graphRow, graphActive bool, selected bool, laneCursor int) string {
+	return graphLineCell(row, graphActive, selected, laneCursor)
+}
+
+func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int) string {
+	if row.Graph == "" && row.Commit.Hash == "" {
+		return ""
+	}
+	if row.Graph == "" {
+		width := graphRowWidth(row)
+		lane := displayLane(row, width)
+		cursorLane := laneCursor
+		if width > 0 && cursorLane >= width {
+			cursorLane = width - 1
+		}
+		pointerFocused := graphActive && selected && cursorLane == lane
+		cells := make([]string, 0, width)
+		for i := 0; i < width; i++ {
+			cell := " "
+			beforeActive := i < len(row.Before)
+			afterActive := i < len(row.After)
+			switch {
+			case i == lane:
+				cell = "*"
+			case shouldHideConvergedDuplicateLane(row, i, lane):
+				cell = " "
+			case beforeActive || afterActive:
+				cell = "|"
+			}
+			if hasHeadDecoration(row.Commit.Decorations) && i == lane {
+				cell = headMark.Render(cell)
+			} else if pointerFocused && i == lane {
+				cell = pointerMark.Render(cell)
+			}
+			cells = append(cells, cell)
+		}
+		return strings.Join(cells, " ")
+	}
+	graphRunes := []rune(row.Graph)
+	width := len(graphRunes)
+	lane := graphPointerLane(row)
+	cursorLane := laneCursor
+	if width > 0 && cursorLane >= width {
+		cursorLane = width - 1
+	}
+	pointerFocused := graphActive && selected && cursorLane == lane
 	var b strings.Builder
 	for i, r := range graphRunes {
 		if pointerFocused && i == lane {
@@ -378,16 +424,7 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 		}
 		b.WriteRune(r)
 	}
-	refInfo := compactDecorationInfo(row.Commit.Decorations, localBranches)
-	refs := fmt.Sprintf("%-10s", refInfo.Text)
-	if pointerFocused && refInfo.HasBranch {
-		refs = branchMark.Render(refs)
-	}
-	line := hash + " " + refs + " " + b.String()
-	if selected {
-		return "> " + line
-	}
-	return "  " + line
+	return b.String()
 }
 
 func renderGraphConnectorLines(current, next graphRow) []string {
@@ -527,8 +564,9 @@ func formatCompactDecorations(decorations []string, localBranches []string) stri
 }
 
 type decorationInfo struct {
-	Text      string
-	HasBranch bool
+	Text         string
+	HasBranch    bool
+	HasLocalHead bool
 }
 
 func compactDecorationInfo(decorations []string, localBranches []string) decorationInfo {
@@ -546,6 +584,7 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 	branches := make(map[string]*branchState)
 	order := make([]string, 0, len(decorations))
 	hasBranch := false
+	hasLocalHead := false
 
 	addBranch := func(name string) *branchState {
 		name = strings.TrimSpace(name)
@@ -571,6 +610,7 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 			if state := addBranch(strings.TrimPrefix(decoration, "HEAD -> ")); state != nil {
 				state.local = true
 				hasBranch = true
+				hasLocalHead = true
 			}
 		case strings.HasPrefix(decoration, "origin/HEAD -> origin/"):
 			if state := addBranch(strings.TrimPrefix(decoration, "origin/HEAD -> origin/")); state != nil {
@@ -630,7 +670,51 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 		runes := []rune(token)
 		token = string(runes[:9]) + "."
 	}
-	return decorationInfo{Text: token, HasBranch: hasBranch}
+	return decorationInfo{Text: token, HasBranch: hasBranch, HasLocalHead: hasLocalHead}
+}
+
+func compactWhenText(relative string) string {
+	relative = strings.TrimSpace(relative)
+	if relative == "" {
+		return "-"
+	}
+	if strings.HasSuffix(relative, " ago") {
+		relative = strings.TrimSpace(strings.TrimSuffix(relative, " ago"))
+	}
+	parts := strings.Fields(relative)
+	if len(parts) < 2 {
+		return shorten(relative, 7)
+	}
+	n := parts[0]
+	unit := parts[1]
+	switch {
+	case strings.HasPrefix(unit, "minute"):
+		return n + "mins"
+	case strings.HasPrefix(unit, "hour"):
+		return n + "hours"
+	case strings.HasPrefix(unit, "day"):
+		return n + "days"
+	case strings.HasPrefix(unit, "month"):
+		return n + "mons"
+	case strings.HasPrefix(unit, "year"):
+		return n + "yrs"
+	case strings.HasPrefix(unit, "week"):
+		return n + "wks"
+	default:
+		return shorten(relative, 7)
+	}
+}
+
+func compactTitleText(subject string) string {
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		return "-"
+	}
+	runes := []rune(subject)
+	if len(runes) <= 10 {
+		return subject
+	}
+	return string(runes[:7]) + "..."
 }
 
 func focusParentLines(node graphNode, width int) []string {

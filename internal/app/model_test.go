@@ -144,6 +144,20 @@ func TestMoveGraphPointerClamps(t *testing.T) {
 	}
 }
 
+func TestMoveSelectableGraphPointerSkipsConnectors(t *testing.T) {
+	rows := []graphRow{
+		{Commit: graphNode{Hash: "a"}},
+		{Graph: "|\\", Commit: graphNode{}},
+		{Commit: graphNode{Hash: "b"}},
+	}
+	if got := moveSelectableGraphPointer(0, rows, 1); got != 2 {
+		t.Fatalf("expected connector row to be skipped on move down, got %d", got)
+	}
+	if got := moveSelectableGraphPointer(2, rows, -1); got != 0 {
+		t.Fatalf("expected connector row to be skipped on move up, got %d", got)
+	}
+}
+
 func TestInitialGraphLanesSeedsCurrentBranchWithoutRemoteTip(t *testing.T) {
 	got := initialGraphLanes([]graphNode{
 		{Hash: "head", Parents: []string{"base"}, Decorations: []string{"HEAD -> tmp1", "tmp1"}},
@@ -762,14 +776,14 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
 	line := renderGraphLine(rows[0], true, true, 0, []string{"main"})
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->main") < 0 || strings.Index(line, "*") < 0 {
-		t.Fatalf("expected graph line to include hash, branches and graph, got %q", line)
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->main") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge b...") < 0 {
+		t.Fatalf("expected graph line to include hash, branches, when, title and graph, got %q", line)
 	}
 	if strings.Index(line, "head") > strings.Index(line, "o/l->main") {
 		t.Fatalf("expected hash to lead branches, got %q", line)
 	}
-	if strings.Index(line, "o/l->main") > strings.Index(line, "*") {
-		t.Fatalf("expected branches to lead graph, got %q", line)
+	if strings.Index(line, "o/l->main") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5mins") || strings.Index(line, "5mins") > strings.Index(line, "Merge b...") {
+		t.Fatalf("expected commit columns to stay ordered, got %q", line)
 	}
 	if strings.Contains(line, "Merge branch") || strings.Contains(line, "origin/") || strings.Contains(line, "develop") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
@@ -778,11 +792,23 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.Contains(connector, "|\\") {
 		t.Fatalf("expected connector graph line to stay visible, got %q", connector)
 	}
+	if compactWhenText("5 minutes ago") != "5mins" {
+		t.Fatalf("expected relative time to compact to 5mins")
+	}
+	if compactTitleText("Merge branch 'main' into develop") != "Merge b..." {
+		t.Fatalf("expected title to compact to 10 chars")
+	}
 	if !strings.Contains(formatTargetItem(state.TargetItem{Kind: state.TargetKindRemote, Name: "origin/HEAD", Ref: "origin/HEAD", Default: true}), "origin/HEAD") {
 		t.Fatalf("expected origin/HEAD to stay visible in the remote section")
 	}
 	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "feature", Ref: "feature", NoUpstream: true}); !strings.Contains(got, "l->feature (no-up)") {
 		t.Fatalf("expected local targets without upstream to be shown after the branch name, got %q", got)
+	}
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", NeedsPull: true}); !strings.Contains(got, "⬇") {
+		t.Fatalf("expected upstream-ahead branches to use a down-arrow badge, got %q", got)
+	}
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", Current: true}); !strings.Contains(got, "l->main") {
+		t.Fatalf("expected current local target to keep branch text visible, got %q", got)
 	}
 }
 
