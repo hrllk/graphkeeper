@@ -103,8 +103,12 @@ func (m model) View() string {
 			Padding(1, 2).
 			Width(50).
 			Align(lipgloss.Center)
+		popupTitle := m.status.Title
+		if popupTitle == "" || popupTitle == "Confirm" {
+			popupTitle = "Do you want to continue?"
+		}
 		popupContent := popupBox.Render(
-			titleStyle.Render("Do you want to continue?") + "\n\n" +
+			titleStyle.Render(popupTitle) + "\n\n" +
 			descStyle.Render(m.status.Detail) + "\n\n" +
 			helpStyle.Render("y: yes  •  n: no"),
 		)
@@ -310,7 +314,7 @@ func renderActionHelpLines(m model) []string {
 			lines = append(lines, "• space: checkout")
 			if m.activeSection == sectionCurrent {
 				if pullReady(m.repoStatus) {
-					lines = append(lines, "• p: pull")
+					lines = append(lines, "• p: pull           • P: push")
 				} else {
 					label := "• p: pull"
 					switch {
@@ -321,7 +325,12 @@ func renderActionHelpLines(m model) []string {
 					case m.repoStatus.Detached:
 						label += " (detached)"
 					}
-					lines = append(lines, disabled.Render(label))
+					pushLabel := "• P: push"
+					if m.repoStatus.Detached || m.repoStatus.EmptyRepo {
+						lines = append(lines, disabled.Render(label)+"   "+disabled.Render(pushLabel))
+					} else {
+						lines = append(lines, disabled.Render(label)+"   "+pushLabel)
+					}
 				}
 				if m.repoStatus.MergeInProgress {
 					lines = append(lines, "• a: abort merge")

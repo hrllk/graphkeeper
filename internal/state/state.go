@@ -24,6 +24,9 @@ const (
 	ActionMerge    Action = "merge"
 	ActionRebase   Action = "rebase"
 	ActionReset    Action = "reset"
+	ActionPush     Action = "push"
+	ActionForcePush Action = "force-push"
+	ActionSetUpstream Action = "set-upstream"
 )
 
 type BlockReason string

@@ -245,6 +245,39 @@ func executeAbort(repo *git.Repo, limit int) tea.Cmd {
 	}
 }
 
+func executePush(repo *git.Repo, branch string, limit int) tea.Cmd {
+	return func() tea.Msg {
+		_, err := repo.Push(context.Background(), branch, false, false)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionPush, target: branch, err: statusErr}
+		}
+		return executedMsg{action: state.ActionPush, target: branch, status: status, err: err}
+	}
+}
+
+func executeForcePush(repo *git.Repo, branch string, limit int) tea.Cmd {
+	return func() tea.Msg {
+		_, err := repo.Push(context.Background(), branch, true, false)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionForcePush, target: branch, err: statusErr}
+		}
+		return executedMsg{action: state.ActionForcePush, target: branch, status: status, err: err}
+	}
+}
+
+func executePushSetUpstream(repo *git.Repo, branch string, limit int) tea.Cmd {
+	return func() tea.Msg {
+		_, err := repo.Push(context.Background(), branch, false, true)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionSetUpstream, target: branch, err: statusErr}
+		}
+		return executedMsg{action: state.ActionSetUpstream, target: branch, status: status, err: err}
+	}
+}
+
 func previewSelection(repo *git.Repo, rs git.Status, action state.Action, target string) tea.Cmd {
 	return func() tea.Msg {
 		if target == "" {
@@ -420,6 +453,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			"mode":   string(msg.status.Mode),
 		})
 		return m, nil
+	case pushFetchedMsg:
+		if msg.err != nil {
+			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch failed before push.", msg.err.Error())
+			return m, nil
+		}
+		m.repoStatus = msg.status
+		syncBrowseState(&m, msg.status)
+		if msg.status.NoUpstream {
+			branchName := msg.status.Branch
+			titleMsg := "Push and Track Remote?"
+			detailMsg := fmt.Sprintf("There is no upstream configured for the current branch. Do you want to push and set upstream tracking to origin/%s?", branchName)
+			m.status = m.status.WithConfirm(state.ActionSetUpstream, titleMsg, detailMsg)
+			m.status.Title = titleMsg
+			return m, nil
+		}
+		m.status = state.New().WithLoading("Pushing commits...")
+		return m, executePush(m.repo, msg.status.Branch, m.commitLimit)
 	case pullFetchedMsg:
 		if msg.err != nil {
 			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch failed before pull.", msg.err.Error())
@@ -453,6 +503,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case executedMsg:
 		if msg.err != nil {
+			isAuthError := strings.Contains(msg.err.Error(), "Permission denied") ||
+				strings.Contains(msg.err.Error(), "Authentication failed") ||
+				strings.Contains(msg.err.Error(), "Could not read from remote repository")
+
+			if msg.action == state.ActionPush && !isAuthError && (strings.Contains(msg.err.Error(), "[rejected]") || strings.Contains(msg.err.Error(), "non-fast-forward")) {
+				status := m.repoStatus
+				if msg.status.Root != "" {
+					status = msg.status
+				}
+				m.repoStatus = status
+				m.handshakeCommits = make(map[string]bool)
+				if status.Head != "" {
+					m.handshakeCommits[status.Head] = true
+				}
+				remoteHash := findRemoteCommitHash(status, status.Upstream)
+				if remoteHash != "" {
+					m.handshakeCommits[remoteHash] = true
+				}
+				branchName := status.Branch
+				titleMsg := fmt.Sprintf("Force push to origin/%s?", branchName)
+				detailMsg := fmt.Sprintf("The remote branch has different history. Force pushing will overwrite origin/%s history with your local commits. Continue?", branchName)
+				m.status = m.status.WithConfirm(state.ActionForcePush, titleMsg, detailMsg)
+				m.status.Title = titleMsg
+				return m, nil
+			}
 			if msg.action == state.ActionPull && msg.status.MergeInProgress {
 				m.repoStatus = msg.status
 				syncBrowseState(&m, msg.status)
@@ -475,12 +550,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					message = "Checkout blocked by local changes."
 					detail = "Your local changes would be overwritten by checkout. Commit or stash them before switching."
 				}
+			} else if isAuthError && (msg.action == state.ActionPush || msg.action == state.ActionForcePush || msg.action == state.ActionSetUpstream) {
+				message = "Authentication or Permission error."
+				detail = "Please check your remote credentials or network connection: " + msg.err.Error()
+			} else if msg.action == state.ActionPush || msg.action == state.ActionForcePush || msg.action == state.ActionSetUpstream {
+				message = "Push failed."
 			}
 			m.status = state.New().WithBlocked(reason, message, detail)
 			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
 			return m, nil
 		}
 		m.repoStatus = msg.status
+		if msg.action == state.ActionPush || msg.action == state.ActionForcePush || msg.action == state.ActionSetUpstream {
+			m.handshakeCommits = make(map[string]bool)
+			syncBrowseState(&m, msg.status)
+			m.status = deriveStatus(msg.status)
+			m.status.Message = fmt.Sprintf("Push completed for %s.", msg.target)
+			telemetry.Log("app", "execute_action", map[string]string{
+				"action": string(msg.action),
+				"head":   msg.status.Head,
+			})
+			return m, nil
+		}
 		if msg.action == state.ActionCheckout {
 			m.commitLimit = initialGraphCommitLimit
 			rows := graphRows(msg.status)
@@ -508,6 +599,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg.action == state.ActionAbort {
+			m.handshakeCommits = make(map[string]bool)
 			syncBrowseState(&m, msg.status)
 			m.status = deriveStatus(msg.status)
 			telemetry.Log("app", "execute_action", map[string]string{
@@ -586,10 +678,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "y", "enter":
 				action := m.status.Action
-				m.status = state.New().WithLoading("Running pull...")
 				m.handshakeCommits = make(map[string]bool)
 				if action == state.ActionPull {
+					m.status = state.New().WithLoading("Running pull...")
 					return m, executePull(m.repo, m.commitLimit)
+				} else if action == state.ActionSetUpstream {
+					m.status = state.New().WithLoading("Pushing new branch and tracking upstream...")
+					return m, executePushSetUpstream(m.repo, m.repoStatus.Branch, m.commitLimit)
+				} else if action == state.ActionForcePush {
+					m.status = state.New().WithLoading("Running force push...")
+					return m, executeForcePush(m.repo, m.repoStatus.Branch, m.commitLimit)
 				}
 				m.status = deriveStatus(m.repoStatus)
 				return m, nil
@@ -628,6 +726,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status.Message = "Fetching remotes..."
 				m.status.Detail = "Refreshing remote refs and branch tracking in the background."
 				return m, fetchRepoState(m.repo, m.commitLimit)
+			}
+		case "P":
+			if m.status.Mode == state.ModeBrowse {
+				if m.repoStatus.Root == "" || m.repoStatus.Detached || m.repoStatus.EmptyRepo {
+					return m, nil
+				}
+				m.status = state.New().WithLoading("Fetching before push...")
+				return m, executeFetchForPush(m.repo, m.commitLimit)
 			}
 		case "p":
 			if pullReady(m.repoStatus) {
@@ -1981,6 +2087,22 @@ type pullFetchedMsg struct {
 	err    error
 }
 
+type pushFetchedMsg struct {
+	status git.Status
+	err    error
+}
+
+func executeFetchForPush(repo *git.Repo, limit int) tea.Cmd {
+	return func() tea.Msg {
+		err := repo.Fetch(context.Background())
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return pushFetchedMsg{err: statusErr}
+		}
+		return pushFetchedMsg{status: status, err: err}
+	}
+}
+
 type pullPreviewReadyMsg struct {
 	commits []string
 	isFF    bool
@@ -2026,4 +2148,23 @@ func loadPullPreviewCommits(repo *git.Repo, isFF bool) tea.Cmd {
 		}
 		return pullPreviewReadyMsg{commits: commits, isFF: isFF}
 	}
+}
+
+func findRemoteCommitHash(rs git.Status, upstream string) string {
+	if upstream == "" {
+		return ""
+	}
+	target := upstream
+	if strings.HasPrefix(target, "refs/remotes/") {
+		target = strings.TrimPrefix(target, "refs/remotes/")
+	}
+	for _, commit := range rs.GraphCommits {
+		for _, dec := range commit.Decorations {
+			decTrim := strings.TrimSpace(dec)
+			if decTrim == target || "origin/"+decTrim == target || decTrim == "origin/"+target {
+				return commit.Hash
+			}
+		}
+	}
+	return ""
 }

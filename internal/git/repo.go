@@ -281,6 +281,17 @@ func (r *Repo) Fetch(ctx context.Context) error {
 	return err
 }
 
+func (r *Repo) Push(ctx context.Context, branch string, force bool, setUpstream bool) (string, error) {
+	args := []string{"push"}
+	if force {
+		args = append(args, "--force")
+	}
+	if setUpstream {
+		args = append(args, "-u", "origin", branch)
+	}
+	return r.Run(args...)
+}
+
 func (r *Repo) worktreeDirty(ctx context.Context) (bool, error) {
 	out, err := r.git(ctx, "status", "--porcelain")
 	if err != nil {

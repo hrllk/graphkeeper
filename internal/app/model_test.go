@@ -1086,3 +1086,130 @@ func TestHasHeadDecoration(t *testing.T) {
 		t.Fatal("expected non-HEAD decorations to stay false")
 	}
 }
+
+func TestPushSetUpstreamTriggeredWhenNoUpstream(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+		repoStatus: git.Status{
+			Root:       "/repo",
+			Branch:     "feature",
+			Head:       "abc1234",
+			NoUpstream: true,
+			HasCommits: true,
+		},
+	}
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected async fetch command, got nil")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Fetching before push..." {
+		t.Fatalf("expected Fetching before push... loading mode, got %s", got.status.Mode)
+	}
+	
+	status := got.repoStatus
+	gotModel2, cmd2 := got.Update(pushFetchedMsg{status: status})
+	got2 := gotModel2.(model)
+	if cmd2 != nil {
+		t.Fatal("expected no immediate executeCmd for set-upstream, should wait for confirm")
+	}
+	if got2.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got2.status.Mode)
+	}
+	if got2.status.Action != state.ActionSetUpstream {
+		t.Fatalf("expected SetUpstream action, got %s", got2.status.Action)
+	}
+	if !strings.Contains(got2.status.Title, "Push and Track Remote?") {
+		t.Fatalf("expected set-upstream title, got %q", got2.status.Title)
+	}
+}
+
+func TestPushNormalTriggeredWhenUpstreamExists(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+		repoStatus: git.Status{
+			Root:       "/repo",
+			Branch:     "main",
+			Head:       "abc1234",
+			Upstream:   "origin/main",
+			NoUpstream: false,
+			HasCommits: true,
+		},
+	}
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected async fetch command, got nil")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Fetching before push..." {
+		t.Fatalf("expected Fetching before push... loading mode, got %s", got.status.Mode)
+	}
+
+	status := got.repoStatus
+	gotModel2, cmd2 := got.Update(pushFetchedMsg{status: status})
+	got2 := gotModel2.(model)
+	if cmd2 == nil {
+		t.Fatal("expected async push command, got nil")
+	}
+	if got2.status.Mode != state.ModeLoading {
+		t.Fatalf("expected loading mode, got %s", got2.status.Mode)
+	}
+	if got2.status.Message != "Pushing commits..." {
+		t.Fatalf("expected push message, got %q", got2.status.Message)
+	}
+}
+
+func TestPushRejectedShowsForcePushConfirmAndHighlights(t *testing.T) {
+	m := model{
+		status: state.New().WithLoading("Pushing..."),
+		repoStatus: git.Status{
+			Root:     "/repo",
+			Branch:   "develop",
+			Head:     "localhead123",
+			Upstream: "origin/develop",
+			GraphCommits: []git.GraphCommit{
+				{Hash: "localhead123", Decorations: []string{"HEAD -> develop"}},
+				{Hash: "remotehead456", Decorations: []string{"origin/develop"}},
+			},
+		},
+		handshakeCommits: make(map[string]bool),
+	}
+	
+	msg := executedMsg{
+		action: state.ActionPush,
+		target: "develop",
+		err:    fmt.Errorf("git push: exit status 1: error: failed to push some refs to '...' [rejected - non-fast-forward]"),
+	}
+	
+	gotModel, cmd := m.Update(msg)
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no async cmd, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode on reject, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionForcePush {
+		t.Fatalf("expected ActionForcePush, got %s", got.status.Action)
+	}
+	if !got.handshakeCommits["localhead123"] || !got.handshakeCommits["remotehead456"] {
+		t.Fatalf("expected both local HEAD and remote HEAD to be highlighted, got %v", got.handshakeCommits)
+	}
+	if !strings.Contains(got.status.Detail, "origin/develop") {
+		t.Fatalf("expected branch name to be dynamically included, got %q", got.status.Detail)
+	}
+}
