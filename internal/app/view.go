@@ -19,13 +19,15 @@ var (
 	warn        = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 	ok          = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	disabled    = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	headMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("118")).Bold(true)
-	branchMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
-	pointerMark = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
-	localColor  = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
-	remoteColor = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
-	tagColor    = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
-	highlight   = lipgloss.NewStyle().Reverse(true).Bold(true)
+	headMark      = lipgloss.NewStyle().Foreground(lipgloss.Color("118")).Bold(true)
+	branchMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
+	pointerMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
+	localColor    = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
+	remoteColor   = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
+	tagColor      = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
+	highlight     = lipgloss.NewStyle().Reverse(true).Bold(true)
+	conflictColor = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	conflictMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
 )
 
 func (m model) getBoxStyle(section graphSection) lipgloss.Style {
@@ -107,10 +109,14 @@ func (m model) View() string {
 		if popupTitle == "" || popupTitle == "Confirm" {
 			popupTitle = "Do you want to continue?"
 		}
+		helpText := "y: yes  •  n: no"
+		if m.status.Action == state.ActionPull && !m.pullIsFastForward {
+			helpText = "m: merge  •  r: rebase  •  esc: cancel"
+		}
 		popupContent := popupBox.Render(
 			titleStyle.Render(popupTitle) + "\n\n" +
 			descStyle.Render(m.status.Detail) + "\n\n" +
-			helpStyle.Render("y: yes  •  n: no"),
+			helpStyle.Render(helpText),
 		)
 		centeredBody = overlayPopup(centeredBody, popupContent)
 	}
@@ -177,6 +183,11 @@ func (m model) renderGraphContent(width, height int) string {
 			for _, line := range renderGraphConnectorLines(rows[i], rows[i+1], isConnectorHandshake) {
 				if len(lines) >= height {
 					break
+				}
+				if rows[i].Commit.Hash == "VIRTUAL_CONFLICT_HASH" || rows[i+1].Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
+					line = strings.ReplaceAll(line, "|", conflictColor.Render("|"))
+					line = strings.ReplaceAll(line, "/", conflictColor.Render("/"))
+					line = strings.ReplaceAll(line, "\\", conflictColor.Render("\\"))
 				}
 				lines = append(lines, line)
 			}
@@ -265,7 +276,7 @@ func formatTargetItem(t state.TargetItem) string {
 				label += " " + warn.Render("(no-up)")
 			}
 			if t.MergeConflicted {
-				label += " " + warn.Render("(conflict)")
+				label += " " + conflictMark.Render("(conflict)")
 			}
 			return label
 		}
@@ -363,26 +374,44 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 	if row.Graph != "" {
 		return renderRawGraphLine(row, selected, graphActive, laneCursor, localBranches, graphColWidth, isHandshake)
 	}
-	hash := fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
-	refInfo := compactDecorationInfo(row.Commit.Decorations, localBranches)
-	refs := fmt.Sprintf("%-10s", refInfo.Text)
+	var hash, refs string
+	var refInfo decorationInfo
+	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
+		hash = "        "
+		refs = "          "
+	} else {
+		hash = fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
+		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
+		refs = fmt.Sprintf("%-10s", refInfo.Text)
+		isHead := hasHeadDecoration(row.Commit.Decorations)
+		pointerFocused := graphActive && selected
+		if isHead {
+			refs = headMark.Render(refs)
+		} else if pointerFocused && refInfo.HasBranch {
+			refs = branchMark.Render(refs)
+		}
+		if graphActive && selected {
+			hash = pointerMark.Render(hash)
+		}
+	}
 	graphCell := graphCells(row, graphActive, selected, laneCursor, graphColWidth)
 	graphCell = padRight(graphCell, graphColWidth)
-	if isHandshake {
+	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
+		graphCell = strings.ReplaceAll(graphCell, "*", conflictMark.Render("*"))
+		graphCell = strings.ReplaceAll(graphCell, "|", conflictColor.Render("|"))
+		graphCell = strings.ReplaceAll(graphCell, "/", conflictColor.Render("/"))
+		graphCell = strings.ReplaceAll(graphCell, "\\", conflictColor.Render("\\"))
+	} else if isHandshake {
 		pinkBg := lipgloss.NewStyle().Background(lipgloss.Color("162")).Foreground(lipgloss.Color("255")).Bold(true)
 		graphCell = strings.ReplaceAll(graphCell, "*", pinkBg.Render("*"))
 	}
-	when := fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
-	title := fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
-	isHead := hasHeadDecoration(row.Commit.Decorations)
-	pointerFocused := graphActive && selected
-	if isHead {
-		refs = headMark.Render(refs)
-	} else if pointerFocused && refInfo.HasBranch {
-		refs = branchMark.Render(refs)
-	}
-	if graphActive && selected {
-		hash = pointerMark.Render(hash)
+	var when, title string
+	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
+		when = "       "
+		title = conflictColor.Render(row.Commit.Subject)
+	} else {
+		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
+		title = fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	if selected {
@@ -404,33 +433,64 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 		}
 		return "  " + line
 	}
-	graphRunes := []rune(row.Graph)
-	width := len(graphRunes)
-	lane := graphPointerLane(row)
-	cursorLane := laneCursor
-	if width > 0 && cursorLane >= width {
-		cursorLane = width - 1
+	var hash, refs string
+	var refInfo decorationInfo
+	pointerFocused := false
+	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
+		hash = "        "
+		refs = "          "
+	} else {
+		graphRunes := []rune(row.Graph)
+		width := len(graphRunes)
+		lane := graphPointerLane(row)
+		cursorLane := laneCursor
+		if width > 0 && cursorLane >= width {
+			cursorLane = width - 1
+		}
+		pointerFocused = graphActive && selected && cursorLane == lane
+		hash = fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
+		if pointerFocused {
+			hash = pointerMark.Render(hash)
+		}
+		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
+		refs = fmt.Sprintf("%-10s", refInfo.Text)
+		if refInfo.HasLocalHead {
+			refs = headMark.Render(refs)
+		} else if pointerFocused && refInfo.HasBranch {
+			refs = branchMark.Render(refs)
+		}
 	}
-	pointerFocused := graphActive && selected && cursorLane == lane
-	hash := fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
-	if pointerFocused {
-		hash = pointerMark.Render(hash)
+	var graphCell string
+	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
+		var b strings.Builder
+		for _, r := range row.Graph {
+			charStr := string(r)
+			if charStr == "*" {
+				b.WriteString(conflictMark.Render(charStr))
+			} else if charStr == "|" || charStr == "/" || charStr == "\\" {
+				b.WriteString(conflictColor.Render(charStr))
+			} else {
+				b.WriteString(charStr)
+			}
+		}
+		graphCell = b.String()
+	} else {
+		lane := graphPointerLane(row)
+		graphCell = highlightRawGraphPrefix(row.Graph, lane, pointerFocused, refInfo.HasLocalHead)
 	}
-	refInfo := compactDecorationInfo(row.Commit.Decorations, localBranches)
-	refs := fmt.Sprintf("%-10s", refInfo.Text)
-	if refInfo.HasLocalHead {
-		refs = headMark.Render(refs)
-	} else if pointerFocused && refInfo.HasBranch {
-		refs = branchMark.Render(refs)
-	}
-	graphCell := highlightRawGraphPrefix(row.Graph, lane, pointerFocused, refInfo.HasLocalHead)
 	graphCell = padRight(graphCell, graphColWidth)
-	if isHandshake {
+	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" && isHandshake {
 		pinkBg := lipgloss.NewStyle().Background(lipgloss.Color("162")).Foreground(lipgloss.Color("255")).Bold(true)
 		graphCell = strings.ReplaceAll(graphCell, "*", pinkBg.Render("*"))
 	}
-	when := fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
-	title := fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
+	var when, title string
+	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
+		when = "       "
+		title = conflictColor.Render(row.Commit.Subject)
+	} else {
+		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
+		title = fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
+	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	if selected {
 		return "> " + line

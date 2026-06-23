@@ -41,6 +41,9 @@ type Status struct {
 	NoRemote        bool
 	WorktreeDirty   bool
 	MergeInProgress bool
+	RebaseInProgress bool
+	ConflictTarget   string
+	ConflictTargetSubject string
 	ErrorMessage    string
 	LoadingReason   string
 }
@@ -94,20 +97,40 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	}
 	worktreeDirty, _ := r.worktreeDirty(ctx)
 	mergeInProgress := false
-	// 서브프로세스 기동 비용을 최소화하기 위해 표준적인 .git 디렉토리를 1차 검사합니다.
-	stdMergeHead := filepath.Join(r.root, ".git", "MERGE_HEAD")
-	if _, err := os.Stat(stdMergeHead); err == nil {
+	rebaseInProgress := false
+	conflictTarget := ""
+
+	gitDirPath := filepath.Join(r.root, ".git")
+	if gitDir, err := r.git(ctx, "rev-parse", "--git-dir"); err == nil {
+		gDir := strings.TrimSpace(gitDir)
+		if !filepath.IsAbs(gDir) {
+			gDir = filepath.Join(r.root, gDir)
+		}
+		gitDirPath = gDir
+	}
+
+	// 1. 머지 상태 및 충돌 대상 검사
+	mergeHeadFile := filepath.Join(gitDirPath, "MERGE_HEAD")
+	if data, err := os.ReadFile(mergeHeadFile); err == nil {
 		mergeInProgress = true
-	} else {
-		// submodule 또는 worktree 등 특수한 환경을 위해 git-dir 경로를 2차로 조회하여 검사합니다.
-		if gitDir, err := r.git(ctx, "rev-parse", "--git-dir"); err == nil {
-			gitDirPath := strings.TrimSpace(gitDir)
-			if !filepath.IsAbs(gitDirPath) {
-				gitDirPath = filepath.Join(r.root, gitDirPath)
-			}
-			if _, err := os.Stat(filepath.Join(gitDirPath, "MERGE_HEAD")); err == nil {
-				mergeInProgress = true
-			}
+		conflictTarget = strings.TrimSpace(string(data))
+	}
+
+	// 2. 리베이스 상태 및 충돌 대상 검사
+	rebaseMergeDir := filepath.Join(gitDirPath, "rebase-merge")
+	if stat, err := os.Stat(rebaseMergeDir); err == nil && stat.IsDir() {
+		rebaseInProgress = true
+		if data, err := os.ReadFile(filepath.Join(rebaseMergeDir, "stopped-sha")); err == nil {
+			conflictTarget = strings.TrimSpace(string(data))
+		} else if data, err := os.ReadFile(filepath.Join(rebaseMergeDir, "onto")); err == nil {
+			conflictTarget = strings.TrimSpace(string(data))
+		}
+	}
+	rebaseApplyDir := filepath.Join(gitDirPath, "rebase-apply")
+	if stat, err := os.Stat(rebaseApplyDir); err == nil && stat.IsDir() {
+		rebaseInProgress = true
+		if data, err := os.ReadFile(filepath.Join(rebaseApplyDir, "onto")); err == nil {
+			conflictTarget = strings.TrimSpace(string(data))
 		}
 	}
 
@@ -115,6 +138,13 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	noRemote := remote == ""
 	emptyRepo := isNoCommits(graphErr) || head == ""
 	remotes, _ := r.gitLines(ctx, "remote")
+
+	conflictTargetSubject := ""
+	if conflictTarget != "" {
+		if subject, err := r.git(ctx, "show", "-s", "--format=%s", conflictTarget); err == nil {
+			conflictTargetSubject = strings.TrimSpace(subject)
+		}
+	}
 
 	return Status{
 		Root:            r.root,
@@ -138,6 +168,9 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		NoRemote:        noRemote,
 		WorktreeDirty:   worktreeDirty,
 		MergeInProgress: mergeInProgress,
+		RebaseInProgress: rebaseInProgress,
+		ConflictTarget:   conflictTarget,
+		ConflictTargetSubject: conflictTargetSubject,
 	}, nil
 }
 

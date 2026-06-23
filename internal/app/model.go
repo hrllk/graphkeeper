@@ -234,9 +234,38 @@ func executePull(repo *git.Repo, limit int) tea.Cmd {
 	}
 }
 
+func executePullMerge(repo *git.Repo, limit int) tea.Cmd {
+	return func() tea.Msg {
+		_, err := repo.Run("pull", "--no-rebase", "--no-edit")
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionPullMerge, err: statusErr}
+		}
+		return executedMsg{action: state.ActionPullMerge, status: status, err: err}
+	}
+}
+
+func executePullRebase(repo *git.Repo, limit int) tea.Cmd {
+	return func() tea.Msg {
+		_, err := repo.Run("pull", "--rebase")
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionPullRebase, err: statusErr}
+		}
+		return executedMsg{action: state.ActionPullRebase, status: status, err: err}
+	}
+}
+
 func executeAbort(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
-		_, err := repo.Run("merge", "--abort")
+		// 현재 리포지토리 상태를 1차 파악하여 merge abort 인지 rebase abort 인지 구분합니다.
+		currentStatus, statusErr := repo.Status(context.Background(), limit)
+		var err error
+		if statusErr == nil && currentStatus.RebaseInProgress {
+			_, err = repo.Run("rebase", "--abort")
+		} else {
+			_, err = repo.Run("merge", "--abort")
+		}
 		status, statusErr := repo.Status(context.Background(), limit)
 		if statusErr != nil {
 			return executedMsg{action: state.ActionAbort, err: statusErr}
@@ -501,11 +530,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.isFF {
 			titleMsg = "Do you want to continue?"
 			detailMsg = "The branch will fast-forward to the highlighted target commit."
+			m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
 		} else {
-			titleMsg = "Do you want to continue?"
-			detailMsg = "The branches have diverged. Merging may cause conflicts."
+			titleMsg = "Choose Pull Integration"
+			detailMsg = "The branches have diverged. Choose integration strategy:\n\nm: merge pull (recreates merge commit)\nr: rebase pull (replays commits)\nesc: cancel integration"
+			m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
 		}
-		m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
+		m.status.Title = titleMsg
 		return m, nil
 	case executedMsg:
 		if msg.err != nil {
@@ -534,12 +565,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status.Title = titleMsg
 				return m, nil
 			}
-			if msg.action == state.ActionPull && msg.status.MergeInProgress {
+			if (msg.action == state.ActionPull || msg.action == state.ActionPullMerge || msg.action == state.ActionPullRebase) && (msg.status.MergeInProgress || msg.status.RebaseInProgress) {
 				m.repoStatus = msg.status
 				syncBrowseState(&m, msg.status)
 				m.status = state.New().WithBrowse()
 				m.status.Message = "Pull stopped with conflicts."
-				m.status.Detail = "Press enter to abort the in-progress merge."
+				m.status.Detail = "Press enter to abort the in-progress merge/rebase."
 				telemetry.Log("app", "execute_conflicted", map[string]string{
 					"action": string(msg.action),
 					"head":   msg.status.Head,
@@ -567,11 +598,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.repoStatus = msg.status
-		if msg.action == state.ActionPush || msg.action == state.ActionForcePush || msg.action == state.ActionSetUpstream {
+		if msg.action == state.ActionPush || msg.action == state.ActionForcePush || msg.action == state.ActionSetUpstream || msg.action == state.ActionPullMerge || msg.action == state.ActionPullRebase {
 			m.handshakeCommits = make(map[string]bool)
 			syncBrowseState(&m, msg.status)
 			m.status = deriveStatus(msg.status)
-			m.status.Message = fmt.Sprintf("Push completed for %s.", msg.target)
+			if msg.action == state.ActionPullMerge || msg.action == state.ActionPullRebase {
+				m.status.Message = "Pull completed successfully."
+			} else {
+				m.status.Message = fmt.Sprintf("Push completed for %s.", msg.target)
+			}
 			telemetry.Log("app", "execute_action", map[string]string{
 				"action": string(msg.action),
 				"head":   msg.status.Head,
@@ -703,8 +738,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				action := m.status.Action
 				m.handshakeCommits = make(map[string]bool)
 				if action == state.ActionPull {
-					m.status = state.New().WithLoading("Running pull...")
-					return m, executePull(m.repo, m.commitLimit)
+					if m.pullIsFastForward {
+						m.status = state.New().WithLoading("Running pull...")
+						return m, executePull(m.repo, m.commitLimit)
+					} else {
+						m.status = state.New().WithLoading("Running merge pull...")
+						return m, executePullMerge(m.repo, m.commitLimit)
+					}
 				} else if action == state.ActionSetUpstream {
 					m.status = state.New().WithLoading("Pushing new branch and tracking upstream...")
 					return m, executePushSetUpstream(m.repo, m.repoStatus.Branch, m.commitLimit)
@@ -717,6 +757,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, executeAction(m.repo, action, target, m.commitLimit)
 				}
 				m.status = deriveStatus(m.repoStatus)
+				return m, nil
+			case "m":
+				action := m.status.Action
+				if action == state.ActionPull && !m.pullIsFastForward {
+					m.handshakeCommits = make(map[string]bool)
+					m.status = state.New().WithLoading("Running merge pull...")
+					return m, executePullMerge(m.repo, m.commitLimit)
+				}
+				return m, nil
+			case "r":
+				action := m.status.Action
+				if action == state.ActionPull && !m.pullIsFastForward {
+					m.handshakeCommits = make(map[string]bool)
+					m.status = state.New().WithLoading("Running rebase pull...")
+					return m, executePullRebase(m.repo, m.commitLimit)
+				}
 				return m, nil
 			case "n", "esc":
 				m.handshakeCommits = make(map[string]bool)
@@ -796,8 +852,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		case "a":
-			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionCurrent && m.repoStatus.MergeInProgress {
-				m.status = state.New().WithLoading("Aborting merge...")
+			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionCurrent && (m.repoStatus.MergeInProgress || m.repoStatus.RebaseInProgress) {
+				m.status = state.New().WithLoading("Aborting merge/rebase...")
 				return m, executeAbort(m.repo, m.commitLimit)
 			}
 		case "esc":
@@ -951,10 +1007,10 @@ func deriveStatus(rs git.Status) state.Status {
 	switch {
 	case rs.Root == "":
 		return state.New().WithBlocked(state.BlockNoRepo, "Not inside a Git repository.", "Run this tool from a repo root.")
-	case rs.MergeInProgress:
+	case rs.MergeInProgress || rs.RebaseInProgress:
 		status := state.New().WithBrowse()
-		status.Message = "Merge in progress after conflict."
-		status.Detail = "Press enter to abort the in-progress merge."
+		status.Message = "Merge/Rebase in progress after conflict."
+		status.Detail = "Press enter to abort the in-progress merge/rebase."
 		return status
 	case rs.Detached:
 		return state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pick a branch before running pull, merge, or rebase.")
@@ -974,8 +1030,8 @@ func actionPull(rs git.Status) state.Status {
 	if rs.Detached {
 		return state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pull needs a branch with an upstream.")
 	}
-	if rs.MergeInProgress {
-		return state.New().WithBlocked(state.BlockUnknown, "A merge is already in progress.", "Abort or resolve the existing merge before pulling again.")
+	if rs.MergeInProgress || rs.RebaseInProgress {
+		return state.New().WithBlocked(state.BlockUnknown, "A merge/rebase is already in progress.", "Abort or resolve the existing merge/rebase before pulling again.")
 	}
 	if rs.NoRemote {
 		return state.New().WithBlocked(state.BlockNoRemote, "No remote configured.", "Pull needs origin or another remote.")
@@ -1058,10 +1114,57 @@ type graphRow struct {
 }
 
 func graphRows(rs git.Status) []graphRow {
+	rs = injectVirtualConflictNode(rs)
 	if hasGraphPrefix(rs.GraphCommits) {
 		return graphRowsFromGitGraph(rs)
 	}
 	return graphRowsLegacy(rs)
+}
+
+func injectVirtualConflictNode(rs git.Status) git.Status {
+	if !rs.MergeInProgress && !rs.RebaseInProgress {
+		return rs
+	}
+
+	newCommits := make([]git.GraphCommit, 0, len(rs.GraphCommits)+1)
+
+	vc := git.GraphCommit{
+		Hash:        "VIRTUAL_CONFLICT_HASH",
+		Subject:     "conflict",
+		RelativeAge: "now",
+		Author:      "You",
+	}
+	if rs.Head != "" {
+		vc.Parents = append(vc.Parents, rs.Head)
+	}
+	if rs.ConflictTarget != "" {
+		vc.Parents = append(vc.Parents, rs.ConflictTarget)
+	}
+
+	if hasGraphPrefix(rs.GraphCommits) {
+		if len(rs.GraphCommits) > 0 {
+			originalGraph := rs.GraphCommits[0].Graph
+			vc.Graph = originalGraph
+
+			modifiedFirst := rs.GraphCommits[0]
+			modifiedFirst.Graph = strings.ReplaceAll(originalGraph, "*", "|")
+
+			newCommits = append(newCommits, vc)
+			newCommits = append(newCommits, modifiedFirst)
+			if len(rs.GraphCommits) > 1 {
+				newCommits = append(newCommits, rs.GraphCommits[1:]...)
+			}
+		} else {
+			vc.Graph = "*"
+			newCommits = append(newCommits, vc)
+		}
+	} else {
+		newCommits = append(newCommits, vc)
+		newCommits = append(newCommits, rs.GraphCommits...)
+	}
+
+	rs.GraphCommits = newCommits
+	return rs
 }
 
 func graphRowsFromGitGraph(rs git.Status) []graphRow {

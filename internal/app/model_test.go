@@ -39,11 +39,95 @@ func TestDeriveStatusShowsAbortWhenMergeInProgress(t *testing.T) {
 	if got.Mode != state.ModeBrowse {
 		t.Fatalf("expected browse mode, got %s", got.Mode)
 	}
-	if got.Message != "Merge in progress after conflict." {
+	if got.Message != "Merge/Rebase in progress after conflict." {
 		t.Fatalf("expected merge conflict message, got %q", got.Message)
 	}
-	if got.Detail != "Press enter to abort the in-progress merge." {
+	if got.Detail != "Press enter to abort the in-progress merge/rebase." {
 		t.Fatalf("expected merge conflict detail, got %q", got.Detail)
+	}
+}
+
+func TestDeriveStatusShowsAbortWhenRebaseInProgress(t *testing.T) {
+	got := deriveStatus(git.Status{Root: "/repo", Branch: "main", RebaseInProgress: true})
+	if got.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode, got %s", got.Mode)
+	}
+	if got.Message != "Merge/Rebase in progress after conflict." {
+		t.Fatalf("expected rebase conflict message, got %q", got.Message)
+	}
+	if got.Detail != "Press enter to abort the in-progress merge/rebase." {
+		t.Fatalf("expected rebase conflict detail, got %q", got.Detail)
+	}
+}
+
+func TestInjectVirtualConflictNode(t *testing.T) {
+	// 1. No merge/rebase in progress -> should not modify
+	rsNormal := git.Status{
+		Root:            "/repo",
+		MergeInProgress: false,
+		GraphCommits: []git.GraphCommit{
+			{Hash: "abc123", Graph: "*"},
+		},
+	}
+	gotNormal := injectVirtualConflictNode(rsNormal)
+	if len(gotNormal.GraphCommits) != 1 || gotNormal.GraphCommits[0].Hash != "abc123" {
+		t.Fatalf("should not modify commits if no conflict in progress")
+	}
+
+	// 2. Merge in progress with graph prefix & conflict subject
+	rsConflict := git.Status{
+		Root:                  "/repo",
+		Head:                  "abc123",
+		ConflictTarget:        "def456",
+		ConflictTargetSubject: "Feature commit message",
+		MergeInProgress:       true,
+		GraphCommits: []git.GraphCommit{
+			{Hash: "abc123", Graph: "*   "},
+		},
+	}
+	gotConflict := injectVirtualConflictNode(rsConflict)
+	if len(gotConflict.GraphCommits) != 2 {
+		t.Fatalf("expected 2 commits, got %d", len(gotConflict.GraphCommits))
+	}
+	vc := gotConflict.GraphCommits[0]
+	if vc.Hash != "VIRTUAL_CONFLICT_HASH" {
+		t.Fatalf("expected virtual conflict hash, got %s", vc.Hash)
+	}
+	if vc.Subject != "conflict" {
+		t.Fatalf("expected detailed merge conflict subject, got %q", vc.Subject)
+	}
+	if vc.Graph != "*   " {
+		t.Fatalf("expected virtual graph to copy c0 graph, got %q", vc.Graph)
+	}
+	if len(vc.Parents) != 2 || vc.Parents[0] != "abc123" || vc.Parents[1] != "def456" {
+		t.Fatalf("expected Parents to have local head and conflict target, got %v", vc.Parents)
+	}
+	c0 := gotConflict.GraphCommits[1]
+	if c0.Hash != "abc123" {
+		t.Fatalf("expected original first commit at index 1")
+	}
+	if c0.Graph != "|   " {
+		t.Fatalf("expected c0 graph * to be replaced with |, got %q", c0.Graph)
+	}
+
+	// 3. Rebase in progress with conflict subject
+	rsRebase := git.Status{
+		Root:                  "/repo",
+		Head:                  "abc123",
+		ConflictTarget:        "def456",
+		ConflictTargetSubject: "Base branch commit message",
+		RebaseInProgress:      true,
+		GraphCommits: []git.GraphCommit{
+			{Hash: "abc123", Graph: "*   "},
+		},
+	}
+	gotRebase := injectVirtualConflictNode(rsRebase)
+	if len(gotRebase.GraphCommits) != 2 {
+		t.Fatalf("expected 2 commits, got %d", len(gotRebase.GraphCommits))
+	}
+	vcRebase := gotRebase.GraphCommits[0]
+	if vcRebase.Subject != "conflict" {
+		t.Fatalf("expected detailed rebase conflict subject, got %q", vcRebase.Subject)
 	}
 }
 
