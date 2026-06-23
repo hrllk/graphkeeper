@@ -92,7 +92,7 @@ func (m model) View() string {
 
 	centeredBody := lipgloss.Place(m.width, m.height-2, lipgloss.Center, lipgloss.Center, body)
 
-	footer := muted.Render("global: tab/shift+tab section  •  up/down/j/k move  •  f fetch  •  q quit")
+	footer := muted.Render("global: 1 local  •  2 remote  •  3 tags  •  4 graph  •  tab/shift+tab section  •  up/down/j/k move  •  f fetch  •  q quit")
 
 	return centeredBody + "\n" + footer + "\n"
 }
@@ -137,15 +137,16 @@ func (m model) renderGraphContent(width, height int) string {
 	lines := make([]string, 0, height)
 	lines = append(lines, "  "+muted.Render(fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))))
 	graphActive := m.activeSection == sectionGraph
+	graphColWidth := max(18, int(float64(width)*0.30))
 	rawGraph := len(rows) > 0 && rows[0].Graph != ""
 	if len(lines) < height {
-		lines = append(lines, "  "+muted.Render(fmt.Sprintf("%-8s %-10s %-7s %-10s %s", "commit", "branches", "graph", "when", "title")))
+		lines = append(lines, "  "+muted.Render(fmt.Sprintf("%-8s %-10s %-*s %-7s %-10s", "commit", "branches", graphColWidth, "graph", "when", "title")))
 	}
 	for i := start; i < end; i++ {
 		if len(lines) >= height {
 			break
 		}
-		lines = append(lines, renderGraphLine(rows[i], graphActive && i == m.sectionCursor[sectionGraph], graphActive, m.graphLaneCursor, m.repoStatus.LocalBranches))
+		lines = append(lines, renderGraphLine(rows[i], graphActive && i == m.sectionCursor[sectionGraph], graphActive, m.graphLaneCursor, m.repoStatus.LocalBranches, graphColWidth))
 		if !rawGraph && i+1 < len(rows) {
 			for _, line := range renderGraphConnectorLines(rows[i], rows[i+1]) {
 				if len(lines) >= height {
@@ -306,14 +307,14 @@ func renderActionHelpLines(m model) []string {
 	}
 }
 
-func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string) string {
+func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int) string {
 	if row.Graph != "" {
-		return renderRawGraphLine(row, selected, graphActive, laneCursor, localBranches)
+		return renderRawGraphLine(row, selected, graphActive, laneCursor, localBranches, graphColWidth)
 	}
 	hash := fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
 	refInfo := compactDecorationInfo(row.Commit.Decorations, localBranches)
 	refs := fmt.Sprintf("%-10s", refInfo.Text)
-	graphCell := graphCells(row, graphActive, selected, laneCursor)
+	graphCell := graphCells(row, graphActive, selected, laneCursor, graphColWidth)
 	when := fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
 	title := fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
 	isHead := hasHeadDecoration(row.Commit.Decorations)
@@ -326,16 +327,16 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 	if graphActive && selected {
 		hash = pointerMark.Render(hash)
 	}
-	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
+	line := hash + " " + refs + " " + padRight(graphCell, graphColWidth) + "  " + when + " " + title
 	if selected {
 		return "> " + line
 	}
 	return "  " + line
 }
 
-func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string) string {
+func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int) string {
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
-		line := fmt.Sprintf("%-8s %-10s %-7s %-10s %s", "", "", row.Graph, "", "")
+		line := fmt.Sprintf("%-8s %-10s %-*s  %-7s %-10s", "", "", graphColWidth, row.Graph, "", "")
 		if selected {
 			return "> " + line
 		}
@@ -360,21 +361,21 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 	} else if pointerFocused && refInfo.HasBranch {
 		refs = branchMark.Render(refs)
 	}
-	graphCell := graphLineCell(row, graphActive, selected, laneCursor)
+	graphCell := highlightRawGraphPrefix(row.Graph, lane, pointerFocused, refInfo.HasLocalHead)
 	when := fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
 	title := fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
-	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
+	line := hash + " " + refs + " " + padRight(graphCell, graphColWidth) + "  " + when + " " + title
 	if selected {
 		return "> " + line
 	}
 	return "  " + line
 }
 
-func graphCells(row graphRow, graphActive bool, selected bool, laneCursor int) string {
-	return graphLineCell(row, graphActive, selected, laneCursor)
+func graphCells(row graphRow, graphActive bool, selected bool, laneCursor int, graphColWidth int) string {
+	return graphLineCell(row, graphActive, selected, laneCursor, graphColWidth)
 }
 
-func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int) string {
+func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int, graphColWidth int) string {
 	if row.Graph == "" && row.Commit.Hash == "" {
 		return ""
 	}
@@ -406,7 +407,7 @@ func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int
 			}
 			cells = append(cells, cell)
 		}
-		return strings.Join(cells, " ")
+		return padRight(strings.Join(cells, " "), graphColWidth)
 	}
 	graphRunes := []rune(row.Graph)
 	width := len(graphRunes)
@@ -424,7 +425,39 @@ func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int
 		}
 		b.WriteRune(r)
 	}
+	return padRight(b.String(), graphColWidth)
+}
+
+func highlightRawGraphPrefix(graph string, lane int, focused bool, hasHead bool) string {
+	if !focused {
+		if !hasHead {
+			return graph
+		}
+	}
+	runes := []rune(graph)
+	if lane < 0 || lane >= len(runes) {
+		return graph
+	}
+	var b strings.Builder
+	for i, r := range runes {
+		if i == lane {
+			if hasHead {
+				b.WriteString(headMark.Render(string(r)))
+			} else {
+				b.WriteString(pointerMark.Render(string(r)))
+			}
+			continue
+		}
+		b.WriteRune(r)
+	}
 	return b.String()
+}
+
+func padRight(value string, width int) string {
+	if lipgloss.Width(value) >= width {
+		return value
+	}
+	return value + strings.Repeat(" ", width-lipgloss.Width(value))
 }
 
 func renderGraphConnectorLines(current, next graphRow) []string {

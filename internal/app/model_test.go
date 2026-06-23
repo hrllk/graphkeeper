@@ -392,6 +392,50 @@ func TestFetchKeyWorksFromAnyBrowseSection(t *testing.T) {
 	}
 }
 
+func TestNumberKeysSwitchSections(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+		commitLimit:   initialGraphCommitLimit,
+	}
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected section switch to be handled synchronously")
+	}
+	if got.activeSection != sectionCurrent {
+		t.Fatalf("expected 1 to switch to local/current section, got %v", got.activeSection)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected section switch to be handled synchronously")
+	}
+	if got.activeSection != sectionRemote {
+		t.Fatalf("expected 2 to switch to remote section, got %v", got.activeSection)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected section switch to be handled synchronously")
+	}
+	if got.activeSection != sectionTags {
+		t.Fatalf("expected 3 to switch to tags section, got %v", got.activeSection)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected section switch to be handled synchronously")
+	}
+	if got.activeSection != sectionGraph {
+		t.Fatalf("expected 4 to switch to graph section, got %v", got.activeSection)
+	}
+}
+
 func TestSpaceDoesNotCheckoutFromGraphSection(t *testing.T) {
 	m := model{
 		status:        state.New().WithBrowse(),
@@ -669,7 +713,7 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 	if graphRowWidth(rows[0]) < 2 {
 		t.Fatalf("expected merge row to expand lanes, got %d", graphRowWidth(rows[0]))
 	}
-	got := renderGraphLine(rows[0], true, true, 1, nil)
+	got := renderGraphLine(rows[0], true, true, 1, nil, 24)
 	if !strings.Contains(got, "*") || !strings.Contains(got, "|") {
 		t.Fatalf("unexpected rendered graph row: %q", got)
 	}
@@ -775,9 +819,12 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.HasPrefix(rows[0].Graph, "*") || rows[1].Commit.Hash != "" || !strings.HasPrefix(rows[2].Graph, "| *") {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
-	line := renderGraphLine(rows[0], true, true, 0, []string{"main"})
+	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24)
 	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->main") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge b...") < 0 {
 		t.Fatalf("expected graph line to include hash, branches, when, title and graph, got %q", line)
+	}
+	if !strings.Contains(line, headMark.Render("*")) {
+		t.Fatalf("expected HEAD pointer to be highlighted, got %q", line)
 	}
 	if strings.Index(line, "head") > strings.Index(line, "o/l->main") {
 		t.Fatalf("expected hash to lead branches, got %q", line)
@@ -788,9 +835,13 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Contains(line, "Merge branch") || strings.Contains(line, "origin/") || strings.Contains(line, "develop") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
 	}
-	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"})
+	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24)
 	if !strings.Contains(connector, "|\\") {
 		t.Fatalf("expected connector graph line to stay visible, got %q", connector)
+	}
+	focused := renderGraphLine(rows[2], true, true, 0, []string{"main"}, 24)
+	if !strings.Contains(focused, pointerMark.Render("*")) {
+		t.Fatalf("expected branch row graph pointer to be highlighted, got %q", focused)
 	}
 	if compactWhenText("5 minutes ago") != "5mins" {
 		t.Fatalf("expected relative time to compact to 5mins")
@@ -832,7 +883,7 @@ func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
 	if graphRowWidth(rows[1]) != 1 {
 		t.Fatalf("expected linear child commit to stay in one lane, got %d", graphRowWidth(rows[1]))
 	}
-	if got := renderGraphLine(rows[1], false, false, 0, nil); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
+	if got := renderGraphLine(rows[1], false, false, 0, nil, 24); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
 		t.Fatalf("expected single-lane render for linear DAG, got %q", got)
 	}
 }
@@ -866,10 +917,10 @@ func TestGraphRowsKeepsLocalAndOriginDivergedFamiliesSeparate(t *testing.T) {
 	if rows[2].Lane != 0 {
 		t.Fatalf("expected checkout branch family lane to stay leftmost, got lane %d", rows[2].Lane)
 	}
-	if got := renderGraphLine(rows[0], false, false, 0, nil); !strings.Contains(got, "| *") {
+	if got := renderGraphLine(rows[0], false, false, 0, nil, 24); !strings.Contains(got, "| *") {
 		t.Fatalf("expected top remote row to render as split branch, got %q", got)
 	}
-	if got := renderGraphLine(rows[2], false, false, 0, nil); !strings.Contains(got, "* |") {
+	if got := renderGraphLine(rows[2], false, false, 0, nil, 24); !strings.Contains(got, "* |") {
 		t.Fatalf("expected local head row to render as split branch, got %q", got)
 	}
 }
@@ -983,7 +1034,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 	if parentIdx < 0 || parentIdx+1 >= len(rows) || rows[parentIdx+1].Commit.Hash != "efb164e" {
 		t.Fatalf("expected efb164e immediately after 37f0954, got index=%d rows=%v", parentIdx, rows)
 	}
-	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil)
+	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil, 24)
 	if !strings.Contains(parentLine, "efb164e") {
 		t.Fatalf("expected efb164e row to render, got %q", parentLine)
 	}
@@ -992,7 +1043,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 	if rootIdx < 0 || rootIdx+1 >= len(rows) || rows[rootIdx+1].Commit.Hash != "5525707" {
 		t.Fatalf("expected 5525707 immediately after 4ba1faf, got index=%d rows=%v", rootIdx, rows)
 	}
-	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil)
+	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil, 24)
 	if !strings.Contains(rootLine, "5525707") {
 		t.Fatalf("expected common root row to render, got %q", rootLine)
 	}
@@ -1005,7 +1056,7 @@ func TestRenderGraphLineKeepsCollapsedCommitMarker(t *testing.T) {
 		After:  []laneRef{{Hash: "base"}},
 		Lane:   2,
 	}
-	got := renderGraphLine(row, false, false, 0, nil)
+	got := renderGraphLine(row, false, false, 0, nil, 24)
 	if !strings.Contains(got, "*") {
 		t.Fatalf("expected collapsed commit line to keep marker, got %q", got)
 	}

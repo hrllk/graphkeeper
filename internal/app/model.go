@@ -512,6 +512,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "1":
+			if m.status.Mode == state.ModeBrowse {
+				m = switchBrowseSection(m, sectionCurrent)
+			}
+		case "2":
+			if m.status.Mode == state.ModeBrowse {
+				m = switchBrowseSection(m, sectionRemote)
+			}
+		case "3":
+			if m.status.Mode == state.ModeBrowse {
+				m = switchBrowseSection(m, sectionTags)
+			}
+		case "4":
+			if m.status.Mode == state.ModeBrowse {
+				m = switchBrowseSection(m, sectionGraph)
+			}
 		case "f":
 			if m.status.Mode == state.ModeBrowse {
 				m.status.Message = "Fetching remotes..."
@@ -1292,7 +1308,7 @@ func syncBrowseState(m *model, rs git.Status) {
 			}
 		}
 		m.sectionCursor[sectionGraph] = row
-		m.graphLaneCursor = clampLaneCursor(m.graphLaneCursor, rows[row])
+		m.graphLaneCursor = graphPointerLane(rows[row])
 	}
 }
 
@@ -1345,6 +1361,12 @@ func prevGraphSection(current graphSection) graphSection {
 		}
 	}
 	return sectionGraph
+}
+
+func switchBrowseSection(m model, section graphSection) model {
+	m.activeSection = section
+	m.awaitingGoTop = false
+	return m
 }
 
 func sectionTargets(rs git.Status, section graphSection) []state.TargetItem {
@@ -1442,7 +1464,7 @@ func moveBrowseCursor(m model, delta int) model {
 			m.graphScroll = cursor - page + 1
 		}
 		if cursor >= 0 && cursor < len(rows) {
-			m.graphLaneCursor = clampLaneCursor(m.graphLaneCursor, rows[cursor])
+			m.graphLaneCursor = graphPointerLane(rows[cursor])
 		}
 	case sectionCurrent, sectionLocal, sectionRemote, sectionTags:
 		items := sectionTargets(m.repoStatus, m.activeSection)
@@ -1488,7 +1510,7 @@ func pageBrowseGraph(m model, pages int) model {
 	m.sectionCursor[sectionGraph] = cursor
 	m.graphScroll = clampScroll(cursor, total, page)
 	if cursor >= 0 && cursor < len(rows) {
-		m.graphLaneCursor = clampLaneCursor(m.graphLaneCursor, rows[cursor])
+		m.graphLaneCursor = graphPointerLane(rows[cursor])
 	}
 	return m
 }
