@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/git-graph-tui/internal/git"
+	"hrllk/git-graph-tui/internal/graph"
 	"hrllk/git-graph-tui/internal/state"
 	"hrllk/git-graph-tui/internal/telemetry"
 )
@@ -124,28 +125,19 @@ type createdBranchMsg struct {
 	err    error
 }
 
-type graphNode struct {
-	Hash        string
-	Parents     []string
-	RelativeAge string
-	Author      string
-	Decorations []string
-	Subject     string
-}
+type graphNode = graph.Node
 
-type laneSide string
+type laneSide = graph.LaneSide
 
 const (
-	laneLocal  laneSide = "local"
-	laneRemote laneSide = "remote"
-	laneOther  laneSide = "other"
+	laneLocal  = graph.LaneLocal
+	laneRemote = graph.LaneRemote
+	laneOther  = graph.LaneOther
 )
 
-type laneRef struct {
-	Hash   string
-	Family string
-	Side   laneSide
-}
+type laneRef = graph.LaneRef
+
+type graphRow = graph.Row
 
 func loadRepoState(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
@@ -1150,37 +1142,11 @@ func actionPickTargets(rs git.Status, action state.Action) state.Status {
 }
 
 func graphNodes(rs git.Status) []graphNode {
-	items := make([]graphNode, 0, len(rs.GraphCommits))
-	for _, commit := range rs.GraphCommits {
-		items = append(items, graphNode{
-			Hash:        commit.Hash,
-			Parents:     append([]string(nil), commit.Parents...),
-			RelativeAge: commit.RelativeAge,
-			Author:      commit.Author,
-			Decorations: append([]string(nil), commit.Decorations...),
-			Subject:     commit.Subject,
-		})
-	}
-	return items
-}
-
-type graphRow struct {
-	Commit       graphNode
-	Graph        string
-	Children     []string
-	Before       []laneRef
-	After        []laneRef
-	Lane         int
-	DisplayWidth int
-	Collapse     bool
+	return graph.Nodes(rs)
 }
 
 func graphRows(rs git.Status) []graphRow {
-	rs = injectVirtualConflictNode(rs)
-	if hasGraphPrefix(rs.GraphCommits) {
-		return graphRowsFromGitGraph(rs)
-	}
-	return graphRowsLegacy(rs)
+	return graph.Rows(rs)
 }
 
 func injectVirtualConflictNode(rs git.Status) git.Status {
@@ -1505,23 +1471,7 @@ func firstParentSet(commits []graphNode, head string) map[string]bool {
 }
 
 func graphRowWidth(row graphRow) int {
-	if row.Graph != "" {
-		return max(1, len([]rune(row.Graph)))
-	}
-	if shouldCollapseRowDisplay(row) {
-		return 1
-	}
-	if row.DisplayWidth > 0 {
-		return row.DisplayWidth
-	}
-	width := len(row.Before)
-	if len(row.After) > width {
-		width = len(row.After)
-	}
-	if width == 0 {
-		width = 1
-	}
-	return width
+	return graph.RowWidth(row)
 }
 
 func indexOf(values []string, target string) int {
@@ -1727,15 +1677,7 @@ func syncBrowseState(m *model, rs git.Status) {
 }
 
 func findGraphRowByHash(rows []graphRow, hash string) int {
-	if hash == "" {
-		return -1
-	}
-	for i, row := range rows {
-		if row.Commit.Hash == hash {
-			return i
-		}
-	}
-	return -1
+	return graph.FindRowByHash(rows, hash)
 }
 
 func graphSectionOrder() []graphSection {
@@ -1986,20 +1928,7 @@ const (
 )
 
 func graphPageSize(m *model) int {
-	totalHeight := int(float64(m.height) * 0.76)
-	if totalHeight < 18 {
-		totalHeight = 18
-	}
-	if totalHeight > m.height-2 {
-		totalHeight = m.height - 2
-	}
-	_, bottomHeight := splitDashboardHeights(totalHeight)
-	graphHeight, _ := splitPaneHeights(bottomHeight)
-	size := graphHeight - graphViewHeightOffset
-	if size < 3 {
-		size = 3
-	}
-	return size
+	return graph.PageSize(m.height)
 }
 
 func moveTarget(s state.Status, delta int) state.Status {
@@ -2054,70 +1983,11 @@ func moveLanePointer(current int, row graphRow, delta int) int {
 }
 
 func moveSelectableGraphPointer(current int, rows []graphRow, delta int) int {
-	if len(rows) == 0 {
-		return -1
-	}
-	if current < 0 || current >= len(rows) {
-		current = 0
-	}
-	if delta == 0 {
-		if rows[current].Commit.Hash != "" {
-			return current
-		}
-		return nearestSelectableGraphRow(rows, current, 1)
-	}
-	step := 1
-	if delta < 0 {
-		step = -1
-	}
-	remaining := delta
-	if remaining < 0 {
-		remaining = -remaining
-	}
-	idx := current
-	for remaining > 0 {
-		idx += step
-		for idx >= 0 && idx < len(rows) && rows[idx].Commit.Hash == "" {
-			idx += step
-		}
-		if idx < 0 {
-			return 0
-		}
-		if idx >= len(rows) {
-			return len(rows) - 1
-		}
-		remaining--
-	}
-	return nearestSelectableGraphRow(rows, idx, step)
+	return graph.MoveSelectableGraphPointer(current, rows, delta)
 }
 
 func nearestSelectableGraphRow(rows []graphRow, start, step int) int {
-	if len(rows) == 0 {
-		return -1
-	}
-	if start < 0 {
-		start = 0
-	}
-	if start >= len(rows) {
-		start = len(rows) - 1
-	}
-	if rows[start].Commit.Hash != "" {
-		return start
-	}
-	if step == 0 {
-		step = 1
-	}
-	for i := start + step; i >= 0 && i < len(rows); i += step {
-		if rows[i].Commit.Hash != "" {
-			return i
-		}
-	}
-	for i := start - step; i >= 0 && i < len(rows); i -= step {
-		if rows[i].Commit.Hash != "" {
-			return i
-		}
-	}
-	return start
+	return graph.NearestSelectableGraphRow(rows, start, step)
 }
 
 func clampLaneCursor(current int, row graphRow) int {
@@ -2132,26 +2002,7 @@ func clampLaneCursor(current int, row graphRow) int {
 }
 
 func graphPointerLane(row graphRow) int {
-	if row.Graph != "" {
-		if idx := strings.Index(row.Graph, "*"); idx >= 0 {
-			return idx
-		}
-		return 0
-	}
-	maxLane := graphRowWidth(row) - 1
-	if maxLane < 0 {
-		return 0
-	}
-	if shouldCollapseRowDisplay(row) {
-		return 0
-	}
-	if row.Lane < 0 {
-		return 0
-	}
-	if row.Lane > maxLane {
-		return maxLane
-	}
-	return row.Lane
+	return graph.PointerLane(row)
 }
 
 // isLocalGraphPointer returns true when the current graph cursor is pointing
@@ -2220,11 +2071,7 @@ func clampCursor(current, total int) int {
 }
 
 func currentGraphFocus(rs git.Status, cursor int) graphNode {
-	items := graphRows(rs)
-	if cursor < 0 || cursor >= len(items) {
-		return graphNode{}
-	}
-	return items[cursor].Commit
+	return graph.CurrentFocus(rs, cursor)
 }
 
 func checkoutTargetFromFocus(node graphNode) string {
