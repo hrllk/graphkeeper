@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -631,11 +630,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.action == state.ActionCheckout {
 			m.commitLimit = initialGraphCommitLimit
-			rows := graphRows(msg.status)
+			rows := graph.Rows(msg.status)
 			if len(rows) > 0 {
 				m.sectionCursor[sectionGraph] = 0
 				m.graphScroll = 0
-				m.graphLaneCursor = graphPointerLane(rows[0])
+				m.graphLaneCursor = graph.PointerLane(rows[0])
 			}
 			syncBrowseState(&m, msg.status)
 			m.status = deriveStatus(msg.status)
@@ -666,8 +665,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg.action == state.ActionReset {
-			rows := graphRows(msg.status)
-			rowIdx := findGraphRowByHash(rows, msg.status.Head)
+			rows := graph.Rows(msg.status)
+			rowIdx := graph.FindRowByHash(rows, msg.status.Head)
 			if rowIdx >= 0 {
 				m.sectionCursor[sectionGraph] = rowIdx
 				m.graphScroll = clampScroll(rowIdx, len(rows), graphPageSize(&m))
@@ -683,8 +682,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg.action == state.ActionMerge || msg.action == state.ActionRebase {
-			rows := graphRows(msg.status)
-			rowIdx := findGraphRowByHash(rows, msg.status.Head)
+			rows := graph.Rows(msg.status)
+			rowIdx := graph.FindRowByHash(rows, msg.status.Head)
 			if rowIdx >= 0 {
 				m.sectionCursor[sectionGraph] = rowIdx
 				m.graphScroll = clampScroll(rowIdx, len(rows), graphPageSize(&m))
@@ -856,7 +855,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						"Move the lane cursor onto a local branch to enable merge.")
 					return m, nil
 				}
-				focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+				focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 				if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 					return m, nil
 				}
@@ -876,7 +875,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						"Move the lane cursor onto a local branch to enable rebase.")
 					return m, nil
 				}
-				focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+				focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 				if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 					return m, nil
 				}
@@ -890,7 +889,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "s":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
-				focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+				focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 				if focus.Hash == "" {
 					m.status = state.New().WithBlocked(state.BlockUnknown, "No reset target.", "Move the pointer onto a commit line.")
 					return m, nil
@@ -953,9 +952,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.awaitingGoTop {
 					m.sectionCursor[sectionGraph] = 0
 					m.graphScroll = 0
-					rows := graphRows(m.repoStatus)
+					rows := graph.Rows(m.repoStatus)
 					if len(rows) > 0 {
-						m.graphLaneCursor = graphPointerLane(rows[0])
+						m.graphLaneCursor = graph.PointerLane(rows[0])
 					}
 					m.awaitingGoTop = false
 					return m, nil
@@ -964,24 +963,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "G":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
-				rows := graphRows(m.repoStatus)
+				rows := graph.Rows(m.repoStatus)
 				if len(rows) > 0 {
 					last := len(rows) - 1
 					m.sectionCursor[sectionGraph] = last
 					m.graphScroll = clampScroll(last, len(rows), graphPageSize(&m))
-					m.graphLaneCursor = graphPointerLane(rows[last])
+					m.graphLaneCursor = graph.PointerLane(rows[last])
 				}
 				m.awaitingGoTop = false
 				return maybeLoadMoreGraph(m)
 			}
 		case "H":
 			if m.status.Mode == state.ModeBrowse && m.activeSection == sectionGraph {
-				rows := graphRows(m.repoStatus)
-				rowIdx := findGraphRowByHash(rows, m.repoStatus.Head)
+				rows := graph.Rows(m.repoStatus)
+				rowIdx := graph.FindRowByHash(rows, m.repoStatus.Head)
 				if rowIdx >= 0 {
 					m.sectionCursor[sectionGraph] = rowIdx
 					m.graphScroll = clampScroll(rowIdx, len(rows), graphPageSize(&m))
-					m.graphLaneCursor = graphPointerLane(rows[rowIdx])
+					m.graphLaneCursor = graph.PointerLane(rows[rowIdx])
 				}
 				m.awaitingGoTop = false
 			}
@@ -1044,7 +1043,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				base := activeSectionTarget(m)
 				if base == "" {
-					focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+					focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 					base = focus.Hash
 				}
 				m.branchBase = base
@@ -1149,329 +1148,32 @@ func graphRows(rs git.Status) []graphRow {
 	return graph.Rows(rs)
 }
 
-func injectVirtualConflictNode(rs git.Status) git.Status {
-	if !rs.MergeInProgress && !rs.RebaseInProgress {
-		return rs
-	}
-
-	newCommits := make([]git.GraphCommit, 0, len(rs.GraphCommits)+1)
-
-	vc := git.GraphCommit{
-		Hash:        "VIRTUAL_CONFLICT_HASH",
-		Subject:     "conflict",
-		RelativeAge: "now",
-		Author:      "You",
-	}
-	if rs.Head != "" {
-		vc.Parents = append(vc.Parents, rs.Head)
-	}
-	if rs.ConflictTarget != "" {
-		vc.Parents = append(vc.Parents, rs.ConflictTarget)
-	}
-
-	if hasGraphPrefix(rs.GraphCommits) {
-		if len(rs.GraphCommits) > 0 {
-			originalGraph := rs.GraphCommits[0].Graph
-			vc.Graph = originalGraph
-
-			modifiedFirst := rs.GraphCommits[0]
-			modifiedFirst.Graph = strings.ReplaceAll(originalGraph, "*", "|")
-
-			newCommits = append(newCommits, vc)
-			newCommits = append(newCommits, modifiedFirst)
-			if len(rs.GraphCommits) > 1 {
-				newCommits = append(newCommits, rs.GraphCommits[1:]...)
-			}
-		} else {
-			vc.Graph = "*"
-			newCommits = append(newCommits, vc)
-		}
-	} else {
-		newCommits = append(newCommits, vc)
-		newCommits = append(newCommits, rs.GraphCommits...)
-	}
-
-	rs.GraphCommits = newCommits
-	return rs
-}
-
-func graphRowsFromGitGraph(rs git.Status) []graphRow {
-	commits := graphNodes(rs)
-	rows := make([]graphRow, 0, len(commits))
-	children := buildChildrenMap(commits)
-	for _, commit := range rs.GraphCommits {
-		if commit.Hash == "" && commit.Subject == "" && len(commit.Parents) == 0 && len(commit.Decorations) == 0 {
-			rows = append(rows, graphRow{
-				Graph:        commit.Graph,
-				DisplayWidth: max(len([]rune(commit.Graph)), 1),
-			})
-			continue
-		}
-		childRefs := append([]string(nil), children[commit.Hash]...)
-		row := graphRow{
-			Commit:       graphNode{Hash: commit.Hash, Parents: append([]string(nil), commit.Parents...), RelativeAge: commit.RelativeAge, Author: commit.Author, Decorations: append([]string(nil), commit.Decorations...), Subject: commit.Subject},
-			Graph:        commit.Graph,
-			Children:     childRefs,
-			DisplayWidth: max(max(len([]rune(commit.Graph)), len(childRefs)), 1),
-		}
-		rows = append(rows, row)
-	}
-	return rows
-}
-
-// Legacy lane-based fallback for older fixtures and compatibility tests.
-func graphRowsLegacy(rs git.Status) []graphRow {
-	commits := graphNodes(rs)
-	rows := make([]graphRow, 0, len(commits))
-	children := buildChildrenMap(commits)
-	preferred := firstParentSet(commits, rs.Head)
-	active := initialGraphLanes(commits, rs)
-	for _, commit := range commits {
-		matches := laneMatches(active, commit.Hash)
-		if len(matches) == 0 {
-			fallback := laneRef{Hash: commit.Hash, Side: laneOther}
-			active = ensureLaneSeeds(active, commit.Hash, []laneRef{fallback}, preferred[commit.Hash], rs.Branch)
-			matches = laneMatches(active, commit.Hash)
-		}
-		lane := chooseDisplayLane(active, matches, rs.Branch)
-		before := append([]laneRef(nil), active...)
-		after := advanceGraphLanes(before, matches, commit, rs.Branch, nil, false)
-		childRefs := append([]string(nil), children[commit.Hash]...)
-		row := graphRow{
-			Commit:       commit,
-			Children:     childRefs,
-			Before:       before,
-			After:        after,
-			Lane:         lane,
-			DisplayWidth: max(max(max(len(before), len(after)), len(childRefs)), 1),
-		}
-		rows = append(rows, row)
-		active = after
-	}
-	return rows
-}
-
-func hasGraphPrefix(commits []git.GraphCommit) bool {
-	for _, commit := range commits {
-		if commit.Graph != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func initialGraphLanes(commits []graphNode, rs git.Status) []laneRef {
-	if rs.Branch == "" || rs.Head == "" {
-		return make([]laneRef, 0, 8)
-	}
-	remoteTip := ""
-	remoteDecoration := "origin/" + rs.Branch
-	headPresent := false
-	for _, commit := range commits {
-		if commit.Hash == rs.Head {
-			headPresent = true
-		}
-		for _, decoration := range commit.Decorations {
-			if strings.TrimSpace(decoration) == remoteDecoration {
-				remoteTip = commit.Hash
-			}
-		}
-	}
-	if !headPresent {
-		return make([]laneRef, 0, 8)
-	}
-	lanes := []laneRef{
-		{Hash: rs.Head, Family: rs.Branch, Side: laneLocal},
-	}
-	if remoteTip != "" && remoteTip != rs.Head {
-		lanes = append(lanes, laneRef{Hash: remoteTip, Family: rs.Branch, Side: laneRemote})
-	}
-	return lanes
-}
-
-func buildLaneSeeds(commits []graphNode, rs git.Status) map[string][]laneRef {
-	localSet := make(map[string]struct{}, len(rs.LocalBranches))
-	for _, branch := range rs.LocalBranches {
-		localSet[branch] = struct{}{}
-	}
-	seeds := make(map[string][]laneRef, len(commits))
-	for _, commit := range commits {
-		refs := seedLaneRefs(commit.Decorations, localSet)
-		if len(refs) == 0 {
-			continue
-		}
-		for i := range refs {
-			refs[i].Hash = commit.Hash
-		}
-		sort.SliceStable(refs, func(i, j int) bool {
-			left := laneRefScore(refs[i], rs.Branch)
-			right := laneRefScore(refs[j], rs.Branch)
-			if left != right {
-				return left > right
-			}
-			leftSide := laneSidePriority(refs[i].Side)
-			rightSide := laneSidePriority(refs[j].Side)
-			if leftSide != rightSide {
-				return leftSide < rightSide
-			}
-			return refs[i].Family < refs[j].Family
-		})
-		seeds[commit.Hash] = refs
-	}
-	return seeds
-}
-
-func buildFamilyPriority(commits []graphNode, rs git.Status) map[string]int {
-	priority := make(map[string]int, len(rs.LocalBranches)+len(rs.RemoteBranches)+1)
-	if rs.Branch != "" {
-		priority[rs.Branch] = 0
-	}
-	return priority
-}
-
-func laneSeedFromDecoration(decoration string, localSet map[string]struct{}) (laneRef, bool) {
-	decoration = strings.TrimSpace(decoration)
-	switch {
-	case strings.HasPrefix(decoration, "HEAD -> "):
-		return laneRef{Family: strings.TrimPrefix(decoration, "HEAD -> "), Side: laneLocal}, true
-	case strings.HasPrefix(decoration, "origin/"):
-		family := strings.TrimPrefix(decoration, "origin/")
-		if _, ok := localSet[family]; ok {
-			return laneRef{Family: family, Side: laneRemote}, true
-		}
-		return laneRef{}, false
-	case strings.HasPrefix(decoration, "tag: "), decoration == "":
-		return laneRef{}, false
-	case strings.Contains(decoration, "/"):
-		return laneRef{}, false
-	default:
-		return laneRef{Family: decoration, Side: laneLocal}, true
-	}
-}
-
-func seedLaneRefs(decorations []string, localSet map[string]struct{}) []laneRef {
-	refs := make([]laneRef, 0, len(decorations))
-	seen := make(map[laneRef]struct{}, len(decorations))
-	for _, decoration := range decorations {
-		ref, ok := laneSeedFromDecoration(decoration, localSet)
-		if !ok {
-			continue
-		}
-		if _, exists := seen[ref]; exists {
-			continue
-		}
-		seen[ref] = struct{}{}
-		refs = append(refs, ref)
-	}
-	return refs
-}
-
-func distinctFamilies(refs []laneRef) map[string]struct{} {
-	families := make(map[string]struct{}, len(refs))
-	for _, ref := range refs {
-		if ref.Family == "" {
-			continue
-		}
-		families[ref.Family] = struct{}{}
-	}
-	return families
-}
-
-func laneRefScore(ref laneRef, currentBranch string) int {
-	score := 0
-	if ref.Family == currentBranch {
-		score += 100
-	}
-	switch ref.Side {
-	case laneLocal:
-		score += 10
-	case laneRemote:
-		score += 5
-	}
-	return score
-}
-
-func buildChildrenMap(commits []graphNode) map[string][]string {
-	children := make(map[string][]string)
-	for _, commit := range commits {
-		for _, parent := range commit.Parents {
-			if parent == "" {
-				continue
-			}
-			children[parent] = append(children[parent], commit.Hash)
-		}
-	}
-	return children
-}
-
-func ensureLaneSeeds(active []laneRef, hash string, seeds []laneRef, preferred bool, currentBranch string) []laneRef {
-	if hash == "" || len(seeds) == 0 {
-		return active
-	}
-	filtered := make([]laneRef, 0, len(seeds))
-	for _, seed := range seeds {
-		seed.Hash = hash
-		if hasLaneRef(active, seed) {
-			continue
-		}
-		filtered = append(filtered, seed)
-	}
-	if len(filtered) == 0 {
-		return active
-	}
-	if len(active) == 0 {
-		return append(active, filtered...)
-	}
-	prepend := preferred
-	if !prepend && currentBranch != "" {
-		for _, seed := range filtered {
-			if seed.Family == currentBranch {
-				prepend = true
-				break
-			}
-		}
-	}
-	if prepend {
-		return append(filtered, active...)
-	}
-	return append(active, filtered...)
-}
-
-func hasLaneRef(active []laneRef, target laneRef) bool {
-	for _, ref := range active {
-		if ref == target {
-			return true
-		}
-	}
-	return false
-}
-
-func firstParentSet(commits []graphNode, head string) map[string]bool {
-	if head == "" {
-		return nil
-	}
-	byHash := make(map[string]graphNode, len(commits))
-	for _, commit := range commits {
-		byHash[commit.Hash] = commit
-	}
-	preferred := make(map[string]bool)
-	current := head
-	for current != "" {
-		if preferred[current] {
-			break
-		}
-		preferred[current] = true
-		commit, ok := byHash[current]
-		if !ok || len(commit.Parents) == 0 {
-			break
-		}
-		current = commit.Parents[0]
-	}
-	return preferred
-}
-
 func graphRowWidth(row graphRow) int {
 	return graph.RowWidth(row)
+}
+
+func findGraphRowByHash(rows []graphRow, hash string) int {
+	return graph.FindRowByHash(rows, hash)
+}
+
+func graphPageSize(m *model) int {
+	return graph.PageSize(m.height)
+}
+
+func moveSelectableGraphPointer(current int, rows []graphRow, delta int) int {
+	return graph.MoveSelectableGraphPointer(current, rows, delta)
+}
+
+func nearestSelectableGraphRow(rows []graphRow, start, step int) int {
+	return graph.NearestSelectableGraphRow(rows, start, step)
+}
+
+func graphPointerLane(row graphRow) int {
+	return graph.PointerLane(row)
+}
+
+func currentGraphFocus(rs git.Status, cursor int) graphNode {
+	return graph.CurrentFocus(rs, cursor)
 }
 
 func indexOf(values []string, target string) int {
@@ -1492,152 +1194,6 @@ func lastIndexOf(values []laneRef, target string) int {
 	return -1
 }
 
-func advanceGraphLanes(active []laneRef, matches []int, commit graphNode, currentBranch string, familyPriority map[string]int, preserveMatchedLanes bool) []laneRef {
-	if len(matches) == 0 {
-		return append([]laneRef(nil), active...)
-	}
-	primary := choosePrimaryMatch(active, matches, currentBranch)
-	next := make([]laneRef, 0, len(active)+len(commit.Parents))
-	skipped := make(map[int]struct{}, len(matches))
-	for _, idx := range matches {
-		skipped[idx] = struct{}{}
-	}
-	inserted := false
-	for idx, ref := range active {
-		if _, ok := skipped[idx]; !ok {
-			next = append(next, ref)
-			continue
-		}
-		if inserted {
-			continue
-		}
-		inserted = true
-		if len(commit.Parents) == 0 {
-			continue
-		}
-		next = append(next, laneRef{
-			Hash:   commit.Parents[0],
-			Family: primary.Family,
-			Side:   primary.Side,
-		})
-		for _, parent := range commit.Parents[1:] {
-			if parent == "" {
-				continue
-			}
-			next = append(next, laneRef{Hash: parent, Side: laneOther})
-		}
-	}
-	return prioritizeLaneRefs(compactLaneRefs(next), currentBranch, familyPriority)
-}
-
-func compactLaneRefs(active []laneRef) []laneRef {
-	if len(active) <= 1 {
-		return active
-	}
-	seen := make(map[laneRef]struct{}, len(active))
-	compacted := make([]laneRef, 0, len(active))
-	for _, ref := range active {
-		if _, ok := seen[ref]; ok {
-			continue
-		}
-		seen[ref] = struct{}{}
-		compacted = append(compacted, ref)
-	}
-	return compacted
-}
-
-func ensureLaneSeed(active []laneRef, hash string, seed laneRef, preferred bool, currentBranch string) []laneRef {
-	if hash == "" {
-		return active
-	}
-	if idx := lastIndexOf(active, hash); idx >= 0 {
-		return active
-	}
-	seed.Hash = hash
-	switch {
-	case len(active) == 0:
-		return append(active, seed)
-	case preferred || seed.Family == currentBranch:
-		return append([]laneRef{seed}, active...)
-	default:
-		return append(active, seed)
-	}
-}
-
-func laneMatches(active []laneRef, hash string) []int {
-	matches := make([]int, 0, 2)
-	for i, ref := range active {
-		if ref.Hash == hash {
-			matches = append(matches, i)
-		}
-	}
-	return matches
-}
-
-func chooseDisplayLane(active []laneRef, matches []int, currentBranch string) int {
-	if len(matches) == 0 {
-		return 0
-	}
-	best := matches[0]
-	bestScore := laneRefScore(active[best], currentBranch)
-	for _, idx := range matches[1:] {
-		score := laneRefScore(active[idx], currentBranch)
-		if score > bestScore {
-			best = idx
-			bestScore = score
-		}
-	}
-	return best
-}
-
-func choosePrimaryMatch(active []laneRef, matches []int, currentBranch string) laneRef {
-	return active[chooseDisplayLane(active, matches, currentBranch)]
-}
-
-func prioritizeLaneRefs(active []laneRef, currentBranch string, familyPriority map[string]int) []laneRef {
-	if len(active) <= 1 || currentBranch == "" {
-		return active
-	}
-	ordered := append([]laneRef(nil), active...)
-	sort.SliceStable(ordered, func(i, j int) bool {
-		left := ordered[i]
-		right := ordered[j]
-		leftRank := lanePriorityRank(left, currentBranch, familyPriority)
-		rightRank := lanePriorityRank(right, currentBranch, familyPriority)
-		if leftRank != rightRank {
-			return leftRank < rightRank
-		}
-		leftSide := laneSidePriority(left.Side)
-		rightSide := laneSidePriority(right.Side)
-		if leftSide != rightSide {
-			return leftSide < rightSide
-		}
-		return false
-	})
-	return ordered
-}
-
-func lanePriorityRank(ref laneRef, currentBranch string, familyPriority map[string]int) int {
-	if ref.Family == currentBranch {
-		return 0
-	}
-	if rank, ok := familyPriority[ref.Family]; ok {
-		return rank
-	}
-	return 1 << 20
-}
-
-func laneSidePriority(side laneSide) int {
-	switch side {
-	case laneLocal:
-		return 0
-	case laneRemote:
-		return 1
-	default:
-		return 2
-	}
-}
-
 func pendingChildren(children []string, current string) []string {
 	for i, child := range children {
 		if child == current {
@@ -1649,10 +1205,10 @@ func pendingChildren(children []string, current string) []string {
 
 func syncBrowseState(m *model, rs git.Status) {
 	currentHash := ""
-	if rows := graphRows(m.repoStatus); m.sectionCursor[sectionGraph] >= 0 && m.sectionCursor[sectionGraph] < len(rows) {
+	if rows := graph.Rows(m.repoStatus); m.sectionCursor[sectionGraph] >= 0 && m.sectionCursor[sectionGraph] < len(rows) {
 		currentHash = rows[m.sectionCursor[sectionGraph]].Commit.Hash
 	}
-	rowCount := len(graphRows(rs))
+	rowCount := len(graph.Rows(rs))
 	m.graphScroll = clampScroll(m.graphScroll, rowCount, graphPageSize(m))
 	for _, section := range graphSectionOrder() {
 		limit := len(sectionTargets(rs, section))
@@ -1663,21 +1219,17 @@ func syncBrowseState(m *model, rs git.Status) {
 		m.sectionCursor[section] = clampCursor(m.sectionCursor[section], limit)
 	}
 	if rowCount > 0 {
-		rows := graphRows(rs)
-		row := findGraphRowByHash(rows, currentHash)
+		rows := graph.Rows(rs)
+		row := graph.FindRowByHash(rows, currentHash)
 		if row < 0 {
 			row = clampCursor(m.sectionCursor[sectionGraph], len(rows))
 			if row >= 0 {
-				row = nearestSelectableGraphRow(rows, row, 1)
+				row = graph.NearestSelectableGraphRow(rows, row, 1)
 			}
 		}
 		m.sectionCursor[sectionGraph] = row
-		m.graphLaneCursor = graphPointerLane(rows[row])
+		m.graphLaneCursor = graph.PointerLane(rows[row])
 	}
-}
-
-func findGraphRowByHash(rows []graphRow, hash string) int {
-	return graph.FindRowByHash(rows, hash)
 }
 
 func graphSectionOrder() []graphSection {
@@ -1813,8 +1365,8 @@ func activeSectionTarget(m model) string {
 func moveBrowseCursor(m model, delta int) model {
 	switch m.activeSection {
 	case sectionGraph:
-		rows := graphRows(m.repoStatus)
-		cursor := moveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)
+		rows := graph.Rows(m.repoStatus)
+		cursor := graph.MoveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)
 		m.sectionCursor[sectionGraph] = cursor
 		page := graphPageSize(&m)
 		if cursor < m.graphScroll {
@@ -1823,7 +1375,7 @@ func moveBrowseCursor(m model, delta int) model {
 			m.graphScroll = cursor - page + 1
 		}
 		if cursor >= 0 && cursor < len(rows) {
-			m.graphLaneCursor = graphPointerLane(rows[cursor])
+			m.graphLaneCursor = graph.PointerLane(rows[cursor])
 		}
 	case sectionCurrent, sectionLocal, sectionRemote, sectionTags:
 		items := sectionTargets(m.repoStatus, m.activeSection)
@@ -1848,7 +1400,7 @@ func moveBrowseCursor(m model, delta int) model {
 }
 
 func moveGraphLane(m model, delta int) model {
-	rows := graphRows(m.repoStatus)
+	rows := graph.Rows(m.repoStatus)
 	if len(rows) == 0 {
 		return m
 	}
@@ -1858,18 +1410,18 @@ func moveGraphLane(m model, delta int) model {
 }
 
 func pageBrowseGraph(m model, pages int) model {
-	total := len(graphRows(m.repoStatus))
+	total := len(graph.Rows(m.repoStatus))
 	if total == 0 {
 		return m
 	}
 	page := graphPageSize(&m)
 	delta := page * pages
-	rows := graphRows(m.repoStatus)
-	cursor := moveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)
+	rows := graph.Rows(m.repoStatus)
+	cursor := graph.MoveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)
 	m.sectionCursor[sectionGraph] = cursor
 	m.graphScroll = clampScroll(cursor, total, page)
 	if cursor >= 0 && cursor < len(rows) {
-		m.graphLaneCursor = graphPointerLane(rows[cursor])
+		m.graphLaneCursor = graph.PointerLane(rows[cursor])
 	}
 	return m
 }
@@ -1881,7 +1433,7 @@ func maybeLoadMoreGraph(m model) (model, tea.Cmd) {
 	if m.activeSection != sectionGraph {
 		return m, nil
 	}
-	rows := graphRows(m.repoStatus)
+	rows := graph.Rows(m.repoStatus)
 	if len(rows) != m.commitLimit {
 		return m, nil
 	}
@@ -1927,10 +1479,6 @@ const (
 	graphViewHeightOffset = 5
 )
 
-func graphPageSize(m *model) int {
-	return graph.PageSize(m.height)
-}
-
 func moveTarget(s state.Status, delta int) state.Status {
 	if s.Mode != state.ModeTargetPick || len(s.Targets) == 0 {
 		return s
@@ -1965,12 +1513,12 @@ func moveGraphPointer(current, total, delta int) int {
 }
 
 func moveLanePointer(current int, row graphRow, delta int) int {
-	maxLane := graphRowWidth(row) - 1
+	maxLane := graph.RowWidth(row) - 1
 	if maxLane < 0 {
 		return 0
 	}
 	if current < 0 {
-		current = graphPointerLane(row)
+		current = graph.PointerLane(row)
 	}
 	next := current + delta
 	if next < 0 {
@@ -1982,33 +1530,21 @@ func moveLanePointer(current int, row graphRow, delta int) int {
 	return next
 }
 
-func moveSelectableGraphPointer(current int, rows []graphRow, delta int) int {
-	return graph.MoveSelectableGraphPointer(current, rows, delta)
-}
-
-func nearestSelectableGraphRow(rows []graphRow, start, step int) int {
-	return graph.NearestSelectableGraphRow(rows, start, step)
-}
-
 func clampLaneCursor(current int, row graphRow) int {
-	maxLane := graphRowWidth(row) - 1
+	maxLane := graph.RowWidth(row) - 1
 	if maxLane < 0 {
 		return 0
 	}
 	if current < 0 || current > maxLane {
-		return min(graphPointerLane(row), maxLane)
+		return min(graph.PointerLane(row), maxLane)
 	}
 	return current
-}
-
-func graphPointerLane(row graphRow) int {
-	return graph.PointerLane(row)
 }
 
 // isLocalGraphPointer returns true when the current graph cursor is pointing
 // at a local-branch lane. Merge and Rebase from Graph are only allowed in this state.
 func isLocalGraphPointer(rs git.Status, cursor int, laneCursor int) bool {
-	rows := graphRows(rs)
+	rows := graph.Rows(rs)
 	if cursor < 0 || cursor >= len(rows) {
 		return false
 	}
@@ -2068,10 +1604,6 @@ func clampCursor(current, total int) int {
 		return 0
 	}
 	return current
-}
-
-func currentGraphFocus(rs git.Status, cursor int) graphNode {
-	return graph.CurrentFocus(rs, cursor)
 }
 
 func checkoutTargetFromFocus(node graphNode) string {

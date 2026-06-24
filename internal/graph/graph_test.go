@@ -80,3 +80,31 @@ func TestCurrentFocusAndFindRowByHash(t *testing.T) {
 		t.Fatalf("expected focus to resolve to b2, got %#v", focus)
 	}
 }
+
+func TestRowsInsertsVirtualConflictNodeDuringMerge(t *testing.T) {
+	rows := Rows(git.Status{
+		MergeInProgress: true,
+		Head:            "abc123",
+		ConflictTarget:  "def456",
+		GraphCommits: []git.GraphCommit{{Hash: "abc123", Graph: "*", Subject: "tip"}},
+	})
+	if len(rows) != 2 {
+		t.Fatalf("expected virtual conflict row plus original row, got %d", len(rows))
+	}
+	if rows[0].Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
+		t.Fatalf("expected virtual conflict row first, got %#v", rows[0])
+	}
+	if rows[0].Commit.Subject != "conflict" {
+		t.Fatalf("expected conflict subject, got %#v", rows[0].Commit.Subject)
+	}
+	if rows[0].Commit.Parents[0] != "abc123" || rows[0].Commit.Parents[1] != "def456" {
+		t.Fatalf("expected conflict parents to include head and target, got %#v", rows[0].Commit.Parents)
+	}
+}
+
+func TestPageSizeClampsToMinimum(t *testing.T) {
+	if got := PageSize(8); got != 3 {
+		t.Fatalf("expected tiny layout to clamp to 3, got %d", got)
+	}
+}
+

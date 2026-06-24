@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/git-graph-tui/internal/git"
+	"hrllk/git-graph-tui/internal/graph"
 	"hrllk/git-graph-tui/internal/state"
 )
 
@@ -60,76 +61,7 @@ func TestDeriveStatusShowsAbortWhenRebaseInProgress(t *testing.T) {
 	}
 }
 
-func TestInjectVirtualConflictNode(t *testing.T) {
-	// 1. No merge/rebase in progress -> should not modify
-	rsNormal := git.Status{
-		Root:            "/repo",
-		MergeInProgress: false,
-		GraphCommits: []git.GraphCommit{
-			{Hash: "abc123", Graph: "*"},
-		},
-	}
-	gotNormal := injectVirtualConflictNode(rsNormal)
-	if len(gotNormal.GraphCommits) != 1 || gotNormal.GraphCommits[0].Hash != "abc123" {
-		t.Fatalf("should not modify commits if no conflict in progress")
-	}
 
-	// 2. Merge in progress with graph prefix & conflict subject
-	rsConflict := git.Status{
-		Root:                  "/repo",
-		Head:                  "abc123",
-		ConflictTarget:        "def456",
-		ConflictTargetSubject: "Feature commit message",
-		MergeInProgress:       true,
-		GraphCommits: []git.GraphCommit{
-			{Hash: "abc123", Graph: "*   "},
-		},
-	}
-	gotConflict := injectVirtualConflictNode(rsConflict)
-	if len(gotConflict.GraphCommits) != 2 {
-		t.Fatalf("expected 2 commits, got %d", len(gotConflict.GraphCommits))
-	}
-	vc := gotConflict.GraphCommits[0]
-	if vc.Hash != "VIRTUAL_CONFLICT_HASH" {
-		t.Fatalf("expected virtual conflict hash, got %s", vc.Hash)
-	}
-	if vc.Subject != "conflict" {
-		t.Fatalf("expected detailed merge conflict subject, got %q", vc.Subject)
-	}
-	if vc.Graph != "*   " {
-		t.Fatalf("expected virtual graph to copy c0 graph, got %q", vc.Graph)
-	}
-	if len(vc.Parents) != 2 || vc.Parents[0] != "abc123" || vc.Parents[1] != "def456" {
-		t.Fatalf("expected Parents to have local head and conflict target, got %v", vc.Parents)
-	}
-	c0 := gotConflict.GraphCommits[1]
-	if c0.Hash != "abc123" {
-		t.Fatalf("expected original first commit at index 1")
-	}
-	if c0.Graph != "|   " {
-		t.Fatalf("expected c0 graph * to be replaced with |, got %q", c0.Graph)
-	}
-
-	// 3. Rebase in progress with conflict subject
-	rsRebase := git.Status{
-		Root:                  "/repo",
-		Head:                  "abc123",
-		ConflictTarget:        "def456",
-		ConflictTargetSubject: "Base branch commit message",
-		RebaseInProgress:      true,
-		GraphCommits: []git.GraphCommit{
-			{Hash: "abc123", Graph: "*   "},
-		},
-	}
-	gotRebase := injectVirtualConflictNode(rsRebase)
-	if len(gotRebase.GraphCommits) != 2 {
-		t.Fatalf("expected 2 commits, got %d", len(gotRebase.GraphCommits))
-	}
-	vcRebase := gotRebase.GraphCommits[0]
-	if vcRebase.Subject != "conflict" {
-		t.Fatalf("expected detailed rebase conflict subject, got %q", vcRebase.Subject)
-	}
-}
 
 func TestActionPickTargetsBlocksWhenEmpty(t *testing.T) {
 	got := actionPickTargets(git.Status{Root: "/repo", Branch: "main"}, state.ActionMerge)
@@ -250,29 +182,15 @@ func TestMoveSelectableGraphPointerSkipsConnectors(t *testing.T) {
 		{Graph: "|\\", Commit: graphNode{}},
 		{Commit: graphNode{Hash: "b"}},
 	}
-	if got := moveSelectableGraphPointer(0, rows, 1); got != 2 {
+	if got := graph.MoveSelectableGraphPointer(0, rows, 1); got != 2 {
 		t.Fatalf("expected connector row to be skipped on move down, got %d", got)
 	}
-	if got := moveSelectableGraphPointer(2, rows, -1); got != 0 {
+	if got := graph.MoveSelectableGraphPointer(2, rows, -1); got != 0 {
 		t.Fatalf("expected connector row to be skipped on move up, got %d", got)
 	}
 }
 
-func TestInitialGraphLanesSeedsCurrentBranchWithoutRemoteTip(t *testing.T) {
-	got := initialGraphLanes([]graphNode{
-		{Hash: "head", Parents: []string{"base"}, Decorations: []string{"HEAD -> tmp1", "tmp1"}},
-		{Hash: "base"},
-	}, git.Status{
-		Branch: "tmp1",
-		Head:   "head",
-	})
-	if len(got) != 1 {
-		t.Fatalf("expected current branch lane without remote tip, got %v", got)
-	}
-	if got[0] != (laneRef{Hash: "head", Family: "tmp1", Side: laneLocal}) {
-		t.Fatalf("unexpected current branch lane: %v", got[0])
-	}
-}
+
 
 func TestWindowResizeDoesNotIncreaseInitialGraphLoadLimit(t *testing.T) {
 	m := model{commitLimit: initialGraphCommitLimit}
@@ -764,48 +682,12 @@ func TestMaybeLoadMoreGraphNoOpsWhenUnlimited(t *testing.T) {
 	}
 }
 
-func TestBuildFamilyPriorityKeepsOnlyCurrentBranch(t *testing.T) {
-	got := buildFamilyPriority([]graphNode{
-		{Hash: "head", Parents: []string{"c1"}, Decorations: []string{"HEAD -> main", "main"}},
-		{Hash: "d1", Parents: []string{"c1"}, Decorations: []string{"develop"}},
-	}, git.Status{
-		Branch:        "main",
-		LocalBranches: []string{"main", "develop"},
-		Head:          "head",
-	})
-	if got["main"] != 0 {
-		t.Fatalf("expected current branch priority 0, got %d", got["main"])
-	}
-	if len(got) != 1 {
-		t.Fatalf("expected only the current branch to be prioritized, got %v", got)
-	}
-}
 
-func TestPrioritizeLaneRefsUsesFamilyPriority(t *testing.T) {
-	got := prioritizeLaneRefs([]laneRef{
-		{Hash: "h2", Family: "tmp2", Side: laneLocal},
-		{Hash: "r1", Family: "tmp1", Side: laneRemote},
-		{Hash: "h3", Family: "tmp3", Side: laneLocal},
-		{Hash: "h1", Family: "tmp1", Side: laneLocal},
-	}, "tmp1", map[string]int{"tmp1": 0, "tmp3": 1, "tmp2": 2})
-	want := []laneRef{
-		{Hash: "h1", Family: "tmp1", Side: laneLocal},
-		{Hash: "r1", Family: "tmp1", Side: laneRemote},
-		{Hash: "h3", Family: "tmp3", Side: laneLocal},
-		{Hash: "h2", Family: "tmp2", Side: laneLocal},
-	}
-	if len(got) != len(want) {
-		t.Fatalf("expected %d lanes, got %v", len(want), got)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("unexpected lane order at %d: got %v want %v (all got %v)", i, got[i], want[i], got)
-		}
-	}
-}
+
+
 
 func TestGraphRowsExpandOnMerge(t *testing.T) {
-	rows := graphRows(git.Status{
+	rows := graph.Rows(git.Status{
 		GraphCommits: []git.GraphCommit{
 			{Hash: "c3", Parents: []string{"b2", "a2"}},
 			{Hash: "b2", Parents: []string{"a1"}},
@@ -815,8 +697,8 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 	if len(rows) != 3 {
 		t.Fatalf("expected 3 rows, got %d", len(rows))
 	}
-	if graphRowWidth(rows[0]) < 2 {
-		t.Fatalf("expected merge row to expand lanes, got %d", graphRowWidth(rows[0]))
+	if graph.RowWidth(rows[0]) < 2 {
+		t.Fatalf("expected merge row to expand lanes, got %d", graph.RowWidth(rows[0]))
 	}
 	got := renderGraphLine(rows[0], true, true, 1, nil, 24, false)
 	if !strings.Contains(got, "*") || !strings.Contains(got, "|") {
@@ -827,42 +709,13 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 	}
 }
 
-func TestAdvanceGraphLanesClampsLaneBounds(t *testing.T) {
-	got := advanceGraphLanes([]laneRef{{Hash: "c1", Family: "main", Side: laneLocal}}, []int{0}, graphNode{Hash: "c1", Parents: []string{"p1", "p2"}}, "", nil, false)
-	if len(got) == 0 {
-		t.Fatal("expected lanes to be created safely")
-	}
-}
 
-func TestAdvanceGraphLanesAllowsRootCommit(t *testing.T) {
-	got := advanceGraphLanes([]laneRef{{Hash: "root"}}, []int{0}, graphNode{Hash: "root"}, "", nil, false)
-	if len(got) != 0 {
-		t.Fatalf("expected root commit to clear active lane, got %v", got)
-	}
-}
 
-func TestAdvanceGraphLanesCollapsesDuplicateCurrentLanes(t *testing.T) {
-	got := advanceGraphLanes([]laneRef{
-		{Hash: "base", Family: "tmp3", Side: laneLocal},
-		{Hash: "base", Family: "tmp3", Side: laneRemote},
-		{Hash: "base", Family: "main", Side: laneLocal},
-	}, []int{0, 1, 2}, graphNode{Hash: "base", Parents: []string{"parent"}}, "tmp3", map[string]int{"tmp3": 0, "main": 1}, false)
-	if len(got) != 1 || got[0].Hash != "parent" {
-		t.Fatalf("expected collapsed lanes to continue as single parent, got %v", got)
-	}
-}
 
-func TestCompactLaneRefsOnlyRemovesExactDuplicates(t *testing.T) {
-	got := compactLaneRefs([]laneRef{
-		{Hash: "base", Family: "tmp3", Side: laneLocal},
-		{Hash: "base", Family: "tmp3", Side: laneLocal},
-		{Hash: "base", Family: "tmp2", Side: laneLocal},
-		{Hash: "base", Family: "tmp3", Side: laneRemote},
-	})
-	if len(got) != 3 {
-		t.Fatalf("expected only exact duplicate lanes to compact, got %v", got)
-	}
-}
+
+
+
+
 
 func TestFormatCompactDecorations(t *testing.T) {
 	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "origin/main", "tag: v1.0.0"}, []string{"main", "develop"})
@@ -885,13 +738,13 @@ func TestCanCreateBranchRequiresCleanWorktree(t *testing.T) {
 
 func TestFindGraphRowByHash(t *testing.T) {
 	rows := []graphRow{{Commit: graphNode{Hash: "a1"}}, {Commit: graphNode{Hash: "b2"}}}
-	if got := findGraphRowByHash(rows, "b2"); got != 1 {
+	if got := graph.FindRowByHash(rows, "b2"); got != 1 {
 		t.Fatalf("expected to restore row by hash, got %d", got)
 	}
 }
 
 func TestGraphRowsKeepsSiblingBranchesVisible(t *testing.T) {
-	rows := graphRows(git.Status{
+	rows := graph.Rows(git.Status{
 		GraphCommits: []git.GraphCommit{
 			{Hash: "t3", Parents: []string{"base"}},
 			{Hash: "t2", Parents: []string{"base"}},
@@ -902,8 +755,8 @@ func TestGraphRowsKeepsSiblingBranchesVisible(t *testing.T) {
 	if len(rows) != 4 {
 		t.Fatalf("expected 4 rows, got %d", len(rows))
 	}
-	if graphRowWidth(rows[0]) < 1 || graphRowWidth(rows[1]) < 2 || graphRowWidth(rows[2]) < 2 {
-		t.Fatalf("expected sibling rows to expand as new tips appear, got widths %d, %d, %d", graphRowWidth(rows[0]), graphRowWidth(rows[1]), graphRowWidth(rows[2]))
+	if graph.RowWidth(rows[0]) < 1 || graph.RowWidth(rows[1]) < 2 || graph.RowWidth(rows[2]) < 2 {
+		t.Fatalf("expected sibling rows to expand as new tips appear, got widths %d, %d, %d", graph.RowWidth(rows[0]), graph.RowWidth(rows[1]), graph.RowWidth(rows[2]))
 	}
 	if len(rows[3].Children) != 3 {
 		t.Fatalf("expected branch point commit to know all children, got %d", len(rows[3].Children))
@@ -911,7 +764,7 @@ func TestGraphRowsKeepsSiblingBranchesVisible(t *testing.T) {
 }
 
 func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
-	rows := graphRows(git.Status{
+	rows := graph.Rows(git.Status{
 		GraphCommits: []git.GraphCommit{
 			{Graph: "*   ", Hash: "head", RelativeAge: "5 minutes ago", Author: "hrllk", Subject: "Merge branch 'main' into develop", Decorations: []string{"HEAD -> main", "origin/main", "origin/HEAD", "develop"}},
 			{Graph: "|\\", Hash: ""},
@@ -972,7 +825,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 }
 
 func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
-	rows := graphRows(git.Status{
+	rows := graph.Rows(git.Status{
 		Branch:        "main",
 		Head:          "a39d548",
 		LocalBranches: []string{"main", "develop"},
@@ -985,11 +838,11 @@ func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
 	if len(rows) != 3 {
 		t.Fatalf("expected 3 rows, got %d", len(rows))
 	}
-	if graphRowWidth(rows[0]) != 1 {
-		t.Fatalf("expected branch tip labels alone to not spawn extra lanes, got %d", graphRowWidth(rows[0]))
+	if graph.RowWidth(rows[0]) != 1 {
+		t.Fatalf("expected branch tip labels alone to not spawn extra lanes, got %d", graph.RowWidth(rows[0]))
 	}
-	if graphRowWidth(rows[1]) != 1 {
-		t.Fatalf("expected linear child commit to stay in one lane, got %d", graphRowWidth(rows[1]))
+	if graph.RowWidth(rows[1]) != 1 {
+		t.Fatalf("expected linear child commit to stay in one lane, got %d", graph.RowWidth(rows[1]))
 	}
 	if got := renderGraphLine(rows[1], false, false, 0, nil, 24, false); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
 		t.Fatalf("expected single-lane render for linear DAG, got %q", got)
@@ -997,7 +850,7 @@ func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
 }
 
 func TestGraphRowsKeepsLocalAndOriginDivergedFamiliesSeparate(t *testing.T) {
-	rows := graphRows(git.Status{
+	rows := graph.Rows(git.Status{
 		Branch:         "tmp3",
 		Head:           "dee56f4",
 		LocalBranches:  []string{"tmp3"},
@@ -1013,14 +866,14 @@ func TestGraphRowsKeepsLocalAndOriginDivergedFamiliesSeparate(t *testing.T) {
 	if len(rows) != 5 {
 		t.Fatalf("expected 5 rows, got %d", len(rows))
 	}
-	if graphRowWidth(rows[0]) < 2 || graphRowWidth(rows[1]) < 2 || graphRowWidth(rows[2]) < 2 {
-		t.Fatalf("expected diverged local/origin history to stay split before merge-base, got widths %d, %d, %d", graphRowWidth(rows[0]), graphRowWidth(rows[1]), graphRowWidth(rows[2]))
+	if graph.RowWidth(rows[0]) < 2 || graph.RowWidth(rows[1]) < 2 || graph.RowWidth(rows[2]) < 2 {
+		t.Fatalf("expected diverged local/origin history to stay split before merge-base, got widths %d, %d, %d", graph.RowWidth(rows[0]), graph.RowWidth(rows[1]), graph.RowWidth(rows[2]))
 	}
 	if rows[0].Lane != 1 || rows[1].Lane != 1 {
 		t.Fatalf("expected origin history to stay on the right lane before local head, got lanes %d and %d", rows[0].Lane, rows[1].Lane)
 	}
-	if graphRowWidth(rows[3]) != 1 {
-		t.Fatalf("expected merge-base to collapse to one lane, got %d", graphRowWidth(rows[3]))
+	if graph.RowWidth(rows[3]) != 1 {
+		t.Fatalf("expected merge-base to collapse to one lane, got %d", graph.RowWidth(rows[3]))
 	}
 	if rows[2].Lane != 0 {
 		t.Fatalf("expected checkout branch family lane to stay leftmost, got lane %d", rows[2].Lane)
@@ -1112,7 +965,7 @@ func TestRenderGraphConnectorLinesShowsParentShiftWithoutFullCollapse(t *testing
 }
 
 func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
-	rows := graphRows(git.Status{
+	rows := graph.Rows(git.Status{
 		Branch:         "tmp1",
 		Head:           "5df093e",
 		LocalBranches:  []string{"tmp1", "tmp2", "tmp3", "main", "develop"},
@@ -1138,7 +991,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 		},
 	})
 
-	parentIdx := findGraphRowByHash(rows, "37f0954")
+	parentIdx := graph.FindRowByHash(rows, "37f0954")
 	if parentIdx < 0 || parentIdx+1 >= len(rows) || rows[parentIdx+1].Commit.Hash != "efb164e" {
 		t.Fatalf("expected efb164e immediately after 37f0954, got index=%d rows=%v", parentIdx, rows)
 	}
@@ -1147,7 +1000,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 		t.Fatalf("expected efb164e row to render, got %q", parentLine)
 	}
 
-	rootIdx := findGraphRowByHash(rows, "4ba1faf")
+	rootIdx := graph.FindRowByHash(rows, "4ba1faf")
 	if rootIdx < 0 || rootIdx+1 >= len(rows) || rows[rootIdx+1].Commit.Hash != "5525707" {
 		t.Fatalf("expected 5525707 immediately after 4ba1faf, got index=%d rows=%v", rootIdx, rows)
 	}
