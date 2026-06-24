@@ -84,12 +84,10 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	head, _ := r.git(ctx, "rev-parse", "HEAD")
 	upstream, _ := r.git(ctx, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
 	remote, _ := r.git(ctx, "remote")
-	branches, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/heads")
-	localBranches, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+	branches, branchUpstreams, tracking := r.branchMetadata(ctx)
+	localBranches := branches
 	remoteBranches, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/remotes")
 	defaultBranch := r.defaultRemoteBranch(ctx)
-	branchUpstreams := r.branchUpstreams(ctx)
-	tracking := r.branchTracking(ctx, localBranches, remoteBranches)
 	tags, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/tags")
 	graphCommits, graphErr := r.graphCommits(ctx, localBranches, branchUpstreams, limit)
 	if graphErr != nil && !isNoCommits(graphErr) {
@@ -174,6 +172,47 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	}, nil
 }
 
+func parseBranchMetadataLine(line string) (branchName string, upstream string, tracking BranchTracking, ok bool) {
+	parts := strings.SplitN(strings.TrimSpace(line), "|", 3)
+	if len(parts) == 0 {
+		return "", "", BranchTracking{}, false
+	}
+	branchName = strings.TrimSpace(parts[0])
+	if branchName == "" {
+		return "", "", BranchTracking{}, false
+	}
+	if len(parts) > 1 {
+		upstream = strings.TrimSpace(parts[1])
+	}
+	if len(parts) > 2 {
+		tracking.Ahead, tracking.Behind = parseTrackingInfo(parts[2])
+	}
+	return branchName, upstream, tracking, true
+}
+
+func (r *Repo) branchMetadata(ctx context.Context) ([]string, map[string]string, map[string]BranchTracking) {
+	branches := make([]string, 0)
+	upstreams := make(map[string]string)
+	tracking := make(map[string]BranchTracking)
+	lines, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)|%(upstream:short)|%(upstream:track)", "refs/heads")
+	if err != nil {
+		telemetry.Log("git", "branch_metadata_error", map[string]string{"error": err.Error()})
+		return branches, upstreams, tracking
+	}
+	for _, line := range lines {
+		branchName, upstream, track, ok := parseBranchMetadataLine(line)
+		if !ok {
+			continue
+		}
+		branches = append(branches, branchName)
+		upstreams[branchName] = upstream
+		if track.Ahead > 0 || track.Behind > 0 {
+			tracking[branchName] = track
+		}
+	}
+	return branches, upstreams, tracking
+}
+
 func (r *Repo) branchTracking(ctx context.Context, localBranches, remoteBranches []string) map[string]BranchTracking {
 	tracking := make(map[string]BranchTracking, len(localBranches))
 	lines, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short) %(upstream:track)", "refs/heads")
@@ -205,27 +244,37 @@ func (r *Repo) branchTracking(ctx context.Context, localBranches, remoteBranches
 
 func (r *Repo) branchUpstreams(ctx context.Context) map[string]string {
 	upstreams := make(map[string]string)
-	lines, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)|%(upstream:short)", "refs/heads")
+	lines, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)|%(upstream:short)|%(upstream:track)", "refs/heads")
 	if err != nil {
 		telemetry.Log("git", "branch_upstreams_error", map[string]string{"error": err.Error()})
 		return upstreams
 	}
 	for _, line := range lines {
-		parts := strings.SplitN(line, "|", 2)
-		if len(parts) == 0 {
+		branchName, upstream, ok := parseBranchUpstreamLine(line)
+		if !ok {
 			continue
-		}
-		branchName := strings.TrimSpace(parts[0])
-		if branchName == "" {
-			continue
-		}
-		upstream := ""
-		if len(parts) > 1 {
-			upstream = strings.TrimSpace(parts[1])
 		}
 		upstreams[branchName] = upstream
 	}
 	return upstreams
+}
+
+func parseBranchUpstreamLine(line string) (branchName string, upstream string, ok bool) {
+	parts := strings.SplitN(line, "|", 3)
+	if len(parts) == 0 {
+		return "", "", false
+	}
+	branchName = strings.TrimSpace(parts[0])
+	if branchName == "" {
+		return "", "", false
+	}
+	if len(parts) > 1 {
+		upstream = strings.TrimSpace(parts[1])
+	}
+	if len(parts) > 2 && strings.Contains(parts[2], "gone") {
+		upstream = ""
+	}
+	return branchName, upstream, true
 }
 
 func parseTrackingInfo(track string) (ahead, behind int) {
@@ -248,10 +297,14 @@ func (r *Repo) graphCommits(ctx context.Context, localBranches []string, branchU
 		return nil, nil
 	}
 	args := graphLogArgs(graphRefs, limit)
-	lines, err := r.gitLines(ctx, args...)
+	lines, err := r.gitRawLines(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
+	return parseGraphCommitLines(lines), nil
+}
+
+func parseGraphCommitLines(lines []string) []GraphCommit {
 	commits := make([]GraphCommit, 0, len(lines))
 	for _, line := range lines {
 		nul := strings.IndexRune(line, '\x00')
@@ -285,12 +338,12 @@ func (r *Repo) graphCommits(ctx context.Context, localBranches []string, branchU
 			commits = append(commits, entry)
 		}
 	}
-	return commits, nil
+	return commits
 }
 
 func graphRefs(localBranches []string, branchUpstreams map[string]string) []string {
-	refs := make([]string, 0, len(localBranches)+len(branchUpstreams))
-	seen := make(map[string]struct{}, len(localBranches)+len(branchUpstreams))
+	refs := make([]string, 0, len(localBranches)+len(branchUpstreams)+1)
+	seen := make(map[string]struct{}, len(localBranches)+len(branchUpstreams)+1)
 	add := func(ref string) {
 		ref = strings.TrimSpace(ref)
 		if ref == "" {
@@ -308,6 +361,7 @@ func graphRefs(localBranches []string, branchUpstreams map[string]string) []stri
 			add(upstream)
 		}
 	}
+	add("HEAD")
 	return refs
 }
 
@@ -450,6 +504,54 @@ func (r *Repo) gitLines(ctx context.Context, args ...string) ([]string, error) {
 		}
 	}
 	return trimmed, nil
+}
+
+func (r *Repo) gitRawLines(ctx context.Context, args ...string) ([]string, error) {
+	out, err := r.gitRaw(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	return splitRawLines(out), nil
+}
+
+func (r *Repo) gitRaw(ctx context.Context, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = r.root
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	out := stdout.String()
+	if err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return out, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, msg)
+	}
+	return out, nil
+}
+
+func splitRawLines(out string) []string {
+	out = strings.TrimRight(out, "\n")
+	if out == "" {
+		return nil
+	}
+	lines := strings.Split(out, "\n")
+	filtered := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimRight(line, "\r")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	return filtered
 }
 
 func isNoCommits(err error) bool {

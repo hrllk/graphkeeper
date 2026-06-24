@@ -77,7 +77,7 @@ func TestGraphLogArgsUsesLocalBranchesOnly(t *testing.T) {
 
 func TestGraphRefsIncludesTrackedUpstreams(t *testing.T) {
 	got := graphRefs([]string{"main", "develop", "tmp1"}, map[string]string{"main": "origin/main", "develop": "", "tmp1": "origin/tmp1"})
-	want := []string{"main", "origin/main", "develop", "tmp1", "origin/tmp1"}
+	want := []string{"main", "origin/main", "develop", "tmp1", "origin/tmp1", "HEAD"}
 	if len(got) != len(want) {
 		t.Fatalf("expected %d refs, got %v", len(want), got)
 	}
@@ -85,6 +85,65 @@ func TestGraphRefsIncludesTrackedUpstreams(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("unexpected refs at %d: got %q want %q (all=%v)", i, got[i], want[i], got)
 		}
+	}
+}
+
+func TestGraphRefsFallsBackToHead(t *testing.T) {
+	got := graphRefs(nil, nil)
+	if len(got) != 1 || got[0] != "HEAD" {
+		t.Fatalf("expected HEAD fallback ref, got %v", got)
+	}
+}
+
+func TestParseBranchUpstreamLineDropsGoneUpstream(t *testing.T) {
+	branch, upstream, ok := parseBranchUpstreamLine("tmp3|origin/tmp3|[gone]")
+	if !ok {
+		t.Fatal("expected branch upstream line to parse")
+	}
+	if branch != "tmp3" {
+		t.Fatalf("unexpected branch name: %q", branch)
+	}
+	if upstream != "" {
+		t.Fatalf("expected gone upstream to be dropped, got %q", upstream)
+	}
+}
+
+func TestParseBranchUpstreamLineKeepsValidUpstream(t *testing.T) {
+	branch, upstream, ok := parseBranchUpstreamLine("develop|origin/develop|")
+	if !ok {
+		t.Fatal("expected branch upstream line to parse")
+	}
+	if branch != "develop" || upstream != "origin/develop" {
+		t.Fatalf("unexpected parsed upstream: branch=%q upstream=%q", branch, upstream)
+	}
+}
+
+func TestSplitRawLinesPreservesGraphWhitespace(t *testing.T) {
+	got := splitRawLines("  * \x00hash\x1fparents\x1fage\x1fauthor\x1f\x1fsubject\n |/  \n")
+	want := []string{"  * \x00hash\x1fparents\x1fage\x1fauthor\x1f\x1fsubject", " |/  "}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d lines, got %v", len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected raw line %d: got %q want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestParseGraphCommitLinesPreservesGraphPrefix(t *testing.T) {
+	got := parseGraphCommitLines([]string{
+		"  * \x00abc\x1fparent\x1f5 minutes ago\x1fdev\x1fHEAD -> main\x1fsubject",
+		" |/",
+	})
+	if len(got) != 2 {
+		t.Fatalf("expected graph commit and connector line, got %v", got)
+	}
+	if got[0].Graph != "  * " {
+		t.Fatalf("expected leading graph spaces to be preserved, got %q", got[0].Graph)
+	}
+	if got[1].Graph != " |/" || got[1].Hash != "" {
+		t.Fatalf("expected connector graph line to be preserved, got %+v", got[1])
 	}
 }
 
