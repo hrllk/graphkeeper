@@ -1,8 +1,6 @@
 package app
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"hrllk/git-graph-tui/internal/git"
 	"hrllk/git-graph-tui/internal/graph"
@@ -339,58 +337,6 @@ func clampLaneCursor(current int, row graphRow) int {
 		return min(graph.PointerLane(row), maxLane)
 	}
 	return current
-}
-
-func isLocalGraphPointer(rs git.Status, cursor int, laneCursor int) bool {
-	rows := graph.Rows(rs)
-	if cursor < 0 || cursor >= len(rows) {
-		return false
-	}
-	row := rows[cursor]
-	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
-		return false
-	}
-
-	// Build local branch set for fast lookup
-	localSet := make(map[string]struct{}, len(rs.LocalBranches))
-	for _, b := range rs.LocalBranches {
-		localSet[b] = struct{}{}
-	}
-
-	// raw-graph mode: check decorations to see if this commit has any local branch
-	// This matches the same logic used in compactDecorationInfo to render "l->name"
-	if row.Graph != "" {
-		for _, dec := range row.Commit.Decorations {
-			dec = strings.TrimSpace(dec)
-			// HEAD -> <branch> is always local
-			if strings.HasPrefix(dec, "HEAD -> ") {
-				return true
-			}
-			// A decoration that is in localBranches (not origin/*, not tag:*)
-			if dec == "" || strings.HasPrefix(dec, "origin/") || strings.HasPrefix(dec, "tag: ") {
-				continue
-			}
-			if !strings.Contains(dec, "/") {
-				// bare name — if it's in local branches, it's a local lane
-				if _, ok := localSet[dec]; ok {
-					return true
-				}
-				// even if not in the set, an unqualified name is treated local (new branch edge case)
-				return true
-			}
-		}
-		return false
-	}
-
-	// legacy lane mode: check laneRef at the lane cursor position
-	if laneCursor >= 0 && laneCursor < len(row.Before) {
-		return row.Before[laneCursor].Side == laneLocal
-	}
-	if laneCursor >= 0 && laneCursor < len(row.After) {
-		return row.After[laneCursor].Side == laneLocal
-	}
-	// fallback: treat single-lane commits on the pointer lane as local
-	return row.Lane == laneCursor
 }
 
 func clampCursor(current, total int) int {
