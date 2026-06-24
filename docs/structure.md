@@ -1,12 +1,14 @@
-# graphkeeper Structure
+### TOC
+- [Goal](#goal)
+- [Current tree](#current-tree)
+- [Responsibility map](#responsibility-map)
+- [Notes](#notes)
 
-## Goal
+### Goal
+This file gives a quick map of the current `graphkeeper` code layout.
+It is a simple reference for where the main work lives right now.
 
-This document gives a quick view of the current code structure.
-It shows where the main work lives and what each part does.
-
-## Current tree
-
+### Current tree
 ```text
 cmd/
   graphkeeper/
@@ -15,60 +17,54 @@ cmd/
 internal/
   app/
     model.go
+    update.go
+    commands.go
+    navigation.go
+    actions.go
     view.go
+    graph_render.go
     model_test.go
-    zz_temp_graph_bench_test.go
+  graph/
+    graph.go
+    graph_test.go
   git/
     repo.go
     repo_test.go
-    zz_temp_status_timing_test.go
   state/
     state.go
   telemetry/
     telemetry.go
 ```
 
-## What each part does
+### Responsibility map
 
-### `cmd/graphkeeper`
+#### `cmd/graphkeeper`
+- thin entrypoint only
+- opens the repo
+- creates the app model
+- starts Bubble Tea
 
-- starts the app
-- opens the Git repo
-- creates the Bubble Tea model
-- runs the TUI program
+#### `internal/app`
+- owns the Bubble Tea model and update flow
+- keeps command creation and user actions in small files
+- keeps navigation, graph focus, and graph rendering close to the app layer
+- `graph_render.go` holds the render helpers that still depend on app state
 
-### `internal/app`
+#### `internal/graph`
+- owns graph rules, lane order, row width, and focus helpers
+- keeps graph-specific logic pure and testable
 
-- owns the Bubble Tea model
-- handles update flow
-- renders the screen
-- keeps app state and navigation together for now
+#### `internal/git`
+- owns raw Git access and parsed repo state
+- wraps Git commands and repo metadata
 
-### `internal/git`
+#### `internal/state`
+- holds shared UI state types and statuses
 
-- reads repo data
-- runs Git commands
-- collects branch and status info
-- provides data to the app layer
+#### `internal/telemetry`
+- holds logging and diagnostic helpers
 
-### `internal/state`
-
-- stores shared state types
-- keeps app status values in one place
-
-### `internal/telemetry`
-
-- writes diagnostics
-- keeps logging helpers together
-
-## Notes
-
-- The current code is still small and simple.
-- Some graph rules still live inside `internal/app` and `internal/git`.
-- Later, those graph rules can move into a separate package if the code grows.
-
-## What this document is for
-
-Use this file when you want to quickly understand where things live.
-It is not a design plan.
-It is a map of the current code.
+### Notes
+- `internal/ui` does not exist yet.
+- The current split keeps render helpers in `internal/app` because they still depend on app state.
+- Tests live next to the code they protect, usually as `_test.go` files in the same package. This document should stay close to the actual tree, not the aspirational one.
