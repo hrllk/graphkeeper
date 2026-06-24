@@ -2,41 +2,26 @@
 
 ## Goal
 
-This document shows the order for cleaning up `graphkeeper`.
-It is about structure first, not new features first.
+This file shows the next work order for `graphkeeper`.
+It is a simple path for the next refactor steps.
 
-## Step 1: Freeze the current state
+## 1. Freeze the current state
 
 Goal:
-- lock the current behavior with tests
-- set a baseline before changes
+- keep the current behavior safe
+- set a test baseline before bigger changes
 
 Work:
 - run `go test ./...`
 - run `go build ./cmd/graphkeeper`
 - check the main user flows
-- list temporary test files for cleanup
+- keep the temporary test files in view
 
 Done when:
 - the current behavior still works
 - we have a clear test baseline
 
-## Step 2: Clean up the entrypoint
-
-Goal:
-- make the main path small and clear
-
-Work:
-- add `cmd/graphkeeper/main.go`
-- add `internal/bootstrap/app.go`
-- keep main as wiring only
-- update the README build path
-
-Done when:
-- the entrypoint is thin
-- app setup lives in one place
-
-## Step 3: Split Git and graph logic
+## 2. Split Git and graph logic
 
 Goal:
 - separate raw Git work from graph rules
@@ -50,7 +35,7 @@ Done when:
 - graph logic is no longer tied to UI code
 - Git calls and Git interpretation are separate
 
-## Step 4: Split the Bubble Tea app files
+## 3. Split the Bubble Tea app files
 
 Goal:
 - make `model.go` smaller and easier to read
@@ -65,7 +50,7 @@ Work:
 Done when:
 - state changes, command creation, and rendering are split
 
-## Step 5: Clean up the UI layer
+## 4. Clean up the UI layer
 
 Goal:
 - make styles and widgets easy to reuse
@@ -79,15 +64,14 @@ Done when:
 - styles are not spread across many files
 - render code is easier to follow
 
-## Step 6: Keep docs in sync
+## 5. Keep docs in sync
 
 Goal:
-- make the structure easy to understand for new readers
+- make the current layout easy to read
 
 Work:
-- keep `docs/architecture.md`
+- keep `docs/structure.md`
 - keep `docs/roadmap.md`
-- keep `docs/cli-structure-plan.md`
 - update README when the code layout changes
 
 Done when:
@@ -102,9 +86,8 @@ New docs should focus on the current structure and the next steps.
 ## Recommended order
 
 1. freeze the baseline with tests
-2. split cmd/bootstrap
-3. split git/graph
-4. split app files
-5. clean up UI/theme
-6. update docs
-7. run full build and tests
+2. split git/graph
+3. split app files
+4. clean up UI/theme
+5. update docs
+6. run full build and tests

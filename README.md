@@ -135,9 +135,7 @@ This README is kept simple on purpose.
 The implementation will keep changing as the graph workflow gets sharper.
 
 ### Docs
----
 
-- `docs/architecture.md` - package and layer plan
-- `docs/roadmap.md` - step-by-step work plan
-- `docs/cli-structure-plan.md` - main structure plan
-- `docs/archive/` - old UX planning docs
+- `docs/structure.md` - current code map
+- `docs/roadmap.md` - next work order
+- `docs/archive/` - old plans and moved docs
