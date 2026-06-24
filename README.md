@@ -1,5 +1,4 @@
-### Overview
----
+# graphkeeper
 
 `graphkeeper` is a graph-first Git TUI for maintainers.
 
@@ -8,6 +7,11 @@ It helps you read repository topology, understand how local branches relate to u
 This is an MVP.
 The product is intentionally small, opinionated, and not yet fully structured.
 The goal right now is clarity, not breadth.
+
+### Demo
+---
+<img width="400" height="279" alt="Screen Recording 2026-06-24 at 13 36 32" src="https://github.com/user-attachments/assets/a84d1926-9bcc-46df-b0af-a3d760adce1e" />
+
 
 ### TOC
 ---
