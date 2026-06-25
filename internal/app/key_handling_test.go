@@ -143,11 +143,12 @@ func TestPullShortcutInGraphSectionRequiresLocalPointer(t *testing.T) {
 		Remote:     "origin",
 		HasCommits: true,
 		GraphCommits: []git.GraphCommit{
-			{Hash: "c1"},
+			{Hash: "c1", Decorations: []string{"HEAD -> main"}},
+			{Hash: "b1"},
 		},
 	})
 	m.activeSection = sectionGraph
-	m.sectionCursor[sectionGraph] = 0
+	m.sectionCursor[sectionGraph] = 1
 	m.graphLaneCursor = 0
 
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
@@ -157,6 +158,36 @@ func TestPullShortcutInGraphSectionRequiresLocalPointer(t *testing.T) {
 	}
 	if got.status.Mode != state.ModeBrowse {
 		t.Fatalf("expected browse mode unchanged, got %s", got.status.Mode)
+	}
+}
+
+func TestPullShortcutInGraphSectionTriggersForLocalPointer(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		Upstream:      "origin/main",
+		Remote:        "origin",
+		LocalBranches: []string{"main"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: fixture.initialHash, Decorations: []string{"HEAD -> main"}},
+		},
+		Tracking: map[string]git.BranchTracking{
+			"main": {Behind: 1},
+		},
+	})
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = 0
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected pull command when graph pointer is local")
+	}
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected loading mode for graph pull, got %s", got.status.Mode)
 	}
 }
 

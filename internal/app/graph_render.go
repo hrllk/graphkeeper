@@ -31,6 +31,7 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 		}
 		if shouldHighlightStash(stashCount, selected) {
 			refs = stashMark.Render(refs)
+			refs += " " + muted.Render(fmt.Sprintf("stash:%d", stashCount))
 		}
 		if graphActive && selected {
 			hash = pointerMark.Render(hash)
@@ -103,6 +104,7 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 		}
 		if shouldHighlightStash(stashCount, selected) {
 			refs = stashMark.Render(refs)
+			refs += " " + muted.Render(fmt.Sprintf("stash:%d", stashCount))
 		}
 	}
 	var graphCell string

@@ -181,6 +181,12 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.status = state.New().WithLoading("Preparing reset...")
 		return m, previewSelection(m.repo, m.repoStatus, state.ActionReset, focus.Hash)
+	case "p":
+		if !pullReady(m.repoStatus) || !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+			return m, nil
+		}
+		m.status = state.New().WithLoading("Fetching upstream...")
+		return m, executeFetchForPull(m.repo, m.commitLimit)
 	case "n":
 		if !canCreateBranch(m.repoStatus) {
 			m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first.")

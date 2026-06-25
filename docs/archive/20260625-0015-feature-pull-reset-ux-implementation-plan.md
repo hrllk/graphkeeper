@@ -8,7 +8,7 @@
 
 1. `pull`의 노출 위치와 활성 조건을 단순화한다.
 2. `reset`은 현재 브랜치 기준의 `hard reset`만 먼저 제공한다.
-3. `reset` 실행 전에는 반드시 대상과 결과를 미리 보여준다.
+3. `reset`은 타깃 선택 이후 confirm 단계에서 mode 선택과 preview를 함께 보여준다.
 4. `merge` / `rebase`는 같은 선택 UI를 재사용하되 이번 문서의 범위에서는 부차적으로 둔다.
 
 ## 현재 관찰된 구현 상태
@@ -27,13 +27,13 @@
 
 ### 1. pull
 
-`pull`은 그래프 포인터 탐색과 분리한다.
+`pull`은 그래프 포인터 탐색과 분리하되, 노출 지점은 `Local`과 `Graph` 둘 다 둔다.
 
 이유:
 
 - `pull`은 특정 커밋을 고르는 행위가 아니라 현재 브랜치 상태를 갱신하는 행위에 가깝다.
-- Graph에서 대상을 탐색하게 만들면 사용자가 `fetch`, `merge`, `rebase`, `reset`과 혼동할 가능성이 높다.
-- 현재 브랜치의 upstream 상태만 알면 되므로, `Current` 또는 `Local` 섹션에서 제공하는 편이 더 일관적이다.
+- Graph에서 임의 커밋을 대상으로 쓰게 만들면 사용자가 `fetch`, `merge`, `rebase`, `reset`과 혼동할 가능성이 높다.
+- `Local`에서는 현재 브랜치 상태 갱신의 기본 진입점으로, `Graph`에서는 현재 브랜치 포인터가 포커스된 경우 보조 진입점으로 제공하는 편이 더 일관적이다.
 
 권장 활성 조건:
 
@@ -41,6 +41,7 @@
 - remote가 존재할 것
 - upstream이 설정되어 있을 것
 - 대상이 명확하지 않은 detached HEAD 상태는 비활성
+- `Graph`에서는 현재 브랜치 포인터에만 pull을 노출할 것
 
 권장 메시지:
 
@@ -56,6 +57,7 @@
 - soft / mixed / hard를 한 번에 넣으면 TUI에서 설명 비용이 커진다.
 - 사용자는 `reset`을 실행했을 때 현재 브랜치 포인터와 작업 결과가 어떻게 바뀌는지 즉시 이해해야 한다.
 - 안전성 측면에서 “무엇이 버려지는지”를 명확히 보여주는 편이 중요하다.
+- 타깃 선택 이후 confirm 단계에서 `soft / mixed / hard`를 고르고 preview 정보를 함께 본 뒤 실행한다.
 
 권장 표현:
 
@@ -69,12 +71,8 @@
 
 권장 배치:
 
-- `Current` 섹션의 액션으로 노출
-- 필요하다면 `Local` 섹션에도 동일 동작을 노출할 수 있으나, 한 곳에서만 시작하는 편이 더 단순하다
-
-권장 선택:
-
-- `Current` 섹션만 1차 배치
+- `Local` 섹션의 기본 액션으로 노출
+- `Graph` 섹션에서는 현재 브랜치 포인터에만 보조 진입점으로 노출
 
 ### reset
 
@@ -109,7 +107,7 @@
 
 ### 실행 전 preview
 
-사용자가 reset을 실행하려고 하면 아래 정보를 보여준다.
+사용자가 reset을 실행하려고 하면 아래 정보를 confirm 안에서 함께 보여준다.
 
 - 현재 branch 이름
 - 현재 HEAD commit
@@ -118,10 +116,11 @@
 - reset 후 HEAD가 이동할 위치
 - 사라질 가능성이 있는 커밋 범위
 - 작업 트리 영향 경고
+- reset mode 선택 UI(`soft / mixed / hard`)
 
 ### 그래프 예시 표기
 
-preview에서는 “현재 위치”와 “이동 후 위치”를 함께 보여줘야 한다.
+confirm에서는 “현재 위치”와 “이동 후 위치”를 함께 보여줘야 한다.
 
 예시 형식:
 
@@ -138,7 +137,7 @@ preview에서는 “현재 위치”와 “이동 후 위치”를 함께 보여
 
 ### 추천 방식
 
-1번 + 2번 조합을 추천한다.
+1번 + 2번 조합을 추천한다. 다만 구현상 preview를 별도 화면으로 강제하지 말고, confirm 패널 안에 같이 보여줘도 된다.
 
 - 그래프 상에서는 포인터 이동을 시각화
 - Mode 패널에서는 before / after를 텍스트로 설명
@@ -182,29 +181,298 @@ preview에서는 “현재 위치”와 “이동 후 위치”를 함께 보여
 
 ## 구현 순서
 
-1. `pull`의 배치 위치를 `Current` 섹션으로 확정한다.
-2. `pull`의 활성 조건과 비활성 메시지를 정리한다.
-3. `reset`을 `hard reset`으로 명시한다.
+1. `pull`의 배치 위치를 `Local` 기본, `Graph` 보조 진입점으로 확정한다.
+2. `pull`의 활성 조건과 비활성 메시지를 `Local` / `Graph` 기준으로 정리한다.
+3. `reset`을 `hard reset`으로 명시하되, confirm 단계에서 `soft / mixed / hard` 선택을 노출한다.
 4. `reset` 대상 허용 범위를 local branch / commit으로 제한한다.
-5. `reset preview` 화면에 before / after 정보를 추가한다.
+5. `reset` preview 정보를 confirm 안에 포함시킨다.
 6. `Mode` 패널의 액션 도움말을 pull/reset 기준으로 갱신한다.
 7. 관련 테스트를 추가한다.
+
+## Code Sketch
+
+### `internal/state/state.go`
+
+`pull/reset` 흐름을 UI 상태로 표시하려면 `Mode`와 `ResetMode`를 먼저 고정한다.
+
+```go
+type Mode string
+
+const (
+	ModeBrowse         Mode = "browse"
+	ModePullCheck      Mode = "pull_check"
+	ModeTargetPick     Mode = "target_pick"
+	ModeOutcomePreview Mode = "outcome_preview"
+	ModeResetModePick  Mode = "reset_mode_pick"
+	ModeBlocked        Mode = "blocked"
+	ModeLoading        Mode = "loading"
+	ModeEmpty          Mode = "empty"
+	ModeError          Mode = "error"
+	ModeConfirm        Mode = "confirm"
+)
+
+type ResetMode string
+
+const (
+	ResetModeSoft  ResetMode = "soft"
+	ResetModeMixed  ResetMode = "mixed"
+	ResetModeHard   ResetMode = "hard"
+)
+
+type Status struct {
+	Mode      Mode
+	Action    Action
+	Block     BlockReason
+	Title     string
+	Message   string
+	Detail    string
+	Targets   []TargetItem
+	TargetIdx int
+	Selected  string
+
+	ResetMode  ResetMode
+	CanExecute bool
+}
+
+func (s Status) WithResetModePick(action Action, message, detail string) Status {
+	s.Mode = ModeResetModePick
+	s.Action = action
+	s.Block = BlockNone
+	s.Title = "Reset"
+	s.Message = message
+	s.Detail = detail
+	s.CanExecute = true
+	if s.ResetMode == "" {
+		s.ResetMode = ResetModeHard
+	}
+	return s
+}
+```
+
+### `internal/app/key_handling.go`
+
+새 모드가 들어오면 키 라우팅을 먼저 분기한다.
+
+```go
+func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.branchOpen {
+		return m.handleBranchOpenKey(msg)
+	}
+	switch m.status.Mode {
+	case state.ModeTargetPick:
+		return m.handleTargetPickKey(msg)
+	case state.ModeResetModePick:
+		return m.handleResetModePickKey(msg)
+	case state.ModeConfirm:
+		return m.handleConfirmKey(msg)
+	case state.ModeOutcomePreview:
+		return m.handleOutcomePreviewKey(msg)
+	case state.ModeBrowse:
+		return m.handleBrowseKey(msg)
+	default:
+		return m, nil
+	}
+}
+```
+
+### `internal/app/key_handling_browse.go`
+
+`pull`은 `Local`과 `Graph`에서 같은 helper를 타고, `reset`은 Graph 포커스에서 시작한다.
+
+```go
+func (m model) triggerPull() (tea.Model, tea.Cmd) {
+	if pullReady(m.repoStatus) {
+		m.status = state.New().WithLoading("Fetching upstream before pull...")
+		return m, executeFetchForPull(m.repo, m.commitLimit)
+	}
+	m.status = actionPull(m.repoStatus)
+	return m, nil
+}
+
+func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "p":
+		if m.activeSection == sectionCurrent {
+			return true, m.triggerPull()
+		}
+		if m.activeSection == sectionGraph && isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+			return true, m.triggerPull()
+		}
+		return true, m, nil
+	default:
+		return false, m, nil
+	}
+}
+
+func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "s":
+		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
+			m.status = state.New().WithBlocked(state.BlockUnknown, "No reset target.", "Move the pointer onto a commit line.")
+			return m, nil
+		}
+
+		currentOnly, targetOnly, err := m.repo.Divergence(context.Background(), "HEAD", focus.Hash)
+		if err != nil {
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Reset preview failed.", err.Error())
+			return m, nil
+		}
+
+		preview := buildResetPreview(focus.Hash, m.repoStatus, currentOnly, targetOnly)
+		m.status = state.New().WithResetModePick(state.ActionReset, preview.Message, preview.Detail+
+			"\n\ns: soft  •  m: mixed  •  h: hard  •  enter: execute  •  esc: back")
+		m.status.Selected = focus.Hash
+		m.status.ResetMode = state.ResetModeHard
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+```
+
+### `internal/app/key_handling_confirm.go`
+
+`reset` 실행은 mode 선택 상태에서만 가능하게 둔다.
+
+```go
+func (m model) handleResetModePickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "s":
+		m.status.ResetMode = state.ResetModeSoft
+		m.status.Title = "Reset (" + string(m.status.ResetMode) + ")"
+		return m, nil
+	case "m":
+		m.status.ResetMode = state.ResetModeMixed
+		m.status.Title = "Reset (" + string(m.status.ResetMode) + ")"
+		return m, nil
+	case "h":
+		m.status.ResetMode = state.ResetModeHard
+		m.status.Title = "Reset (" + string(m.status.ResetMode) + ")"
+		return m, nil
+	case "enter":
+		target := m.status.Selected
+		mode := m.status.ResetMode
+		m.status = state.New().WithLoading("Running " + string(mode) + " reset...")
+		return m, executeReset(m.repo, target, mode, m.commitLimit)
+	case "esc", "n":
+		m.status = deriveStatus(m.repoStatus)
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+```
+
+### `internal/app/commands.go` and `internal/app/update_execute.go`
+
+실행 커맨드는 reset mode를 그대로 Git command에 매핑하고, 완료 후 상태를 다시 읽어야 한다.
+
+```go
+type executedMsg struct {
+	action    state.Action
+	target    string
+	resetMode state.ResetMode
+	status    git.Status
+	err       error
+}
+
+func executeReset(repo *git.Repo, target string, mode state.ResetMode, limit int) tea.Cmd {
+	return func() tea.Msg {
+		if target == "" {
+			return executedMsg{action: state.ActionReset, resetMode: mode, err: fmt.Errorf("target is empty")}
+		}
+
+		args := []string{"reset", "--hard", target}
+		switch mode {
+		case state.ResetModeSoft:
+			args = []string{"reset", "--soft", target}
+		case state.ResetModeMixed:
+			args = []string{"reset", "--mixed", target}
+		case state.ResetModeHard:
+			args = []string{"reset", "--hard", target}
+		}
+
+		_, err := repo.Run(args...)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionReset, target: target, resetMode: mode, err: statusErr}
+		}
+		return executedMsg{action: state.ActionReset, target: target, resetMode: mode, status: status, err: err}
+	}
+}
+```
+
+```go
+func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
+	msg2, ok := msg.(executedMsg)
+	if !ok {
+		return m, nil
+	}
+
+	if msg2.action == state.ActionReset {
+		rows := graph.Rows(msg2.status)
+		if rowIdx := graph.FindRowByHash(rows, msg2.status.Head); rowIdx >= 0 {
+			m.sectionCursor[sectionGraph] = rowIdx
+			m.graphScroll = clampScroll(rowIdx, len(rows), graphPageSize(&m))
+		}
+
+		syncBrowseState(&m, msg2.status)
+		m.status = deriveStatus(msg2.status)
+		m.status.Message = fmt.Sprintf("%s reset completed to %s.", strings.ToUpper(string(msg2.resetMode)), shorten(msg2.target, 7))
+		return m, nil
+	}
+
+	// existing branches keep their current behavior
+	return m, nil
+}
+```
+
+### `internal/app/view_sections.go`
+
+`pull`과 `reset` 도움말은 섹션 기준으로 다르게 보여준다.
+
+```go
+case sectionCurrent:
+	if pullReady(m.repoStatus) {
+		lines = append(lines, "• p: pull           • P: push")
+	} else {
+		lines = append(lines, disabled.Render("• p: pull")+"   "+muted.Render("(no upstream / detached)"))
+	}
+case sectionGraph:
+	if isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+		lines = append(lines, "• p: pull           • s: reset")
+	} else {
+		lines = append(lines, disabled.Render("• p: pull")+"   "+disabled.Render("• s: reset")+" "+muted.Render("(current branch only)"))
+	}
+```
+
+## Test Sketch
+
+```go
+func TestPullIsAvailableFromLocalAndGraph(t *testing.T)
+func TestPullIsBlockedOutsideCurrentBranchContext(t *testing.T)
+func TestResetOpensModePickWithPreview(t *testing.T)
+func TestResetModePickExecutesSelectedMode(t *testing.T)
+func TestResetConfirmRendersModeAndPreviewInDetailPane(t *testing.T)
+```
 
 ## 테스트 항목
 
 - `pull`이 detached HEAD에서 비활성인지
 - `pull`이 upstream 없는 브랜치에서 비활성인지
 - `pull`이 정상 상태에서 실행되는지
+- `pull`이 Local과 Graph 섹션에서 올바르게 노출되는지
 - `reset`이 Graph 섹션에서만 진입 가능한지
 - `reset` 대상이 remote branch면 거부되는지
-- `reset` preview가 현재 HEAD와 target을 함께 보여주는지
+- `reset` confirm이 mode 선택과 preview 정보를 함께 보여주는지
 - `reset` 실행 전 confirm 단계가 존재하는지
 - `reset`이 hard reset으로만 동작하는지
 
 ## 내일 이어서 할 일
 
-- [ ] `pull`의 실제 진입 위치를 정한다
-- [ ] `reset` preview 문구를 확정한다
+- [ ] `pull`의 Local / Graph 노출 문구를 확정한다
+- [ ] `reset` confirm 문구를 확정한다
 - [ ] `reset`의 before / after 표시 방식 결정
 - [ ] target 선택기에서 remote branch 제외
 - [ ] 테스트 케이스 추가
@@ -214,7 +482,7 @@ preview에서는 “현재 위치”와 “이동 후 위치”를 함께 보여
 
 현재 단계에서는 `pull`과 `reset`을 “서로 다른 성격의 작업”으로 분리하는 것이 가장 안전하다.
 
-- `pull`은 현재 브랜치 기준의 상태 갱신
-- `reset`은 Graph에서 대상 선택 후 실행하는 hard reset
+- `pull`은 Local과 Graph에서 현재 브랜치 기준으로 갱신하는 동작
+- `reset`은 Graph에서 대상 선택 후 confirm 안에서 mode와 preview를 함께 보고 실행하는 hard reset
 
 이렇게 고정하면 이후 `merge` / `rebase`도 같은 타깃 선택 구조 위에 얹을 수 있다.

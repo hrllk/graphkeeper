@@ -10,7 +10,8 @@ func stashSummaryLines(entries []git.StashEntry, width int) []string {
 	if len(entries) == 0 {
 		return nil
 	}
-	lines := make([]string, 0, len(entries))
+	lines := make([]string, 0, len(entries)+1)
+	lines = append(lines, fmt.Sprintf("  count: %d", len(entries)))
 	for _, entry := range entries {
 		label := entry.Ref
 		if entry.Subject != "" {

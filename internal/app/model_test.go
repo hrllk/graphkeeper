@@ -909,6 +909,10 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.Contains(focused, pointerMark.Render("*")) {
 		t.Fatalf("expected branch row graph pointer to be highlighted, got %q", focused)
 	}
+	stashed := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, false, 2)
+	if !strings.Contains(stashed, "stash:2") {
+		t.Fatalf("expected stash count to be shown on focused graph rows, got %q", stashed)
+	}
 	if compactWhenText("5 minutes ago") != "5mins" {
 		t.Fatalf("expected relative time to compact to 5mins")
 	}
