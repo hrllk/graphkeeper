@@ -30,7 +30,7 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			"branch": msg.status.Branch,
 			"head":   msg.status.Head,
 		})
-		return m, nil
+		return m, loadStashState(m.repo)
 	case tickMsg:
 		return m, tea.Batch(scheduleRefresh(), refreshRepoState(m.repo, m.commitLimit))
 	case refreshedMsg:
@@ -42,7 +42,7 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.branchOpen && (m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeBlocked || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError) {
 			m.status = deriveStatus(msg.status)
 		}
-		return m, nil
+		return m, loadStashState(m.repo)
 	default:
 		return m, nil
 	}

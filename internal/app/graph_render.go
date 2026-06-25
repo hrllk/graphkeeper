@@ -9,9 +9,9 @@ import (
 	"hrllk/graphkeeper/internal/graph"
 )
 
-func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, isHandshake bool) string {
+func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, isHandshake bool, stashCount int) string {
 	if row.Graph != "" {
-		return renderRawGraphLine(row, selected, graphActive, laneCursor, localBranches, graphColWidth, isHandshake)
+		return renderRawGraphLine(row, selected, graphActive, laneCursor, localBranches, graphColWidth, isHandshake, stashCount)
 	}
 	var hash, refs string
 	var refInfo decorationInfo
@@ -28,6 +28,9 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 			refs = headMark.Render(refs)
 		} else if pointerFocused && refInfo.HasBranch {
 			refs = branchMark.Render(refs)
+		}
+		if shouldHighlightStash(stashCount, selected) {
+			refs = stashMark.Render(refs)
 		}
 		if graphActive && selected {
 			hash = pointerMark.Render(hash)
@@ -59,7 +62,7 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 	return "  " + line
 }
 
-func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, isHandshake bool) string {
+func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, isHandshake bool, stashCount int) string {
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
 		graphCell := padRight(row.Graph, graphColWidth)
 		if isHandshake {
@@ -98,6 +101,9 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 		} else if pointerFocused && refInfo.HasBranch {
 			refs = branchMark.Render(refs)
 		}
+		if shouldHighlightStash(stashCount, selected) {
+			refs = stashMark.Render(refs)
+		}
 	}
 	var graphCell string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
@@ -135,6 +141,10 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 		return "> " + line
 	}
 	return "  " + line
+}
+
+func shouldHighlightStash(stashCount int, selected bool) bool {
+	return stashCount > 0 && selected
 }
 
 func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int, graphColWidth int) string {

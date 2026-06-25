@@ -21,8 +21,8 @@ func handleBranchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		detail := msg2.err.Error()
 		if strings.Contains(msg2.err.Error(), "working tree is not clean") {
 			reason = state.BlockDirtyTree
-			message = "Working tree is not clean."
-			detail = "Commit or stash local changes before creating and checking out a new branch."
+			message = "Working tree is dirty."
+			detail = "Commit or stash changes first."
 		}
 		m.status = state.New().WithBlocked(reason, message, detail)
 		telemetry.Log("app", "branch_create_failed", map[string]string{"name": msg2.name, "base": msg2.base, "error": msg2.err.Error()})

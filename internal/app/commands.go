@@ -32,6 +32,13 @@ func refreshRepoState(repo *git.Repo, limit int) tea.Cmd {
 	}
 }
 
+func loadStashState(repo *git.Repo) tea.Cmd {
+	return func() tea.Msg {
+		entries, err := repo.Stashes(context.Background())
+		return stashLoadedMsg{entries: entries, err: err}
+	}
+}
+
 func fetchRepoState(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if err := repo.Fetch(context.Background()); err != nil {
@@ -123,7 +130,7 @@ func executePullRebase(repo *git.Repo, limit int) tea.Cmd {
 
 func executeAbort(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
-		// 현재 리포지토리 상태를 1차 파악하여 merge abort 인지 rebase abort 인지 구분합니다.
+		// Inspect the current repo state first to distinguish merge abort from rebase abort.
 		currentStatus, statusErr := repo.Status(context.Background(), limit)
 		var err error
 		if statusErr == nil && currentStatus.RebaseInProgress {
@@ -219,6 +226,34 @@ func executeAction(repo *git.Repo, action state.Action, target string, limit int
 		}
 		status, statusErr := repo.Status(context.Background(), limit)
 		return executedMsg{action: action, target: target, status: status, err: statusErr}
+	}
+}
+
+func executeReset(repo *git.Repo, target string, mode state.ResetMode, limit int) tea.Cmd {
+	return func() tea.Msg {
+		if target == "" {
+			return executedMsg{action: state.ActionReset, err: fmt.Errorf("target is empty"), resetMode: mode}
+		}
+		if mode == "" {
+			mode = state.ResetModeHard
+		}
+		args := []string{"reset", "--hard", target}
+		switch mode {
+		case state.ResetModeSoft:
+			args = []string{"reset", "--soft", target}
+		case state.ResetModeMixed:
+			args = []string{"reset", "--mixed", target}
+		case state.ResetModeHard:
+			args = []string{"reset", "--hard", target}
+		default:
+			return executedMsg{action: state.ActionReset, target: target, err: fmt.Errorf("unsupported reset mode %q", mode), resetMode: mode}
+		}
+		_, err := repo.Run(args...)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionReset, target: target, status: status, err: statusErr, resetMode: mode}
+		}
+		return executedMsg{action: state.ActionReset, target: target, status: status, err: err, resetMode: mode}
 	}
 }
 

@@ -33,6 +33,15 @@ func buildActionTargetItems(rs git.Status) []state.TargetItem {
 	return targets
 }
 
+func buildResetTargetItems(rs git.Status) []state.TargetItem {
+	targets := make([]state.TargetItem, 0, len(rs.LocalBranches)+len(rs.Branches))
+	targets = appendLocalTargets(targets, rs)
+	if len(targets) == 0 {
+		targets = appendFallbackBranchTargets(targets, rs.Branches)
+	}
+	return targets
+}
+
 func buildCurrentSectionTargets(rs git.Status) []state.TargetItem {
 	items := make([]state.TargetItem, 0, 1+len(rs.LocalBranches))
 	if rs.Branch != "" {
@@ -43,6 +52,7 @@ func buildCurrentSectionTargets(rs git.Status) []state.TargetItem {
 			Name:            rs.Branch,
 			Ref:             rs.Branch,
 			Current:         true,
+			WorktreeDirty:   rs.WorktreeDirty,
 			NeedsPull:       track.Behind > 0 && track.Ahead == 0,
 			NeedsPush:       track.Ahead > 0,
 			NoUpstream:      known && upstream == "",
@@ -54,6 +64,7 @@ func buildCurrentSectionTargets(rs git.Status) []state.TargetItem {
 			Name:            "HEAD",
 			Ref:             rs.Head,
 			Current:         true,
+			WorktreeDirty:   rs.WorktreeDirty,
 			MergeConflicted: rs.MergeInProgress,
 		})
 	}

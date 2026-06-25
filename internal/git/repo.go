@@ -60,6 +60,13 @@ type GraphCommit struct {
 	Subject     string
 }
 
+type StashEntry struct {
+	Ref      string
+	Hash     string
+	BaseHash string
+	Subject  string
+}
+
 type BranchTracking struct {
 	Ahead  int
 	Behind int

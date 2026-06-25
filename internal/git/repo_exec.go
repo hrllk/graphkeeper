@@ -33,6 +33,35 @@ func (r *Repo) worktreeDirty(ctx context.Context) (bool, error) {
 	return strings.TrimSpace(out) != "", nil
 }
 
+func (r *Repo) Stashes(ctx context.Context) ([]StashEntry, error) {
+	lines, err := r.gitLines(ctx, "stash", "list", "--format=%gd%x1f%H%x1f%P%x1f%gs")
+	if err != nil {
+		return nil, err
+	}
+	if len(lines) == 0 {
+		return nil, nil
+	}
+	entries := make([]StashEntry, 0, len(lines))
+	for _, line := range lines {
+		parts := strings.SplitN(line, "\x1f", 4)
+		if len(parts) < 4 {
+			continue
+		}
+		parents := strings.Fields(parts[2])
+		baseHash := ""
+		if len(parents) > 0 {
+			baseHash = parents[0]
+		}
+		entries = append(entries, StashEntry{
+			Ref:      strings.TrimSpace(parts[0]),
+			Hash:     strings.TrimSpace(parts[1]),
+			BaseHash: baseHash,
+			Subject:  strings.TrimSpace(parts[3]),
+		})
+	}
+	return entries, nil
+}
+
 func (r *Repo) Divergence(ctx context.Context, left, right string) (leftOnly int, rightOnly int, err error) {
 	if left == "" || right == "" {
 		return 0, 0, fmt.Errorf("divergence requires two refs")

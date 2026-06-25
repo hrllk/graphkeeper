@@ -30,7 +30,7 @@ func TestBranchOpenEscCancelsDraft(t *testing.T) {
 	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root})
 	m.branchOpen = true
 	m.branchDraft = "feature"
-	m.status = state.New().WithLoading("Type a new branch name and press enter.")
+	m.status = state.New().WithLoading("Enter a branch name.")
 
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	got := gotModel.(model)
@@ -79,8 +79,84 @@ func TestTargetPickEnterStartsPreview(t *testing.T) {
 	if got.status.Mode != state.ModeLoading {
 		t.Fatalf("expected loading mode while previewing, got %s", got.status.Mode)
 	}
-	if got.status.Message != "Previewing result..." {
+	if got.status.Message != "Previewing..." {
 		t.Fatalf("expected preview message, got %q", got.status.Message)
+	}
+}
+
+func TestResetModePickerKeyHandling(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root, Branch: "main", Head: fixture.initialHash})
+	m.status = state.New().WithResetModePick("Choose reset mode.", "Preview...")
+	m.status.Selected = fixture.initialHash
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected reset mode toggle to stay synchronous, got %v", cmd)
+	}
+	if got.status.ResetMode != state.ResetModeHard {
+		t.Fatalf("expected hard reset selection, got %s", got.status.ResetMode)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected reset execution command on enter")
+	}
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected loading mode while executing reset, got %s", got.status.Mode)
+	}
+}
+
+func TestPullShortcutAvailableInCurrentSection(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		Upstream:      "origin/main",
+		Remote:        "origin",
+		LocalBranches: []string{"main"},
+		Tracking: map[string]git.BranchTracking{
+			"main": git.BranchTracking{Behind: 1},
+		},
+	})
+	m.activeSection = sectionCurrent
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected pull command from current section")
+	}
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected loading mode for pull, got %s", got.status.Mode)
+	}
+}
+
+func TestPullShortcutInGraphSectionRequiresLocalPointer(t *testing.T) {
+	m := testKeyHandlingModel(nil, git.Status{
+		Root:       "/repo",
+		Branch:     "main",
+		Head:       "c1",
+		Upstream:   "origin/main",
+		Remote:     "origin",
+		HasCommits: true,
+		GraphCommits: []git.GraphCommit{
+			{Hash: "c1"},
+		},
+	})
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = 0
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no pull command when graph pointer is not clearly local, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode unchanged, got %s", got.status.Mode)
 	}
 }
 
@@ -95,7 +171,7 @@ func TestConfirmPullShortcutVariants(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected merge-pull command for m shortcut")
 	}
-	if got.status.Mode != state.ModeLoading || got.status.Message != "Running merge pull..." {
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Merging pull..." {
 		t.Fatalf("expected merge-pull loading state, got %+v", got.status)
 	}
 
@@ -107,7 +183,7 @@ func TestConfirmPullShortcutVariants(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected rebase-pull command for r shortcut")
 	}
-	if got.status.Mode != state.ModeLoading || got.status.Message != "Running rebase pull..." {
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Rebasing pull..." {
 		t.Fatalf("expected rebase-pull loading state, got %+v", got.status)
 	}
 }

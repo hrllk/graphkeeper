@@ -46,8 +46,8 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.repoStatus = msg2.status
 			syncBrowseState(&m, msg2.status)
 			m.status = state.New().WithBrowse()
-			m.status.Message = "Pull stopped with conflicts."
-			m.status.Detail = "Press enter to abort the in-progress merge/rebase."
+			m.status.Message = "Pull conflicted."
+			m.status.Detail = "Press Enter to abort."
 			telemetry.Log("app", "execute_conflicted", map[string]string{
 				"action": string(msg2.action),
 				"head":   msg2.status.Head,
@@ -58,8 +58,8 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.repoStatus = msg2.status
 			syncBrowseState(&m, msg2.status)
 			m.status = state.New().WithBrowse()
-			m.status.Message = "Merge stopped with conflicts."
-			m.status.Detail = "Resolve conflicts, then press 'a' to abort or commit to complete."
+			m.status.Message = "Merge conflicted."
+			m.status.Detail = "Resolve conflicts, then abort or commit."
 			telemetry.Log("app", "execute_conflicted", map[string]string{
 				"action": string(msg2.action),
 				"head":   msg2.status.Head,
@@ -70,8 +70,8 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.repoStatus = msg2.status
 			syncBrowseState(&m, msg2.status)
 			m.status = state.New().WithBrowse()
-			m.status.Message = "Rebase stopped with conflicts."
-			m.status.Detail = "Resolve conflicts, then press 'a' to abort or continue rebase."
+			m.status.Message = "Rebase conflicted."
+			m.status.Detail = "Resolve conflicts, then abort or continue."
 			telemetry.Log("app", "execute_conflicted", map[string]string{
 				"action": string(msg2.action),
 				"head":   msg2.status.Head,
@@ -79,18 +79,18 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		reason := state.BlockUnknown
-		message := "Execution failed."
+		message := "Action failed."
 		detail := msg2.err.Error()
 		if msg2.action == state.ActionCheckout {
 			message = "Checkout failed."
 			if strings.Contains(detail, "local changes") || strings.Contains(detail, "overwritten by checkout") {
 				reason = state.BlockDirtyTree
 				message = "Checkout blocked by local changes."
-				detail = "Your local changes would be overwritten by checkout. Commit or stash them before switching."
+				detail = "Commit or stash changes first."
 			}
 		} else if isAuthError && (msg2.action == state.ActionPush || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream) {
-			message = "Authentication or Permission error."
-			detail = "Please check your remote credentials or network connection: " + msg2.err.Error()
+			message = "Auth or permission error."
+			detail = "Check credentials or network: " + msg2.err.Error()
 		} else if msg2.action == state.ActionPush || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream {
 			message = "Push failed."
 		}
@@ -104,9 +104,9 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		if msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase {
-			m.status.Message = "Pull completed successfully."
+			m.status.Message = "Pull complete."
 		} else {
-			m.status.Message = fmt.Sprintf("Push completed for %s.", msg2.target)
+			m.status.Message = fmt.Sprintf("Push complete: %s.", msg2.target)
 		}
 		telemetry.Log("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
@@ -159,7 +159,11 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
-		m.status.Message = fmt.Sprintf("Hard reset completed to %s.", shorten(msg2.target, 7))
+		mode := msg2.resetMode
+		if mode == "" {
+			mode = state.ResetModeHard
+		}
+		m.status.Message = fmt.Sprintf("%s reset complete: %s.", strings.Title(string(mode)), shorten(msg2.target, 7))
 		telemetry.Log("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
@@ -176,7 +180,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	syncBrowseState(&m, msg2.status)
-	m.status = state.New().WithOutcome(msg2.action, "Completed.", executionDetail(msg2.action, msg2.target, msg2.status), false)
+	m.status = state.New().WithOutcome(msg2.action, "Complete.", executionDetail(msg2.action, msg2.target, msg2.status), false)
 	m.status.Selected = msg2.target
 	telemetry.Log("app", "execute_action", map[string]string{
 		"action": string(msg2.action),

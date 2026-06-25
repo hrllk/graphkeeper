@@ -37,6 +37,8 @@ func renderStatusCompact(s state.Status) string {
 		return ok.Render("Browse") + " | " + msg
 	case state.ModeLoading:
 		return accent.Render("Loading") + " | " + msg
+	case state.ModeResetModePick:
+		return ok.Render("Reset") + " | " + msg
 	case state.ModeBlocked:
 		return warn.Render("Blocked") + " | " + msg
 	default:
@@ -68,6 +70,9 @@ func formatTargetItem(t state.TargetItem) string {
 	case state.TargetKindLocal:
 		if t.Current {
 			label := headMark.Render("l->" + t.Name)
+			if t.WorktreeDirty {
+				label += " " + dirtyMark.Render("(dirty)")
+			}
 			if t.NeedsPull {
 				label += " " + warn.Render("⬇")
 			}
@@ -83,6 +88,9 @@ func formatTargetItem(t state.TargetItem) string {
 			return label
 		}
 		label := "l->" + t.Name
+		if t.WorktreeDirty {
+			label += " " + dirtyMark.Render("(dirty)")
+		}
 		if t.NeedsPull {
 			label += " " + warn.Render("⬇")
 		}
@@ -127,6 +135,11 @@ func renderActionHelpLines(m model) []string {
 			} else {
 				lines = append(lines, disabled.Render(mergeLabel)+"         "+disabled.Render(rebaseLabel)+" "+muted.Render("(local lane only)"))
 			}
+			if pullReady(m.repoStatus) && isLocal {
+				lines = append(lines, "• p: pull")
+			} else {
+				lines = append(lines, disabled.Render("• p: pull")+" "+muted.Render("(current branch lane)"))
+			}
 			lines = append(lines, "• s: reset         • ctrl+u/d: scroll")
 			lines = append(lines, "• gg: top         • G: bottom")
 			lines = append(lines, "• H: jump to HEAD")
@@ -170,6 +183,8 @@ func renderActionHelpLines(m model) []string {
 		return lines
 	case state.ModeTargetPick:
 		return []string{"• up/down: choose target            • enter: preview", "• esc: back"}
+	case state.ModeResetModePick:
+		return []string{"• s: soft  •  m: mixed  •  h: hard", "• enter: execute        • esc: back"}
 	case state.ModeOutcomePreview:
 		if m.status.CanExecute {
 			return []string{"• enter: execute                    • esc: back"}

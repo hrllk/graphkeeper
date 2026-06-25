@@ -7,6 +7,7 @@ const (
 	ModePullCheck      Mode = "pull_check"
 	ModeTargetPick     Mode = "target_pick"
 	ModeOutcomePreview Mode = "outcome_preview"
+	ModeResetModePick  Mode = "reset_mode_pick"
 	ModeBlocked        Mode = "blocked"
 	ModeLoading        Mode = "loading"
 	ModeEmpty          Mode = "empty"
@@ -46,6 +47,21 @@ const (
 	BlockUnknown     BlockReason = "unknown"
 )
 
+type ResetMode string
+
+const (
+	ResetModeSoft  ResetMode = "soft"
+	ResetModeMixed ResetMode = "mixed"
+	ResetModeHard  ResetMode = "hard"
+)
+
+type WorktreeState string
+
+const (
+	WorktreeStateClean WorktreeState = "clean"
+	WorktreeStateDirty WorktreeState = "dirty"
+)
+
 type TargetKind string
 
 const (
@@ -59,6 +75,7 @@ type TargetItem struct {
 	Name            string
 	Ref             string
 	Current         bool
+	WorktreeDirty   bool
 	Default         bool
 	NeedsPull       bool
 	NeedsPush       bool
@@ -67,16 +84,18 @@ type TargetItem struct {
 }
 
 type Status struct {
-	Mode       Mode
-	Action     Action
-	Block      BlockReason
-	Title      string
-	Message    string
-	Detail     string
-	Targets    []TargetItem
-	TargetIdx  int
-	Selected   string
-	CanExecute bool
+	Mode          Mode
+	Action        Action
+	Block         BlockReason
+	ResetMode     ResetMode
+	WorktreeState WorktreeState
+	Title         string
+	Message       string
+	Detail        string
+	Targets       []TargetItem
+	TargetIdx     int
+	Selected      string
+	CanExecute    bool
 }
 
 func New() Status {
@@ -88,7 +107,7 @@ func (s Status) WithBrowse() Status {
 	s.Action = ActionNone
 	s.Block = BlockNone
 	s.Title = "Browse"
-	s.Message = "Inspect the graph and choose an action."
+	s.Message = "Choose an action."
 	s.Detail = ""
 	s.TargetIdx = -1
 	s.Selected = ""
@@ -135,6 +154,20 @@ func (s Status) WithOutcome(action Action, message, detail string, canExecute bo
 	s.Message = message
 	s.Detail = detail
 	s.CanExecute = canExecute
+	return s
+}
+
+func (s Status) WithResetModePick(message, detail string) Status {
+	s.Mode = ModeResetModePick
+	s.Action = ActionReset
+	s.Block = BlockNone
+	s.Title = "Reset mode"
+	s.Message = message
+	s.Detail = detail
+	if s.ResetMode == "" {
+		s.ResetMode = ResetModeMixed
+	}
+	s.CanExecute = true
 	return s
 }
 

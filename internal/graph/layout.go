@@ -21,6 +21,9 @@ func RowWidth(row Row) int {
 }
 
 func PageSize(height int) int {
+	if height <= 12 {
+		return 3
+	}
 	totalHeight := int(float64(height) * 0.76)
 	if totalHeight < 18 {
 		totalHeight = 18
@@ -28,7 +31,7 @@ func PageSize(height int) int {
 	if height > 0 && totalHeight > height-2 {
 		totalHeight = height - 2
 	}
-	top := totalHeight / 5
+	top := totalHeight / 8
 	if top < 1 {
 		top = 1
 	}
@@ -36,8 +39,7 @@ func PageSize(height int) int {
 	if bottom < 1 {
 		bottom = 1
 	}
-	graphHeight := bottom / 2
-	size := graphHeight - 5
+	size := bottom - 2
 	if size < 3 {
 		size = 3
 	}

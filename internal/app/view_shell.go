@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"hrllk/graphkeeper/internal/state"
@@ -19,6 +21,8 @@ var (
 	headMark      = lipgloss.NewStyle().Foreground(lipgloss.Color("118")).Bold(true)
 	branchMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
 	pointerMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
+	dirtyMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	stashMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("110"))
 	localColor    = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
 	remoteColor   = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
 	tagColor      = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
@@ -39,57 +43,41 @@ func (m model) View() string {
 }
 
 func renderAppView(m model) string {
-	totalWidth := int(float64(m.width) * 0.70)
-	if totalWidth < 80 {
-		totalWidth = 80
+	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
+	bodyWidth, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	headerHeight := layoutHeaderHeight(bodyHeight)
+	graphRailHeight := layoutGraphRailHeight(bodyHeight)
+
+	globalWidth, contextWidth := splitPaneWidths(bodyWidth)
+	globalBox := baseBox.Width(globalWidth).Height(headerHeight).Render(
+		"Global\n" + m.renderGlobalContent(max(globalWidth-4, 0), max(headerHeight-3, 0)),
+	)
+	contextBox := baseBox.Width(contextWidth).Height(headerHeight).Render(
+		"Context\n" + m.renderContextContent(max(contextWidth-4, 0), max(headerHeight-3, 0)),
+	)
+	headerRow := lipgloss.JoinHorizontal(lipgloss.Top, globalBox, contextBox)
+
+	graphWidth := int(float64(bodyWidth) * 0.72)
+	if graphWidth < 56 {
+		graphWidth = 56
 	}
-	if totalWidth > m.width {
-		totalWidth = m.width
+	if graphWidth > bodyWidth-18 {
+		graphWidth = bodyWidth - 18
 	}
-
-	totalHeight := int(float64(m.height) * 0.76)
-	if totalHeight < 18 {
-		totalHeight = 18
+	if graphWidth < 0 {
+		graphWidth = 0
 	}
-	if totalHeight > m.height-2 {
-		totalHeight = m.height - 2
-	}
+	rightWidth := bodyWidth - graphWidth
+	graphBox := m.getBoxStyle(sectionGraph).Width(graphWidth).Height(graphRailHeight).Render(
+		"Graph\n" + m.renderGraphContent(max(graphWidth-4, 0), max(graphRailHeight-3, 0)),
+	)
+	rightRail := m.renderRightRail(rightWidth, graphRailHeight)
+	graphRow := lipgloss.JoinHorizontal(lipgloss.Top, graphBox, rightRail)
 
-	leftColWidth := int(float64(totalWidth) * 0.70)
-	rightColWidth := totalWidth - leftColWidth - 2
+	body := lipgloss.JoinVertical(lipgloss.Left, headerRow, graphRow)
+	centeredBody := applyOuterMargins(body, bodyWidth, bodyHeight, hMargin, topMargin, bottomMargin)
 
-	topHeight, bottomHeight := splitDashboardHeights(totalHeight)
-	graphHeight, detailHeight := splitPaneHeights(bottomHeight)
-	graphWidth, detailWidth := splitPaneWidths(totalWidth)
-
-	localWidth := leftColWidth / 2
-	remoteWidth := leftColWidth - localWidth
-
-	localContent := m.renderSectionContent(sectionCurrent, localWidth-4, topHeight-3)
-	remoteContent := m.renderSectionContent(sectionRemote, remoteWidth-4, topHeight-3)
-
-	localBox := m.getBoxStyle(sectionCurrent).Width(localWidth).Height(topHeight).Render("Local\n" + localContent)
-	remoteBox := m.getBoxStyle(sectionRemote).Width(remoteWidth).Height(topHeight).Render("Remote\n" + remoteContent)
-
-	branchesInner := lipgloss.JoinHorizontal(lipgloss.Top, localBox, remoteBox)
-
-	tagsContent := m.renderSectionContent(sectionTags, rightColWidth-4, topHeight-3)
-	tagsBox := m.getBoxStyle(sectionTags).Width(rightColWidth).Height(topHeight).Render("Tags\n" + tagsContent)
-
-	topRow := lipgloss.JoinHorizontal(lipgloss.Top, branchesInner, tagsBox)
-
-	graphContent := m.renderGraphContent(graphWidth-4, graphHeight-3)
-	graphBox := m.getBoxStyle(sectionGraph).Width(graphWidth).Height(graphHeight).Render("Graph (local branches)\n" + graphContent)
-
-	detailContent := m.renderDetailContent(detailWidth-4, detailHeight-3)
-	detailBox := baseBox.Width(detailWidth).Height(detailHeight).Render(detailContent)
-
-	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, graphBox, detailBox)
-	body := lipgloss.JoinVertical(lipgloss.Left, topRow, bottomRow)
-
-	centeredBody := lipgloss.Place(m.width, m.height-2, lipgloss.Center, lipgloss.Center, body)
-
-	if m.status.Mode == state.ModeConfirm {
+	if m.status.Mode == state.ModeConfirm || m.status.Mode == state.ModeResetModePick {
 		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
 		descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 		helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
@@ -101,11 +89,13 @@ func renderAppView(m model) string {
 			Align(lipgloss.Center)
 		popupTitle := m.status.Title
 		if popupTitle == "" || popupTitle == "Confirm" {
-			popupTitle = "Do you want to continue?"
+			popupTitle = "Continue?"
 		}
 		helpText := "y: yes  •  n: no"
 		if m.status.Action == state.ActionPull && !m.pullIsFastForward {
 			helpText = "m: merge  •  r: rebase  •  esc: cancel"
+		} else if m.status.Mode == state.ModeResetModePick {
+			helpText = "s: soft  •  m: mixed  •  h: hard  •  enter: execute  •  esc: back"
 		}
 		popupContent := popupBox.Render(
 			titleStyle.Render(popupTitle) + "\n\n" +
@@ -116,6 +106,46 @@ func renderAppView(m model) string {
 	}
 
 	footer := muted.Render("global: 1 local  •  2 remote  •  3 tags  •  4 graph  •  tab/shift+tab section  •  up/down/j/k move  •  f fetch  •  q quit")
+	footer = lipgloss.Place(bodyWidth, 1, lipgloss.Center, lipgloss.Center, footer)
+	footer = applyOuterMarginLine(footer, bodyWidth, hMargin)
 
-	return centeredBody + "\n" + footer + "\n"
+	return centeredBody + strings.Repeat("\n", bottomMargin) + "\n" + footer + "\n"
+}
+
+func (m model) renderRightRail(width, height int) string {
+	if width <= 0 || height <= 0 {
+		return ""
+	}
+	localHeight, remoteHeight, tagsHeight := splitThreeHeights(height)
+	localBox := m.getBoxStyle(sectionCurrent).Width(width).Height(localHeight).Render("Local\n" + m.renderSectionContent(sectionCurrent, max(width-4, 0), max(localHeight-3, 0)))
+	remoteBox := m.getBoxStyle(sectionRemote).Width(width).Height(remoteHeight).Render("Remote\n" + m.renderSectionContent(sectionRemote, max(width-4, 0), max(remoteHeight-3, 0)))
+	tagsBox := m.getBoxStyle(sectionTags).Width(width).Height(tagsHeight).Render("Tags\n" + m.renderSectionContent(sectionTags, max(width-4, 0), max(tagsHeight-3, 0)))
+	return lipgloss.JoinVertical(lipgloss.Left, localBox, remoteBox, tagsBox)
+}
+
+func applyOuterMargins(content string, totalWidth, totalHeight, hMargin, topMargin, bottomMargin int) string {
+	lines := strings.Split(content, "\n")
+	leftPad := strings.Repeat(" ", hMargin)
+	rightPad := strings.Repeat(" ", hMargin)
+	blank := strings.Repeat(" ", totalWidth)
+	out := make([]string, 0, totalHeight+topMargin+bottomMargin)
+	for i := 0; i < topMargin; i++ {
+		out = append(out, blank)
+	}
+	for _, line := range lines {
+		out = append(out, leftPad+line+rightPad)
+	}
+	for i := 0; i < bottomMargin; i++ {
+		out = append(out, blank)
+	}
+	return strings.Join(out, "\n")
+}
+
+func applyOuterMarginLine(line string, totalWidth, hMargin int) string {
+	if totalWidth <= 0 {
+		return line
+	}
+	leftPad := strings.Repeat(" ", hMargin)
+	rightPad := strings.Repeat(" ", hMargin)
+	return leftPad + line + rightPad
 }

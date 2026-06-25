@@ -8,6 +8,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return handleWindowSize(m, msg)
 	case loadedMsg, refreshedMsg, tickMsg:
 		return handleLifecycleUpdate(m, msg)
+	case stashLoadedMsg:
+		return handleStashUpdate(m, msg)
 	case fetchedMsg, preparedMsg, pullCheckedMsg, previewMsg, pushFetchedMsg, pullFetchedMsg, pullPreviewReadyMsg:
 		return handleFetchUpdate(m, msg)
 	case executedMsg:

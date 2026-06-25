@@ -109,8 +109,39 @@ func TestSplitDashboardHeightsUseWeightedLayout(t *testing.T) {
 	if top+bottom != 100 {
 		t.Fatalf("expected dashboard heights to sum to total, got %d and %d", top, bottom)
 	}
-	if top != 20 || bottom != 80 {
-		t.Fatalf("expected 2:8 layout split, got %d and %d", top, bottom)
+	if top != 12 || bottom != 88 {
+		t.Fatalf("expected 1:7 layout split, got %d and %d", top, bottom)
+	}
+}
+
+func TestSplitThreeHeightsUseStackedLayout(t *testing.T) {
+	a, b, c := splitThreeHeights(100)
+	if a+b+c != 100 {
+		t.Fatalf("expected stacked heights to sum to total, got %d, %d, %d", a, b, c)
+	}
+	if a <= 0 || b <= 0 || c <= 0 {
+		t.Fatalf("expected stacked heights to stay positive, got %d, %d, %d", a, b, c)
+	}
+}
+
+func TestShellLayoutAllocatesSmallHeaderAndLargeGraphRail(t *testing.T) {
+	m := model{width: 140, height: 60}
+	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
+	bodyWidth, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	headerHeight := layoutHeaderHeight(bodyHeight)
+	graphRailHeight := layoutGraphRailHeight(bodyHeight)
+
+	if bodyWidth != m.width-2*hMargin {
+		t.Fatalf("expected body width to respect horizontal margin, got %d", bodyWidth)
+	}
+	if headerHeight <= 0 {
+		t.Fatalf("expected positive header height, got %d", headerHeight)
+	}
+	if graphRailHeight <= headerHeight {
+		t.Fatalf("expected graph rail to dominate header, got header=%d rail=%d", headerHeight, graphRailHeight)
+	}
+	if graphRailHeight < 12 {
+		t.Fatalf("expected graph rail to keep minimum height, got %d", graphRailHeight)
 	}
 }
 
@@ -120,16 +151,14 @@ func TestGraphPageSizeMatchesGraphPaneHeight(t *testing.T) {
 	if got <= 0 {
 		t.Fatalf("expected positive graph page size, got %d", got)
 	}
-	totalHeight := int(float64(m.height) * 0.76)
-	if totalHeight > m.height-2 {
-		totalHeight = m.height - 2
+	boxHeight := graphBoxHeightForModel(&m)
+	if boxHeight <= 0 {
+		t.Fatalf("expected positive graph box height, got %d", boxHeight)
 	}
-	_, bottomHeight := splitDashboardHeights(totalHeight)
-	graphHeight, _ := splitPaneHeights(bottomHeight)
-	want := graphHeight - 5
-	if want < 3 {
-		want = 3
+	if boxHeight >= m.height {
+		t.Fatalf("expected graph box height to stay within shell height, got %d of %d", boxHeight, m.height)
 	}
+	want := graph.PageSize(boxHeight)
 	if got != want {
 		t.Fatalf("expected graph page size %d, got %d", want, got)
 	}
@@ -304,6 +333,129 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 	}
 }
 
+func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch:        "main",
+			Head:          "abc1234",
+			Upstream:      "origin/main",
+			Remote:        "origin",
+			WorktreeDirty: true,
+			LocalBranches: []string{"main"},
+			Tracking: map[string]git.BranchTracking{
+				"main": {Behind: 1, Ahead: 2},
+			},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+		},
+	}
+	m.activeSection = sectionCurrent
+	m.status.WorktreeState = state.WorktreeStateDirty
+
+	got := m.renderContextContent(40, 16)
+	if !strings.Contains(got, "target:") || !strings.Contains(got, "(dirty)") {
+		t.Fatalf("expected current branch context to show dirty target, got %q", got)
+	}
+	if !strings.Contains(got, "worktree:") || !strings.Contains(got, "sync: push required") {
+		t.Fatalf("expected worktree/sync details in context, got %q", got)
+	}
+}
+
+func TestRenderAppViewUsesGraphFirstLayout(t *testing.T) {
+	m := model{
+		width:  140,
+		height: 60,
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Root:           "/repo",
+			Branch:         "main",
+			Head:           "abc1234",
+			Upstream:       "origin/main",
+			Remote:         "origin",
+			LocalBranches:  []string{"main", "feature"},
+			RemoteBranches: []string{"origin/main", "origin/dev"},
+			Tags:           []string{"v1.0.0"},
+			GraphCommits: []git.GraphCommit{
+				{Hash: "abc1234", Parents: []string{"def5678"}, Decorations: []string{"HEAD -> main", "origin/main"}},
+				{Hash: "def5678"},
+			},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+
+	got := renderAppView(m)
+	for _, want := range []string{"Global", "Context", "Graph", "Local", "Remote", "Tags"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected view to contain %q, got %q", want, got)
+		}
+	}
+
+	localIdx := strings.Index(got, "Local")
+	remoteIdx := strings.Index(got, "Remote")
+	tagsIdx := strings.Index(got, "Tags")
+	if localIdx < 0 || remoteIdx < 0 || tagsIdx < 0 {
+		t.Fatalf("expected right rail sections to appear in output, got %q", got)
+	}
+	if !(localIdx < remoteIdx && remoteIdx < tagsIdx) {
+		t.Fatalf("expected Local / Remote / Tags to stack in order, got %d / %d / %d", localIdx, remoteIdx, tagsIdx)
+	}
+}
+
+func TestRenderAppViewUsesOuterMargins(t *testing.T) {
+	m := model{
+		width:  140,
+		height: 60,
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Root:     "/repo",
+			Branch:   "main",
+			Head:     "abc1234",
+			Upstream: "origin/main",
+			Remote:   "origin",
+			GraphCommits: []git.GraphCommit{
+				{Hash: "abc1234", Subject: "Commit 1"},
+			},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+
+	got := renderAppView(m)
+	lines := strings.Split(got, "\n")
+	firstVisible := ""
+	lastVisible := ""
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if firstVisible == "" {
+			firstVisible = line
+		}
+		lastVisible = line
+	}
+	if firstVisible == "" || lastVisible == "" {
+		t.Fatalf("expected visible content, got %q", got)
+	}
+	if !strings.HasPrefix(firstVisible, strings.Repeat(" ", 8)) {
+		t.Fatalf("expected top margin of at least 8 spaces, got %q", firstVisible)
+	}
+	if !strings.HasPrefix(lastVisible, strings.Repeat(" ", 8)) {
+		t.Fatalf("expected bottom/footer margin of at least 8 spaces, got %q", lastVisible)
+	}
+}
+
 func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	graph := renderActionHelpLines(model{
 		status:        state.New().WithBrowse(),
@@ -383,7 +535,7 @@ func TestFetchKeyDoesNotForceLoadingMode(t *testing.T) {
 	if got.status.Mode != state.ModeBrowse {
 		t.Fatalf("expected fetch to keep browse mode, got %s", got.status.Mode)
 	}
-	if got.status.Message != "Fetching remotes..." {
+	if got.status.Message != "Fetching..." {
 		t.Fatalf("expected fetch message to be visible, got %q", got.status.Message)
 	}
 }
@@ -402,7 +554,7 @@ func TestFetchKeyWorksFromAnyBrowseSection(t *testing.T) {
 	if got.status.Mode != state.ModeBrowse {
 		t.Fatalf("expected fetch to keep browse mode, got %s", got.status.Mode)
 	}
-	if got.status.Message != "Fetching remotes..." {
+	if got.status.Message != "Fetching..." {
 		t.Fatalf("expected fetch message to be visible, got %q", got.status.Message)
 	}
 }
@@ -664,7 +816,7 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 	if graph.RowWidth(rows[0]) < 2 {
 		t.Fatalf("expected merge row to expand lanes, got %d", graph.RowWidth(rows[0]))
 	}
-	got := renderGraphLine(rows[0], true, true, 1, nil, 24, false)
+	got := renderGraphLine(rows[0], true, true, 1, nil, 24, false, 0)
 	if !strings.Contains(got, "*") || !strings.Contains(got, "|") {
 		t.Fatalf("unexpected rendered graph row: %q", got)
 	}
@@ -733,7 +885,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.HasPrefix(rows[0].Graph, "*") || rows[1].Commit.Hash != "" || !strings.HasPrefix(rows[2].Graph, "| *") {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
-	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, false)
+	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, false, 0)
 	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->main") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge b...") < 0 {
 		t.Fatalf("expected graph line to include hash, branches, when, title and graph, got %q", line)
 	}
@@ -749,11 +901,11 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Contains(line, "Merge branch") || strings.Contains(line, "origin/") || strings.Contains(line, "develop") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
 	}
-	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24, false)
+	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24, false, 0)
 	if !strings.Contains(connector, "|\\") {
 		t.Fatalf("expected connector graph line to stay visible, got %q", connector)
 	}
-	focused := renderGraphLine(rows[2], true, true, 0, []string{"main"}, 24, false)
+	focused := renderGraphLine(rows[2], true, true, 0, []string{"main"}, 24, false, 0)
 	if !strings.Contains(focused, pointerMark.Render("*")) {
 		t.Fatalf("expected branch row graph pointer to be highlighted, got %q", focused)
 	}
@@ -778,6 +930,12 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", Current: true}); !strings.Contains(got, "l->main") {
 		t.Fatalf("expected current local target to keep branch text visible, got %q", got)
 	}
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", Current: true, WorktreeDirty: true}); !strings.Contains(got, "(dirty)") {
+		t.Fatalf("expected current dirty local target to show dirty badge, got %q", got)
+	}
+	if !shouldHighlightStash(1, true) || shouldHighlightStash(1, false) || shouldHighlightStash(0, true) {
+		t.Fatalf("expected stash highlight gating to depend on selection and count")
+	}
 }
 
 func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
@@ -800,7 +958,7 @@ func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
 	if graph.RowWidth(rows[1]) != 1 {
 		t.Fatalf("expected linear child commit to stay in one lane, got %d", graph.RowWidth(rows[1]))
 	}
-	if got := renderGraphLine(rows[1], false, false, 0, nil, 24, false); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
+	if got := renderGraphLine(rows[1], false, false, 0, nil, 24, false, 0); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
 		t.Fatalf("expected single-lane render for linear DAG, got %q", got)
 	}
 }
@@ -834,10 +992,10 @@ func TestGraphRowsKeepsLocalAndOriginDivergedFamiliesSeparate(t *testing.T) {
 	if rows[2].Lane != 0 {
 		t.Fatalf("expected checkout branch family lane to stay leftmost, got lane %d", rows[2].Lane)
 	}
-	if got := renderGraphLine(rows[0], false, false, 0, nil, 24, false); !strings.Contains(got, "| *") {
+	if got := renderGraphLine(rows[0], false, false, 0, nil, 24, false, 0); !strings.Contains(got, "| *") {
 		t.Fatalf("expected top remote row to render as split branch, got %q", got)
 	}
-	if got := renderGraphLine(rows[2], false, false, 0, nil, 24, false); !strings.Contains(got, "* |") {
+	if got := renderGraphLine(rows[2], false, false, 0, nil, 24, false, 0); !strings.Contains(got, "* |") {
 		t.Fatalf("expected local head row to render as split branch, got %q", got)
 	}
 }
@@ -951,7 +1109,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 	if parentIdx < 0 || parentIdx+1 >= len(rows) || rows[parentIdx+1].Commit.Hash != "efb164e" {
 		t.Fatalf("expected efb164e immediately after 37f0954, got index=%d rows=%v", parentIdx, rows)
 	}
-	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil, 24, false)
+	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil, 24, false, 0)
 	if !strings.Contains(parentLine, "efb164e") {
 		t.Fatalf("expected efb164e row to render, got %q", parentLine)
 	}
@@ -960,7 +1118,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 	if rootIdx < 0 || rootIdx+1 >= len(rows) || rows[rootIdx+1].Commit.Hash != "5525707" {
 		t.Fatalf("expected 5525707 immediately after 4ba1faf, got index=%d rows=%v", rootIdx, rows)
 	}
-	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil, 24, false)
+	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil, 24, false, 0)
 	if !strings.Contains(rootLine, "5525707") {
 		t.Fatalf("expected common root row to render, got %q", rootLine)
 	}
@@ -973,7 +1131,7 @@ func TestRenderGraphLineKeepsCollapsedCommitMarker(t *testing.T) {
 		After:  []laneRef{{Hash: "base"}},
 		Lane:   2,
 	}
-	got := renderGraphLine(row, false, false, 0, nil, 24, false)
+	got := renderGraphLine(row, false, false, 0, nil, 24, false, 0)
 	if !strings.Contains(got, "*") {
 		t.Fatalf("expected collapsed commit line to keep marker, got %q", got)
 	}
@@ -1011,8 +1169,8 @@ func TestPushSetUpstreamTriggeredWhenNoUpstream(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected async fetch command, got nil")
 	}
-	if got.status.Mode != state.ModeLoading || got.status.Message != "Fetching before push..." {
-		t.Fatalf("expected Fetching before push... loading mode, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Fetching for push..." {
+		t.Fatalf("expected Fetching for push... loading mode, got %s", got.status.Mode)
 	}
 
 	status := got.repoStatus
@@ -1027,7 +1185,7 @@ func TestPushSetUpstreamTriggeredWhenNoUpstream(t *testing.T) {
 	if got2.status.Action != state.ActionSetUpstream {
 		t.Fatalf("expected SetUpstream action, got %s", got2.status.Action)
 	}
-	if !strings.Contains(got2.status.Title, "Push and Track Remote?") {
+	if !strings.Contains(got2.status.Title, "Push and track remote?") {
 		t.Fatalf("expected set-upstream title, got %q", got2.status.Title)
 	}
 }
@@ -1056,8 +1214,8 @@ func TestPushNormalTriggeredWhenUpstreamExists(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected async fetch command, got nil")
 	}
-	if got.status.Mode != state.ModeLoading || got.status.Message != "Fetching before push..." {
-		t.Fatalf("expected Fetching before push... loading mode, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Fetching for push..." {
+		t.Fatalf("expected Fetching for push... loading mode, got %s", got.status.Mode)
 	}
 
 	status := got.repoStatus
@@ -1069,7 +1227,7 @@ func TestPushNormalTriggeredWhenUpstreamExists(t *testing.T) {
 	if got2.status.Mode != state.ModeLoading {
 		t.Fatalf("expected loading mode, got %s", got2.status.Mode)
 	}
-	if got2.status.Message != "Pushing commits..." {
+	if got2.status.Message != "Pushing..." {
 		t.Fatalf("expected push message, got %q", got2.status.Message)
 	}
 }
@@ -1115,8 +1273,10 @@ func TestPushRejectedShowsForcePushConfirmAndHighlights(t *testing.T) {
 	}
 }
 
-func TestResetTriggeredConfirmModal(t *testing.T) {
+func TestResetTriggeredResetModePicker(t *testing.T) {
+	fixture := newCommandRepo(t)
 	m := model{
+		repo:          fixture.repo,
 		status:        state.New().WithBrowse(),
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{
@@ -1126,37 +1286,55 @@ func TestResetTriggeredConfirmModal(t *testing.T) {
 			sectionTags:    0,
 		},
 		repoStatus: git.Status{
-			Root:       "/repo",
+			Root:       fixture.root,
 			Branch:     "main",
-			Head:       "c1",
+			Head:       fixture.initialHash,
 			HasCommits: true,
 			GraphCommits: []git.GraphCommit{
-				{Hash: "c1", Subject: "Commit 1"},
+				{Hash: fixture.initialHash, Subject: "Commit 1"},
 			},
 		},
 	}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	got := gotModel.(model)
-	if cmd != nil {
-		t.Fatal("expected no immediate cmd execution for reset, should wait for confirm")
+	if cmd == nil {
+		t.Fatal("expected async preview command for reset")
 	}
-	if got.status.Mode != state.ModeConfirm {
-		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected loading mode while preparing reset preview, got %s", got.status.Mode)
+	}
+	preview := cmd()
+	previewMsg, ok := preview.(previewMsg)
+	if !ok {
+		t.Fatalf("expected previewMsg, got %T", preview)
+	}
+	gotModel, cmd = got.Update(previewMsg)
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no command after preview is applied, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeResetModePick {
+		t.Fatalf("expected reset mode picker, got %s", got.status.Mode)
 	}
 	if got.status.Action != state.ActionReset {
 		t.Fatalf("expected ActionReset, got %s", got.status.Action)
 	}
-	if !strings.Contains(got.status.Title, "Hard reset to commit?") {
-		t.Fatalf("expected hard reset title, got %q", got.status.Title)
+	if got.status.Selected != fixture.initialHash {
+		t.Fatalf("expected target hash selected, got %q", got.status.Selected)
 	}
-	if got.status.Selected != "c1" {
-		t.Fatalf("expected target c1 to be selected, got %q", got.status.Selected)
+	if got.status.ResetMode != state.ResetModeMixed {
+		t.Fatalf("expected mixed reset to be the default, got %s", got.status.ResetMode)
+	}
+	if !strings.Contains(got.status.Detail, "Preview:") || !strings.Contains(got.status.Detail, "Worktree:") {
+		t.Fatalf("expected preview and worktree detail, got %q", got.status.Detail)
 	}
 }
 
-func TestResetConfirmExecuted(t *testing.T) {
+func TestResetModePickerExecutesSelectedMode(t *testing.T) {
+	fixture := newCommandRepo(t)
 	m := model{
-		status:        state.New().WithConfirm(state.ActionReset, "Hard reset to commit?", "Detail..."),
+		repo:          fixture.repo,
+		status:        state.New().WithResetModePick("Choose reset mode.", "Preview..."),
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
@@ -1165,64 +1343,31 @@ func TestResetConfirmExecuted(t *testing.T) {
 			sectionTags:    0,
 		},
 		repoStatus: git.Status{
-			Root:       "/repo",
+			Root:       fixture.root,
 			Branch:     "main",
-			Head:       "c1",
+			Head:       fixture.initialHash,
 			HasCommits: true,
 		},
 	}
-	m.status.Selected = "c1"
+	m.status.Selected = fixture.initialHash
+	m.status.ResetMode = state.ResetModeSoft
 
-	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := gotModel.(model)
 	if cmd == nil {
-		t.Fatal("expected async action execution command, got nil")
+		t.Fatal("expected async reset execution command, got nil")
 	}
 	if got.status.Mode != state.ModeLoading {
-		t.Fatalf("expected loading mode on confirm, got %s", got.status.Mode)
+		t.Fatalf("expected loading mode on execute, got %s", got.status.Mode)
 	}
-	if !strings.Contains(got.status.Message, "Running hard reset...") {
-		t.Fatalf("expected hard reset running message, got %q", got.status.Message)
-	}
-}
-
-func TestResetTriggeredConfirmModalWithDirtyWorktree(t *testing.T) {
-	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
-		},
-		repoStatus: git.Status{
-			Root:          "/repo",
-			Branch:        "main",
-			Head:          "c1",
-			HasCommits:    true,
-			WorktreeDirty: true,
-			GraphCommits: []git.GraphCommit{
-				{Hash: "c1", Subject: "Commit 1"},
-			},
-		},
-	}
-	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
-	got := gotModel.(model)
-	if cmd != nil {
-		t.Fatal("expected no immediate cmd execution for reset, should wait for confirm")
-	}
-	if got.status.Mode != state.ModeConfirm {
-		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
-	}
-	if !strings.Contains(got.status.Detail, "WARNING") || !strings.Contains(got.status.Detail, "OVERWRITE") {
-		t.Fatalf("expected dirty warning description, got %q", got.status.Detail)
+	if !strings.Contains(got.status.Message, "Soft reset...") {
+		t.Fatalf("expected soft reset running message, got %q", got.status.Message)
 	}
 }
 
 func TestResetExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 	m := model{
-		status:        state.New().WithLoading("Running hard reset..."),
+		status:        state.New().WithLoading("Hard reset..."),
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
@@ -1239,8 +1384,9 @@ func TestResetExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 	}
 
 	msg := executedMsg{
-		action: state.ActionReset,
-		target: "c2",
+		action:    state.ActionReset,
+		target:    "c2",
+		resetMode: state.ResetModeHard,
 		status: git.Status{
 			Root:       "/repo",
 			Branch:     "main",
@@ -1261,7 +1407,7 @@ func TestResetExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 	if got.status.Mode != state.ModeBrowse {
 		t.Fatalf("expected Browse mode, got %s", got.status.Mode)
 	}
-	if !strings.Contains(got.status.Message, "Hard reset completed to c2") {
+	if !strings.Contains(got.status.Message, "Hard reset complete: c2") {
 		t.Fatalf("expected success message, got %q", got.status.Message)
 	}
 	if got.repoStatus.Head != "c2" {

@@ -13,8 +13,9 @@ func (m model) renderGraphContent(width, height int) string {
 	if len(rows) == 0 {
 		return fitBlockLines([]string{muted.Render("  (no graph to show yet)")}, height)
 	}
-	start := clampScroll(m.graphScroll, len(rows), graphPageSize(&m))
-	end := start + graphPageSize(&m)
+	page := graphPageSize(&m)
+	start := clampScroll(m.graphScroll, len(rows), page)
+	end := start + page
 	if end > len(rows) {
 		end = len(rows)
 	}
@@ -31,7 +32,8 @@ func (m model) renderGraphContent(width, height int) string {
 			break
 		}
 		isHandshake := rows[i].Commit.Hash != "" && m.handshakeCommits[rows[i].Commit.Hash]
-		lineStr := renderGraphLine(rows[i], graphActive && i == m.sectionCursor[sectionGraph], graphActive, m.graphLaneCursor, m.repoStatus.LocalBranches, graphColWidth, isHandshake)
+		stashCount := len(m.stashesForCommit(rows[i].Commit.Hash))
+		lineStr := renderGraphLine(rows[i], graphActive && i == m.sectionCursor[sectionGraph], graphActive, m.graphLaneCursor, m.repoStatus.LocalBranches, graphColWidth, isHandshake, stashCount)
 		lines = append(lines, lineStr)
 		if !rawGraph && i+1 < len(rows) {
 			isConnectorHandshake := rows[i].Commit.Hash != "" && m.handshakeCommits[rows[i].Commit.Hash] && rows[i+1].Commit.Hash != "" && m.handshakeCommits[rows[i+1].Commit.Hash]

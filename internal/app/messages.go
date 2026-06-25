@@ -14,6 +14,11 @@ type loadedMsg struct {
 
 type tickMsg time.Time
 
+type stashLoadedMsg struct {
+	entries []git.StashEntry
+	err     error
+}
+
 type refreshedMsg struct {
 	status git.Status
 	err    error
@@ -45,10 +50,11 @@ type previewMsg struct {
 }
 
 type executedMsg struct {
-	action state.Action
-	target string
-	status git.Status
-	err    error
+	action    state.Action
+	target    string
+	resetMode state.ResetMode
+	status    git.Status
+	err       error
 }
 
 type createdBranchMsg struct {

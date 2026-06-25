@@ -43,22 +43,15 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		m = switchBrowseSection(m, sectionGraph)
 		return true, m, nil
 	case "f":
-		m.status.Message = "Fetching remotes..."
-		m.status.Detail = "Refreshing remote refs and branch tracking in the background."
+		m.status.Message = "Fetching..."
+		m.status.Detail = "Refreshing refs and tracking."
 		return true, m, fetchRepoState(m.repo, m.commitLimit)
 	case "P":
 		if m.repoStatus.Root == "" || m.repoStatus.Detached || m.repoStatus.EmptyRepo {
 			return true, m, nil
 		}
-		m.status = state.New().WithLoading("Fetching before push...")
+		m.status = state.New().WithLoading("Fetching for push...")
 		return true, m, executeFetchForPush(m.repo, m.commitLimit)
-	case "p":
-		if pullReady(m.repoStatus) {
-			m.status = state.New().WithLoading("Fetching upstream before pull...")
-			return true, m, executeFetchForPull(m.repo, m.commitLimit)
-		}
-		m.status = actionPull(m.repoStatus)
-		return true, m, nil
 	case "tab":
 		m.activeSection = nextGraphSection(m.activeSection)
 		return true, m, nil
@@ -150,7 +143,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "m":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
-			m.status = state.New().WithBlocked(state.BlockUnknown, "Merge not available.", "Move the lane cursor onto a local branch to enable merge.")
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Merge unavailable.", "Select a local branch.")
 			return m, nil
 		}
 		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
@@ -166,7 +159,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "r":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
-			m.status = state.New().WithBlocked(state.BlockUnknown, "Rebase not available.", "Move the lane cursor onto a local branch to enable rebase.")
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Rebase unavailable.", "Select a local branch.")
 			return m, nil
 		}
 		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
@@ -183,21 +176,14 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash == "" {
-			m.status = state.New().WithBlocked(state.BlockUnknown, "No reset target.", "Move the pointer onto a commit line.")
+			m.status = state.New().WithBlocked(state.BlockUnknown, "No reset target.", "Move to a commit line.")
 			return m, nil
 		}
-		titleMsg := "Hard reset to commit?"
-		detailMsg := fmt.Sprintf("This will reset your HEAD, index, and working tree. Any uncommitted changes will be lost. Target commit: %s. Continue?", focus.Hash)
-		if m.repoStatus.WorktreeDirty {
-			detailMsg = fmt.Sprintf("⚠️ WARNING: You have uncommitted changes in your working tree! Hard reset will permanently OVERWRITE and LOSE all uncommitted changes. Target commit: %s. Continue?", focus.Hash)
-		}
-		m.status = m.status.WithConfirm(state.ActionReset, titleMsg, detailMsg)
-		m.status.Title = titleMsg
-		m.status.Selected = focus.Hash
-		return m, nil
+		m.status = state.New().WithLoading("Preparing reset...")
+		return m, previewSelection(m.repo, m.repoStatus, state.ActionReset, focus.Hash)
 	case "n":
 		if !canCreateBranch(m.repoStatus) {
-			m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is not clean.", "Commit or stash local changes before creating and checking out a new branch.")
+			m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first.")
 			return m, nil
 		}
 		base := activeSectionTarget(m)
@@ -208,7 +194,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.branchBase = base
 		m.branchOpen = true
 		m.branchDraft = ""
-		m.status = state.New().WithLoading("Type a new branch name and press enter.")
+		m.status = state.New().WithLoading("Enter a branch name.")
 		return m, nil
 	default:
 		return m, nil
@@ -223,24 +209,41 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = state.New().WithLoading("Checking out " + target + "...")
 				return m, executeCheckout(m.repo, target, 0)
 			}
-			m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move the pointer onto a local or remote branch.")
+			m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move to a local or remote branch.")
 			return m, nil
 		}
 		if m.activeSection == sectionGraph {
 			return m, nil
 		}
-		m.status = state.New().WithBlocked(state.BlockUnknown, "Checkout unavailable in this section.", "Use the Local or Remote sections to switch branches.")
+		m.status = state.New().WithBlocked(state.BlockUnknown, "Checkout unavailable here.", "Use the Local or Remote section.")
 		return m, nil
 	case "a":
 		if m.activeSection == sectionCurrent && (m.repoStatus.MergeInProgress || m.repoStatus.RebaseInProgress) {
-			m.status = state.New().WithLoading("Aborting merge/rebase...")
+			m.status = state.New().WithLoading("Aborting...")
 			return m, executeAbort(m.repo, m.commitLimit)
+		}
+		return m, nil
+	case "p":
+		if m.activeSection == sectionCurrent {
+			if pullReady(m.repoStatus) {
+				m.status = state.New().WithLoading("Fetching upstream...")
+				return m, executeFetchForPull(m.repo, m.commitLimit)
+			}
+			m.status = actionPull(m.repoStatus)
+			return m, nil
+		}
+		if m.activeSection == sectionGraph {
+			if !pullReady(m.repoStatus) || !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+				return m, nil
+			}
+			m.status = state.New().WithLoading("Fetching upstream...")
+			return m, executeFetchForPull(m.repo, m.commitLimit)
 		}
 		return m, nil
 	case "n":
 		if m.activeSection == sectionCurrent {
 			if !canCreateBranch(m.repoStatus) {
-				m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is not clean.", "Commit or stash local changes before creating and checking out a new branch.")
+				m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first.")
 				return m, nil
 			}
 			base := activeSectionTarget(m)
@@ -251,7 +254,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.branchBase = base
 			m.branchOpen = true
 			m.branchDraft = ""
-			m.status = state.New().WithLoading("Type a new branch name and press enter.")
+			m.status = state.New().WithLoading("Enter a branch name.")
 			return m, nil
 		}
 		return m, nil

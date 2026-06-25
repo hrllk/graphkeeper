@@ -172,6 +172,27 @@ func TestLoadAndRefreshRepoState(t *testing.T) {
 	}
 }
 
+func TestLoadStashState(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, "stash.txt", "stash\n")
+	runGit(t, fixture.root, "add", "stash.txt")
+	runGit(t, fixture.root, "stash", "push", "-m", "wip stash")
+
+	got, ok := cmdResult(t, loadStashState(fixture.repo)).(stashLoadedMsg)
+	if !ok {
+		t.Fatalf("expected stashLoadedMsg, got %T", cmdResult(t, loadStashState(fixture.repo)))
+	}
+	if got.err != nil {
+		t.Fatalf("loadStashState err = %v", got.err)
+	}
+	if len(got.entries) != 1 {
+		t.Fatalf("expected one stash entry, got %+v", got.entries)
+	}
+	if got.entries[0].BaseHash == "" || got.entries[0].Ref == "" {
+		t.Fatalf("expected stash entry to include base hash and ref, got %+v", got.entries[0])
+	}
+}
+
 func TestFetchAndPrepareState(t *testing.T) {
 	fixture := newCommandRepo(t)
 	advanceRemote(t, fixture.remote, "remote.txt", "remote\n", "remote advance")
@@ -422,6 +443,55 @@ func TestExecuteAction(t *testing.T) {
 			t.Fatal("expected reset to move HEAD")
 		}
 	})
+}
+
+func TestExecuteResetModes(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		mode state.ResetMode
+	}{
+		{name: "soft", mode: state.ResetModeSoft},
+		{name: "mixed", mode: state.ResetModeMixed},
+		{name: "hard", mode: state.ResetModeHard},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newCommandRepo(t)
+			writeRepoFile(t, fixture.root, "file.txt", "change\n")
+			runGit(t, fixture.root, "add", "file.txt")
+			runGit(t, fixture.root, "commit", "-m", "local change")
+
+			got, ok := cmdResult(t, executeReset(fixture.repo, fixture.initialHash, tt.mode, 40)).(executedMsg)
+			if !ok {
+				t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeReset(fixture.repo, fixture.initialHash, tt.mode, 40)))
+			}
+			if got.action != state.ActionReset {
+				t.Fatalf("action = %s, want reset", got.action)
+			}
+			if got.resetMode != tt.mode {
+				t.Fatalf("resetMode = %s, want %s", got.resetMode, tt.mode)
+			}
+			if got.err != nil {
+				t.Fatalf("executeReset err = %v", got.err)
+			}
+			if got.status.Head != fixture.initialHash {
+				t.Fatalf("expected reset to %q, got %+v", fixture.initialHash, got.status)
+			}
+			switch tt.mode {
+			case state.ResetModeSoft:
+				if !got.status.WorktreeDirty {
+					t.Fatalf("expected soft reset to keep worktree dirty, got %+v", got.status)
+				}
+			case state.ResetModeMixed:
+				if !got.status.WorktreeDirty {
+					t.Fatalf("expected mixed reset to keep worktree dirty, got %+v", got.status)
+				}
+			case state.ResetModeHard:
+				if got.status.WorktreeDirty {
+					t.Fatalf("expected hard reset to clean worktree, got %+v", got.status)
+				}
+			}
+		})
+	}
 }
 
 func TestCreateBranch(t *testing.T) {

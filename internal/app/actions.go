@@ -10,40 +10,40 @@ import (
 func deriveStatus(rs git.Status) state.Status {
 	switch {
 	case rs.Root == "":
-		return state.New().WithBlocked(state.BlockNoRepo, "Not inside a Git repository.", "Run this tool from a repo root.")
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRepo, "Not inside a Git repository.", "Run this tool from a repo root."), rs)
 	case rs.MergeInProgress || rs.RebaseInProgress:
 		status := state.New().WithBrowse()
-		status.Message = "Merge/Rebase in progress after conflict."
-		status.Detail = "Press enter to abort the in-progress merge/rebase."
-		return status
+		status.Message = "Merge/rebase in progress."
+		status.Detail = "Press Enter to abort."
+		return applyRepoMetadata(status, rs)
 	case rs.Detached:
-		return state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pick a branch before running pull, merge, or rebase.")
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pick a branch before running pull, merge, or rebase."), rs)
 	case rs.EmptyRepo:
-		return state.New().WithEmpty("Repository has no commits yet.")
+		return applyRepoMetadata(state.New().WithEmpty("No commits yet."), rs)
 	case rs.NoRemote && rs.NoUpstream:
-		return state.New().WithBlocked(state.BlockNoRemote, "No remote or upstream configured.", "Pull, merge, and rebase need a branch with a remote target.")
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRemote, "No remote or upstream.", "Set a remote target first."), rs)
 	default:
-		return state.New().WithBrowse()
+		return applyRepoMetadata(state.New().WithBrowse(), rs)
 	}
 }
 
 func actionPull(rs git.Status) state.Status {
 	if rs.Root == "" {
-		return state.New().WithBlocked(state.BlockNoRepo, "Not inside a Git repository.", "Run this tool from a repo root.")
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRepo, "Not inside a Git repository.", "Run this tool from a repo root."), rs)
 	}
 	if rs.Detached {
-		return state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pull needs a branch with an upstream.")
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pull needs a branch with an upstream."), rs)
 	}
 	if rs.MergeInProgress || rs.RebaseInProgress {
-		return state.New().WithBlocked(state.BlockUnknown, "A merge/rebase is already in progress.", "Abort or resolve the existing merge/rebase before pulling again.")
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockUnknown, "Merge/rebase already in progress.", "Abort or resolve it before pulling again."), rs)
 	}
 	if rs.NoRemote {
-		return state.New().WithBlocked(state.BlockNoRemote, "No remote configured.", "Pull needs origin or another remote.")
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRemote, "No remote.", "Pull needs a remote."), rs)
 	}
 	if rs.NoUpstream {
-		return state.New().WithBlocked(state.BlockNoUpstream, "No upstream configured.", "Set an upstream before pulling.")
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoUpstream, "No upstream.", "Set an upstream first."), rs)
 	}
-	return state.New().WithOutcome(state.ActionPull, "Pull is ready.", "Pull will fetch and merge upstream changes into the current branch.", true)
+	return applyRepoMetadata(state.New().WithOutcome(state.ActionPull, "Pull ready.", "Will fetch and merge upstream changes.", true), rs)
 }
 
 func pullReady(rs git.Status) bool {
@@ -59,13 +59,16 @@ func actionPickTargets(rs git.Status, action state.Action) state.Status {
 		return state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Choose a branch before merging or rebasing.")
 	}
 	targets := buildActionTargetItems(rs)
+	if action == state.ActionReset {
+		targets = buildResetTargetItems(rs)
+	}
 	if len(targets) == 0 {
-		return state.New().WithBlocked(state.BlockTargetEmpty, "No branch targets available.", "Create or fetch a branch before merging, rebasing, or resetting.")
+		return state.New().WithBlocked(state.BlockTargetEmpty, "No targets available.", "Create or fetch a branch first.")
 	}
 	status := state.New().WithTargetPick(action, targets)
-	status.Message = "Use up/down to choose a target."
-	status.Detail = "Enter previews the result. Esc returns to browse."
-	return status
+	status.Message = "Choose a target."
+	status.Detail = "Enter previews. Esc returns."
+	return applyRepoMetadata(status, rs)
 }
 
 func checkoutTargetFromFocus(node graphNode) string {

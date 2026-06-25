@@ -16,11 +16,11 @@ func TestDeriveStatusCases(t *testing.T) {
 		wantMsg string
 	}{
 		{name: "no repo", rs: git.Status{}, want: state.ModeBlocked, wantBlk: state.BlockNoRepo, wantMsg: "Not inside a Git repository."},
-		{name: "merge in progress", rs: git.Status{Root: "/repo", MergeInProgress: true}, want: state.ModeBrowse, wantMsg: "Merge/Rebase in progress after conflict."},
-		{name: "rebase in progress", rs: git.Status{Root: "/repo", RebaseInProgress: true}, want: state.ModeBrowse, wantMsg: "Merge/Rebase in progress after conflict."},
+		{name: "merge in progress", rs: git.Status{Root: "/repo", MergeInProgress: true}, want: state.ModeBrowse, wantMsg: "Merge/rebase in progress."},
+		{name: "rebase in progress", rs: git.Status{Root: "/repo", RebaseInProgress: true}, want: state.ModeBrowse, wantMsg: "Merge/rebase in progress."},
 		{name: "detached", rs: git.Status{Root: "/repo", Detached: true}, want: state.ModeBlocked, wantBlk: state.BlockDetached, wantMsg: "Detached HEAD."},
-		{name: "empty repo", rs: git.Status{Root: "/repo", EmptyRepo: true}, want: state.ModeEmpty, wantMsg: "Repository has no commits yet."},
-		{name: "no remote no upstream", rs: git.Status{Root: "/repo", NoRemote: true, NoUpstream: true}, want: state.ModeBlocked, wantBlk: state.BlockNoRemote, wantMsg: "No remote or upstream configured."},
+		{name: "empty repo", rs: git.Status{Root: "/repo", EmptyRepo: true}, want: state.ModeEmpty, wantMsg: "No commits yet."},
+		{name: "no remote no upstream", rs: git.Status{Root: "/repo", NoRemote: true, NoUpstream: true}, want: state.ModeBlocked, wantBlk: state.BlockNoRemote, wantMsg: "No remote or upstream."},
 		{name: "browse", rs: git.Status{Root: "/repo"}, want: state.ModeBrowse},
 	}
 
@@ -54,7 +54,7 @@ func TestActionPullCases(t *testing.T) {
 		{name: "rebase in progress", rs: git.Status{Root: "/repo", RebaseInProgress: true}, want: state.ModeBlocked, wantBlk: state.BlockUnknown},
 		{name: "no remote", rs: git.Status{Root: "/repo", NoRemote: true}, want: state.ModeBlocked, wantBlk: state.BlockNoRemote},
 		{name: "no upstream", rs: git.Status{Root: "/repo", NoUpstream: true}, want: state.ModeBlocked, wantBlk: state.BlockNoUpstream},
-		{name: "ready", rs: git.Status{Root: "/repo"}, want: state.ModeOutcomePreview, wantMsg: "Pull is ready."},
+		{name: "ready", rs: git.Status{Root: "/repo"}, want: state.ModeOutcomePreview, wantMsg: "Pull ready."},
 	}
 
 	for _, tt := range tests {
@@ -122,6 +122,20 @@ func TestActionPickTargets(t *testing.T) {
 		got := actionPickTargets(git.Status{Detached: true, Branches: []string{"main"}}, state.ActionReset)
 		if got.Mode != state.ModeTargetPick {
 			t.Fatalf("got = %#v", got)
+		}
+	})
+	t.Run("reset excludes remote and tags", func(t *testing.T) {
+		got := actionPickTargets(git.Status{
+			Root:           "/repo",
+			LocalBranches:  []string{"main"},
+			RemoteBranches: []string{"origin/main"},
+			Tags:           []string{"v1.0.0"},
+		}, state.ActionReset)
+		if got.Mode != state.ModeTargetPick {
+			t.Fatalf("got = %#v", got)
+		}
+		if len(got.Targets) != 1 || got.Targets[0].Ref != "main" {
+			t.Fatalf("expected reset targets to stay local only, got %#v", got.Targets)
 		}
 	})
 	t.Run("empty targets blocked", func(t *testing.T) {

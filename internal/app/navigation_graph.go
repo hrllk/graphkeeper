@@ -22,7 +22,7 @@ func findGraphRowByHash(rows []graphRow, hash string) int {
 }
 
 func graphPageSize(m *model) int {
-	return graph.PageSize(m.height)
+	return graph.PageSize(graphBoxHeightForModel(m))
 }
 
 func moveSelectableGraphPointer(current int, rows []graphRow, delta int) int {

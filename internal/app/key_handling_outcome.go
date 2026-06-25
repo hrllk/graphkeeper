@@ -23,14 +23,20 @@ func (m model) handleOutcomePreviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 	action := m.status.Action
 	target := m.status.Selected
-	m.status = state.New().WithLoading("Running action...")
+	resetMode := m.status.ResetMode
+	m.status = state.New().WithLoading("Running...")
 	switch action {
 	case state.ActionPull:
 		return m, executePull(m.repo, m.commitLimit)
 	case state.ActionAbort:
 		return m, executeAbort(m.repo, m.commitLimit)
-	case state.ActionMerge, state.ActionRebase, state.ActionReset:
+	case state.ActionMerge, state.ActionRebase:
 		return m, executeAction(m.repo, action, target, m.commitLimit)
+	case state.ActionReset:
+		if resetMode == "" {
+			resetMode = state.ResetModeHard
+		}
+		return m, executeReset(m.repo, target, resetMode, m.commitLimit)
 	default:
 		return m, nil
 	}

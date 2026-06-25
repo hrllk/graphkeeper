@@ -87,8 +87,25 @@ func TestBuildCurrentSectionTargets(t *testing.T) {
 	if !got[0].Current || !got[0].NeedsPull || got[0].NeedsPush || !got[0].MergeConflicted {
 		t.Fatalf("main section target = %#v", got[0])
 	}
+	if got[0].WorktreeDirty {
+		t.Fatalf("expected clean worktree by default, got %#v", got[0])
+	}
 	if !got[1].NeedsPush || !got[1].NoUpstream {
 		t.Fatalf("feature section target = %#v", got[1])
+	}
+}
+
+func TestBuildCurrentSectionTargetsMarksDirtyCurrentBranch(t *testing.T) {
+	got := buildCurrentSectionTargets(git.Status{
+		Branch:        "main",
+		Head:          "abc123",
+		WorktreeDirty: true,
+	})
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if !got[0].Current || !got[0].WorktreeDirty {
+		t.Fatalf("expected dirty current branch target, got %#v", got[0])
 	}
 }
 

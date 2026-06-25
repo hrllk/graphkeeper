@@ -15,6 +15,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleTargetPickKey(msg)
 	case state.ModeConfirm:
 		return m.handleConfirmKey(msg)
+	case state.ModeResetModePick:
+		return m.handleResetModePickKey(msg)
 	case state.ModeOutcomePreview:
 		return m.handleOutcomePreviewKey(msg)
 	case state.ModeBrowse:

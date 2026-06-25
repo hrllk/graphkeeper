@@ -6,6 +6,80 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+func layoutShellMargins(m model) (hMargin, topMargin, bottomMargin int) {
+	hMargin = int(float64(m.width) * 0.08)
+	topMargin = int(float64(m.height) * 0.08)
+	bottomMargin = int(float64(m.height) * 0.04)
+	if hMargin < 2 {
+		hMargin = 2
+	}
+	if topMargin < 1 {
+		topMargin = 1
+	}
+	if bottomMargin < 1 {
+		bottomMargin = 1
+	}
+	if maxMargin := (m.width - 80) / 2; maxMargin >= 0 && hMargin > maxMargin {
+		hMargin = maxMargin
+	}
+	if maxTop := m.height - 20; maxTop >= 0 && topMargin > maxTop {
+		topMargin = maxTop
+	}
+	if maxBottom := m.height - topMargin - 19; maxBottom >= 0 && bottomMargin > maxBottom {
+		bottomMargin = maxBottom
+	}
+	return hMargin, topMargin, bottomMargin
+}
+
+func layoutShellBodySize(m model, hMargin, topMargin, bottomMargin int) (width, height int) {
+	width = m.width - hMargin*2
+	if width < 80 {
+		width = 80
+	}
+	height = m.height - topMargin - bottomMargin - 1
+	if height < 18 {
+		height = 18
+	}
+	return width, height
+}
+
+func layoutHeaderHeight(bodyHeight int) int {
+	if bodyHeight <= 0 {
+		return 0
+	}
+	height := 6
+	if bodyHeight < 24 {
+		height = 5
+	}
+	if height > bodyHeight-12 {
+		height = bodyHeight - 12
+	}
+	if height < 4 {
+		height = 4
+	}
+	if height >= bodyHeight {
+		height = bodyHeight - 1
+	}
+	if height < 1 {
+		height = 1
+	}
+	return height
+}
+
+func layoutGraphRailHeight(bodyHeight int) int {
+	railHeight := bodyHeight - layoutHeaderHeight(bodyHeight)
+	if railHeight < 12 {
+		railHeight = 12
+	}
+	return railHeight
+}
+
+func graphBoxHeightForModel(m *model) int {
+	hMargin, topMargin, bottomMargin := layoutShellMargins(*m)
+	_, bodyHeight := layoutShellBodySize(*m, hMargin, topMargin, bottomMargin)
+	return layoutGraphRailHeight(bodyHeight)
+}
+
 func paneWidth(total int, ratio float64) int {
 	if total <= 0 {
 		return 0
@@ -26,7 +100,7 @@ func splitDashboardHeights(total int) (int, int) {
 	if total <= 0 {
 		return 0, 0
 	}
-	top := total / 5
+	top := total / 8
 	if top < 1 {
 		top = 1
 	}
@@ -45,6 +119,40 @@ func splitPaneHeights(total int) (int, int) {
 	top := total / 2
 	bottom := total - top
 	return top, bottom
+}
+
+func splitThreeHeights(total int) (int, int, int) {
+	if total <= 0 {
+		return 0, 0, 0
+	}
+	first := total / 3
+	second := total / 3
+	third := total - first - second
+	if first == 0 {
+		first = 1
+	}
+	if second == 0 && total > 1 {
+		second = 1
+	}
+	if third == 0 && total > 2 {
+		third = 1
+	}
+	for first+second+third > total {
+		switch {
+		case third > 1:
+			third--
+		case second > 1:
+			second--
+		case first > 1:
+			first--
+		default:
+			return total, 0, 0
+		}
+	}
+	if rem := total - (first + second + third); rem > 0 {
+		third += rem
+	}
+	return first, second, third
 }
 
 func fitBlockLines(lines []string, height int) string {

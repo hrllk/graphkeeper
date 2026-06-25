@@ -77,31 +77,31 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case pushFetchedMsg:
 		if msg.err != nil {
-			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch failed before push.", msg.err.Error())
+			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch before push failed.", msg.err.Error())
 			return m, nil
 		}
 		m.repoStatus = msg.status
 		syncBrowseState(&m, msg.status)
 		if msg.status.NoUpstream {
 			branchName := msg.status.Branch
-			titleMsg := "Push and Track Remote?"
-			detailMsg := fmt.Sprintf("There is no upstream configured for the current branch. Do you want to push and set upstream tracking to origin/%s?", branchName)
+			titleMsg := "Push and track remote?"
+			detailMsg := fmt.Sprintf("Set upstream to origin/%s?", branchName)
 			m.status = m.status.WithConfirm(state.ActionSetUpstream, titleMsg, detailMsg)
 			m.status.Title = titleMsg
 			return m, nil
 		}
-		m.status = state.New().WithLoading("Pushing commits...")
+		m.status = state.New().WithLoading("Pushing...")
 		return m, executePush(m.repo, msg.status.Branch, m.commitLimit)
 	case pullFetchedMsg:
 		if msg.err != nil {
-			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch failed before pull.", msg.err.Error())
+			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch before pull failed.", msg.err.Error())
 			return m, nil
 		}
 		m.repoStatus = msg.status
 		syncBrowseState(&m, msg.status)
 		track := m.repoStatus.Tracking[m.repoStatus.Branch]
 		isFF := track.Behind > 0 && track.Ahead == 0
-		m.status = state.New().WithLoading("Analyzing pull changes...")
+		m.status = state.New().WithLoading("Analyzing pull...")
 		return m, loadPullPreviewCommits(m.repo, isFF)
 	case pullPreviewReadyMsg:
 		if msg.err != nil {
@@ -121,12 +121,12 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pullIsFastForward = msg.isFF
 		var titleMsg, detailMsg string
 		if msg.isFF {
-			titleMsg = "Do you want to continue?"
-			detailMsg = "The branch will fast-forward to the highlighted target commit."
+			titleMsg = "Fast-forward pull?"
+			detailMsg = "Fast-forward to the target commit."
 			m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
 		} else {
-			titleMsg = "Choose Pull Integration"
-			detailMsg = "The branches have diverged. Choose integration strategy:\n\nm: merge pull (recreates merge commit)\nr: rebase pull (replays commits)\nesc: cancel integration"
+			titleMsg = "Choose pull mode"
+			detailMsg = "Branches diverged.\n\nm: merge\nr: rebase\nesc: cancel"
 			m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
 		}
 		m.status.Title = titleMsg

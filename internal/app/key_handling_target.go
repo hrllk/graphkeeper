@@ -32,10 +32,10 @@ func (m model) handleTargetPickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		action := m.status.Action
 		target := selectedTarget(m.status)
 		if target == "" {
-			m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No target selected.", "Choose a branch, tag, or ref first.")
+			m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No target selected.", "Choose a branch, tag, or ref.")
 			return m, nil
 		}
-		m.status = state.New().WithLoading("Previewing result...")
+		m.status = state.New().WithLoading("Previewing...")
 		return m, previewSelection(m.repo, m.repoStatus, action, target)
 	case "esc":
 		m.handshakeCommits = make(map[string]bool)

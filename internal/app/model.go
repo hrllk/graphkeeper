@@ -11,6 +11,8 @@ type model struct {
 	repo              *git.Repo
 	status            state.Status
 	repoStatus        git.Status
+	stashEntries      []git.StashEntry
+	stashByBase       map[string][]git.StashEntry
 	activeSection     graphSection
 	sectionCursor     map[graphSection]int
 	graphLaneCursor   int
@@ -39,7 +41,7 @@ const (
 func New(repo *git.Repo) (tea.Model, error) {
 	m := model{
 		repo:          repo,
-		status:        state.New().WithLoading("Loading repository state..."),
+		status:        state.New().WithLoading("Loading..."),
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
@@ -50,6 +52,7 @@ func New(repo *git.Repo) (tea.Model, error) {
 		graphLaneCursor:  0,
 		commitLimit:      0,
 		handshakeCommits: make(map[string]bool),
+		stashByBase:      make(map[string][]git.StashEntry),
 	}
 	return m, nil
 }
