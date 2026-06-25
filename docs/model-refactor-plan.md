@@ -8,10 +8,10 @@
 
 `model.go` 관련 작업은 아래 아카이브 문서들을 기준으로 진행한다.
 
-- `docs/archive/202606-0008-REFACTOR-model-shrink-plan.md`
-- `docs/archive/202606-0009-REFACTOR-model-structure-plan.md`
-- `docs/archive/202606-0010-REFACTOR-model-messages-plan.md`
-- `docs/archive/202606-0011-REFACTOR-model-boundary-plan.md`
+- `docs/archive/202606-0008-refactor-model-shrink-plan.md`
+- `docs/archive/202606-0009-refactor-model-structure-plan.md`
+- `docs/archive/202606-0010-refactor-model-messages-plan.md`
+- `docs/archive/202606-0011-refactor-model-boundary-plan.md`
 
 ## What to keep in mind
 

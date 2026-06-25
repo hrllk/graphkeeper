@@ -30,7 +30,7 @@
 - `docs/archive/architecture.md`
 - `docs/archive/202606-0001-REFACTOR-actions-refactor-test-plan.md`
 - `docs/archive/202606-0005-REFACTOR-navigation-graph-rules-plan.md`
-- `docs/archive/pull-reset-ux-implementation-plan.md`
+- `docs/archive/20260625-0015-feature-pull-reset-ux-implementation-plan.md`
 
 ## 현재 문제
 
