@@ -6,6 +6,22 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
+func moveTarget(s state.Status, delta int) state.Status {
+	if s.Mode != state.ModeTargetPick || len(s.Targets) == 0 {
+		return s
+	}
+	next := s.TargetIdx + delta
+	if next < 0 {
+		next = len(s.Targets) - 1
+	}
+	if next >= len(s.Targets) {
+		next = 0
+	}
+	s.TargetIdx = next
+	s.Selected = s.Targets[next].Ref
+	return s
+}
+
 func (m model) handleTargetPickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":

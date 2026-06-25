@@ -30,6 +30,34 @@ func TestMoveGraphPointerClamps(t *testing.T) {
 	}
 }
 
+func TestNavigationClampHelpers(t *testing.T) {
+	if got := moveGraphScroll(3, 10, 4); got != 7 {
+		t.Fatalf("expected graph scroll to advance within bounds, got %d", got)
+	}
+	if got := moveGraphScroll(9, 10, 5); got != 9 {
+		t.Fatalf("expected graph scroll to clamp at max, got %d", got)
+	}
+	if got := clampScroll(12, 10, 4); got != 6 {
+		t.Fatalf("expected page scroll to clamp to visible window, got %d", got)
+	}
+	if got := clampScroll(-2, 10, 4); got != 0 {
+		t.Fatalf("expected scroll to clamp at top, got %d", got)
+	}
+	if got := clampCursor(-1, 3); got != 0 {
+		t.Fatalf("expected cursor to clamp to first item, got %d", got)
+	}
+	if got := clampCursor(99, 3); got != 0 {
+		t.Fatalf("expected cursor to clamp to first item when out of range, got %d", got)
+	}
+	row := graphRow{
+		Commit: graphNode{Hash: "a"},
+		After:  []laneRef{{Hash: "a"}, {Hash: "b"}},
+	}
+	if got := clampLaneCursor(7, row); got != 0 {
+		t.Fatalf("expected lane cursor to clamp to pointer lane, got %d", got)
+	}
+}
+
 func TestMoveSelectableGraphPointerSkipsConnectors(t *testing.T) {
 	rows := []graphRow{
 		{Commit: graphNode{Hash: "a"}},
@@ -104,6 +132,118 @@ func TestGraphPageSizeMatchesGraphPaneHeight(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("expected graph page size %d, got %d", want, got)
+	}
+}
+
+func TestMoveGraphBrowseCursorUpdatesCursorScrollAndLane(t *testing.T) {
+	status := git.Status{
+		GraphCommits: []git.GraphCommit{
+			{Hash: "c3", Parents: []string{"b2", "a2"}},
+			{Hash: "b2", Parents: []string{"a1"}},
+			{Hash: "a2", Parents: []string{"a1"}},
+			{Hash: "a1"},
+		},
+	}
+	rows := graph.Rows(status)
+	m := model{
+		height:          80,
+		repoStatus:      status,
+		activeSection:   sectionGraph,
+		sectionCursor:   map[graphSection]int{sectionGraph: 0},
+		graphLaneCursor: 0,
+		graphScroll:     0,
+	}
+	got := moveGraphBrowseCursor(m, 1)
+	if got.sectionCursor[sectionGraph] != 1 {
+		t.Fatalf("expected cursor to move to next selectable row, got %d", got.sectionCursor[sectionGraph])
+	}
+	if got.graphLaneCursor != graph.PointerLane(rows[1]) {
+		t.Fatalf("expected lane cursor to follow selected row, got %d want %d", got.graphLaneCursor, graph.PointerLane(rows[1]))
+	}
+	if got.graphScroll != 0 {
+		t.Fatalf("expected scroll to stay on first page, got %d", got.graphScroll)
+	}
+}
+
+func TestMoveSectionBrowseCursorWraps(t *testing.T) {
+	m := model{
+		repoStatus: git.Status{
+			Branch:         "main",
+			LocalBranches:  []string{"main", "feature"},
+			RemoteBranches: []string{"origin/main", "origin/dev"},
+			Tags:           []string{"v1"},
+		},
+		activeSection: sectionCurrent,
+		sectionCursor: map[graphSection]int{
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+	got := moveSectionBrowseCursor(m, 1)
+	if got.sectionCursor[sectionCurrent] != 1 {
+		t.Fatalf("expected current section cursor to move forward, got %d", got.sectionCursor[sectionCurrent])
+	}
+	got = moveSectionBrowseCursor(got, 1)
+	if got.sectionCursor[sectionCurrent] != 0 {
+		t.Fatalf("expected current section cursor to wrap, got %d", got.sectionCursor[sectionCurrent])
+	}
+	got.activeSection = sectionTags
+	got = moveSectionBrowseCursor(got, 1)
+	if got.sectionCursor[sectionTags] != 0 {
+		t.Fatalf("expected tags cursor to stay on only item, got %d", got.sectionCursor[sectionTags])
+	}
+}
+
+func TestSyncBrowseStateRestoresGraphSelectionAndClampsSections(t *testing.T) {
+	m := model{
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{
+				{Hash: "c3", Parents: []string{"b2"}},
+				{Hash: "b2", Parents: []string{"a1"}},
+				{Hash: "a1"},
+			},
+			Branch:          "main",
+			LocalBranches:   []string{"main", "feature"},
+			RemoteBranches:  []string{"origin/main"},
+			Tags:            []string{"v1", "v2"},
+			BranchUpstreams: map[string]string{"main": "origin/main", "feature": ""},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   1,
+			sectionCurrent: 1,
+			sectionRemote:  0,
+			sectionTags:    1,
+		},
+		graphScroll:     2,
+		graphLaneCursor: 1,
+	}
+	rs := git.Status{
+		GraphCommits: []git.GraphCommit{
+			{Hash: "c3", Parents: []string{"b2"}},
+			{Hash: "b2", Parents: []string{"a1"}},
+			{Hash: "a1"},
+		},
+		Branch:          "main",
+		LocalBranches:   []string{"main"},
+		RemoteBranches:  []string{"origin/main"},
+		Tags:            []string{"v1"},
+		BranchUpstreams: map[string]string{"main": "origin/main"},
+	}
+
+	syncBrowseState(&m, rs)
+
+	if m.sectionCursor[sectionGraph] != 1 {
+		t.Fatalf("expected graph cursor to stay on matching hash, got %d", m.sectionCursor[sectionGraph])
+	}
+	if m.graphLaneCursor != graph.PointerLane(graph.Rows(rs)[1]) {
+		t.Fatalf("expected graph lane cursor to be restored, got %d", m.graphLaneCursor)
+	}
+	if m.sectionCursor[sectionCurrent] != 0 {
+		t.Fatalf("expected current section cursor to clamp to available target, got %d", m.sectionCursor[sectionCurrent])
+	}
+	if m.sectionCursor[sectionTags] != 0 {
+		t.Fatalf("expected tags cursor to clamp to available target, got %d", m.sectionCursor[sectionTags])
 	}
 }
 
@@ -507,30 +647,6 @@ func TestCheckoutResetsGraphLoadState(t *testing.T) {
 	}
 	if got.graphLaneCursor != 0 {
 		t.Fatalf("expected checkout to reset lane cursor to current branch lane, got %d", got.graphLaneCursor)
-	}
-}
-
-func TestMaybeLoadMoreGraphNoOpsWhenUnlimited(t *testing.T) {
-	commits := make([]git.GraphCommit, 0)
-	for i := range commits {
-		hash := fmt.Sprintf("c%02d", i)
-		commits[i] = git.GraphCommit{Hash: hash}
-		if i+1 < len(commits) {
-			commits[i].Parents = []string{fmt.Sprintf("c%02d", i+1)}
-		}
-	}
-	m := model{
-		activeSection: sectionGraph,
-		commitLimit:   0,
-		repoStatus:    git.Status{GraphCommits: commits},
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
-	got, cmd := maybeLoadMoreGraph(m)
-	if cmd != nil {
-		t.Fatalf("expected no lazy load command in unlimited mode, got %v", cmd)
-	}
-	if got.commitLimit != 0 {
-		t.Fatalf("expected unlimited mode to keep commit limit unchanged, got %d", got.commitLimit)
 	}
 }
 

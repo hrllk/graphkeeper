@@ -143,3 +143,39 @@ func TestOutcomePreviewEscapeRoutesByAction(t *testing.T) {
 		t.Fatalf("expected pull outcome escape to return to browse, got %s", got.status.Mode)
 	}
 }
+
+func TestBrowseNavigationKeysDoNotSpawnLazyLoadCommands(t *testing.T) {
+	m := testKeyHandlingModel(nil, git.Status{
+		GraphCommits: []git.GraphCommit{
+			{Hash: "c2", Parents: []string{"c1"}},
+			{Hash: "c1"},
+		},
+	})
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected down key to stay synchronous, got %v", cmd)
+	}
+	if got.sectionCursor[sectionGraph] != 1 {
+		t.Fatalf("expected down key to move graph cursor, got %d", got.sectionCursor[sectionGraph])
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected G key to stay synchronous, got %v", cmd)
+	}
+	if got.sectionCursor[sectionGraph] != 1 {
+		t.Fatalf("expected G key to keep cursor on last row, got %d", got.sectionCursor[sectionGraph])
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected ctrl+d to stay synchronous, got %v", cmd)
+	}
+	if got.sectionCursor[sectionGraph] != 1 {
+		t.Fatalf("expected ctrl+d to keep cursor on last row, got %d", got.sectionCursor[sectionGraph])
+	}
+}

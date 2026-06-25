@@ -76,9 +76,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 			return false, m, nil
 		}
 		m = moveBrowseCursor(m, 1)
-		var cmd tea.Cmd
-		m, cmd = maybeLoadMoreGraph(m)
-		return true, m, cmd
+		return true, m, nil
 	case "left", "h":
 		if m.activeSection == sectionGraph {
 			m = moveGraphLane(m, -1)
@@ -116,9 +114,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 				m.graphLaneCursor = graph.PointerLane(rows[last])
 			}
 			m.awaitingGoTop = false
-			var cmd tea.Cmd
-			m, cmd = maybeLoadMoreGraph(m)
-			return true, m, cmd
+			return true, m, nil
 		}
 		return true, m, nil
 	case "H":
@@ -142,9 +138,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 	case "ctrl+d":
 		if m.activeSection == sectionGraph {
 			m = pageBrowseGraph(m, 1)
-			var cmd tea.Cmd
-			m, cmd = maybeLoadMoreGraph(m)
-			return true, m, cmd
+			return true, m, nil
 		}
 		return true, m, nil
 	default:
