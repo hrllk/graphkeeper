@@ -75,6 +75,7 @@ func renderAppView(m model) string {
 	graphRow := lipgloss.JoinHorizontal(lipgloss.Top, graphBox, rightRail)
 
 	body := lipgloss.JoinVertical(lipgloss.Left, headerRow, graphRow)
+	body = lipgloss.Place(bodyWidth, bodyHeight, lipgloss.Left, lipgloss.Top, body)
 	centeredBody := applyOuterMargins(body, bodyWidth, bodyHeight, hMargin, topMargin, bottomMargin)
 
 	if m.status.Mode == state.ModeConfirm || m.status.Mode == state.ModeResetModePick {
