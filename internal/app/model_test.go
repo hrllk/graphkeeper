@@ -152,6 +152,17 @@ func TestShellLayoutAllocatesSmallHeaderAndLargeGraphRail(t *testing.T) {
 	}
 }
 
+func TestGraphRailMatchesStackedSideRailHeight(t *testing.T) {
+	m := model{width: 140, height: 60}
+	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
+	_, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	graphRailHeight := layoutGraphRailHeight(bodyHeight)
+	localHeight, remoteHeight, tagsHeight := splitThreeHeights(graphRailHeight)
+	if graphRailHeight != localHeight+remoteHeight+tagsHeight {
+		t.Fatalf("expected graph rail height to match stacked side rail height, got %d vs %d", graphRailHeight, localHeight+remoteHeight+tagsHeight)
+	}
+}
+
 func TestShellLayoutUsesTenPercentMargins(t *testing.T) {
 	m := model{width: 140, height: 60}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
@@ -454,7 +465,7 @@ func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
 		},
 	}
 	got := m.renderGlobalContent(40, 14)
-	for _, want := range []string{"Mode", "Hotkeys", "tab/shift+tab section", "j/k move", "f fetch", "q quit"} {
+	for _, want := range []string{"Mode", "Hotkeys", "tab / shift+tab", "j / k", "f", "q"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected global hotkeys to include %q, got %q", want, got)
 		}

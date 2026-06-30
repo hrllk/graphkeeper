@@ -36,9 +36,9 @@ func layoutShellBodySize(m model, hMargin, topMargin, bottomMargin int) (width, 
 	if width < 80 {
 		width = 80
 	}
-	height = m.height - topMargin - bottomMargin - 18
-	if height < 6 {
-		height = 6
+	height = m.height - topMargin - bottomMargin
+	if height < 12 {
+		height = 12
 	}
 	return width, height
 }
@@ -47,15 +47,15 @@ func layoutHeaderHeight(bodyHeight int) int {
 	if bodyHeight <= 0 {
 		return 0
 	}
-	height := 8
+	height := 9
 	if bodyHeight < 24 {
-		height = 7
+		height = 8
 	}
 	if height > bodyHeight-12 {
 		height = bodyHeight - 12
 	}
-	if height < 6 {
-		height = 6
+	if height < 7 {
+		height = 7
 	}
 	if height >= bodyHeight {
 		height = bodyHeight - 1
