@@ -90,7 +90,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status.Title = titleMsg
 			return m, nil
 		}
-		m.status = state.New().WithLoading("Pushing...")
+		m.status = loadingToast("Pushing...")
 		return m, executePush(m.repo, msg.status.Branch, m.commitLimit)
 	case pullFetchedMsg:
 		if msg.err != nil {
@@ -101,7 +101,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg.status)
 		track := m.repoStatus.Tracking[m.repoStatus.Branch]
 		isFF := track.Behind > 0 && track.Ahead == 0
-		m.status = state.New().WithLoading("Analyzing pull...")
+		m.status = loadingToast("Analyzing pull...")
 		return m, loadPullPreviewCommits(m.repo, isFF)
 	case pullPreviewReadyMsg:
 		if msg.err != nil {

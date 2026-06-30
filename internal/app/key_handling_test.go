@@ -30,7 +30,7 @@ func TestBranchOpenEscCancelsDraft(t *testing.T) {
 	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root})
 	m.branchOpen = true
 	m.branchDraft = "feature"
-	m.status = state.New().WithLoading("Enter a branch name.")
+	m.status = loadingToast("Enter a branch name.")
 
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	got := gotModel.(model)

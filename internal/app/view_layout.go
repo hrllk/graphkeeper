@@ -7,9 +7,9 @@ import (
 )
 
 func layoutShellMargins(m model) (hMargin, topMargin, bottomMargin int) {
-	hMargin = int(float64(m.width) * 0.08)
-	topMargin = int(float64(m.height) * 0.08)
-	bottomMargin = int(float64(m.height) * 0.04)
+	hMargin = int(float64(m.width) * 0.10)
+	topMargin = int(float64(m.height) * 0.10)
+	bottomMargin = int(float64(m.height) * 0.10)
 	if hMargin < 2 {
 		hMargin = 2
 	}
@@ -36,9 +36,9 @@ func layoutShellBodySize(m model, hMargin, topMargin, bottomMargin int) (width, 
 	if width < 80 {
 		width = 80
 	}
-	height = m.height - topMargin - bottomMargin - 1
-	if height < 18 {
-		height = 18
+	height = m.height - topMargin - bottomMargin - 18
+	if height < 6 {
+		height = 6
 	}
 	return width, height
 }
@@ -91,7 +91,13 @@ func splitPaneWidths(total int) (int, int) {
 	if total <= 0 {
 		return 0, 0
 	}
-	left := total / 2
+	left := total * 3 / 10
+	if left < 1 {
+		left = 1
+	}
+	if left > total-1 {
+		left = total - 1
+	}
 	right := total - left
 	return left, right
 }

@@ -41,7 +41,7 @@ const (
 func New(repo *git.Repo) (tea.Model, error) {
 	m := model{
 		repo:          repo,
-		status:        state.New().WithLoading("Loading..."),
+		status:        loadingToast("Loading..."),
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,

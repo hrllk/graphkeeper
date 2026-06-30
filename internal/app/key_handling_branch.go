@@ -4,8 +4,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"hrllk/graphkeeper/internal/state"
 )
 
 func (m model) handleBranchOpenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -20,7 +18,7 @@ func (m model) handleBranchOpenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		base := m.branchBase
 		m.branchOpen = false
 		m.branchDraft = ""
-		m.status = state.New().WithLoading("Creating branch...")
+		m.status = loadingToast("Creating branch...")
 		return m, createBranch(m.repo, name, base, m.commitLimit)
 	case "backspace":
 		if len(m.branchDraft) > 0 {

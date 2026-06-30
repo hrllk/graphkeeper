@@ -31,16 +31,16 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 	case "ctrl+c", "q":
 		return true, m, tea.Quit
 	case "1":
-		m = switchBrowseSection(m, sectionCurrent)
+		m = switchBrowseSection(m, sectionGraph)
 		return true, m, nil
 	case "2":
-		m = switchBrowseSection(m, sectionRemote)
+		m = switchBrowseSection(m, sectionCurrent)
 		return true, m, nil
 	case "3":
-		m = switchBrowseSection(m, sectionTags)
+		m = switchBrowseSection(m, sectionRemote)
 		return true, m, nil
 	case "4":
-		m = switchBrowseSection(m, sectionGraph)
+		m = switchBrowseSection(m, sectionTags)
 		return true, m, nil
 	case "f":
 		m.status.Message = "Fetching..."
@@ -50,7 +50,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		if m.repoStatus.Root == "" || m.repoStatus.Detached || m.repoStatus.EmptyRepo {
 			return true, m, nil
 		}
-		m.status = state.New().WithLoading("Fetching for push...")
+		m.status = loadingToast("Fetching for push...")
 		return true, m, executeFetchForPush(m.repo, m.commitLimit)
 	case "tab":
 		m.activeSection = nextGraphSection(m.activeSection)
@@ -179,7 +179,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "No reset target.", "Move to a commit line.")
 			return m, nil
 		}
-		m.status = state.New().WithLoading("Preparing reset...")
+		m.status = loadingToast("Preparing reset...")
 		return m, previewSelection(m.repo, m.repoStatus, state.ActionReset, focus.Hash)
 	case "n":
 		if !canCreateBranch(m.repoStatus) {
@@ -194,7 +194,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.branchBase = base
 		m.branchOpen = true
 		m.branchDraft = ""
-		m.status = state.New().WithLoading("Enter a branch name.")
+		m.status = loadingToast("Enter a branch name.")
 		return m, nil
 	default:
 		return m, nil
@@ -206,7 +206,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "space", " ":
 		if m.activeSection == sectionCurrent || m.activeSection == sectionRemote {
 			if target := activeSectionTarget(m); target != "" {
-				m.status = state.New().WithLoading("Checking out " + target + "...")
+				m.status = loadingToast("Checking out " + target + "...")
 				return m, executeCheckout(m.repo, target, 0)
 			}
 			m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move to a local or remote branch.")
@@ -219,14 +219,14 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		if m.activeSection == sectionCurrent && (m.repoStatus.MergeInProgress || m.repoStatus.RebaseInProgress) {
-			m.status = state.New().WithLoading("Aborting...")
+			m.status = loadingToast("Aborting...")
 			return m, executeAbort(m.repo, m.commitLimit)
 		}
 		return m, nil
 	case "p":
 		if m.activeSection == sectionCurrent {
 			if pullReady(m.repoStatus) {
-				m.status = state.New().WithLoading("Fetching upstream...")
+				m.status = loadingToast("Fetching upstream...")
 				return m, executeFetchForPull(m.repo, m.commitLimit)
 			}
 			m.status = actionPull(m.repoStatus)
@@ -236,7 +236,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if !pullReady(m.repoStatus) || !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 				return m, nil
 			}
-			m.status = state.New().WithLoading("Fetching upstream...")
+			m.status = loadingToast("Fetching upstream...")
 			return m, executeFetchForPull(m.repo, m.commitLimit)
 		}
 		return m, nil
@@ -254,7 +254,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.branchBase = base
 			m.branchOpen = true
 			m.branchDraft = ""
-			m.status = state.New().WithLoading("Enter a branch name.")
+			m.status = loadingToast("Enter a branch name.")
 			return m, nil
 		}
 		return m, nil

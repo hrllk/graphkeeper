@@ -28,7 +28,7 @@ func (m model) handleResetModePickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if mode == "" {
 			mode = state.ResetModeMixed
 		}
-		m.status = state.New().WithLoading(strings.Title(string(mode)) + " reset...")
+		m.status = loadingToast(strings.Title(string(mode)) + " reset...")
 		return m, executeReset(m.repo, target, mode, m.commitLimit)
 	case "esc":
 		m.handshakeCommits = make(map[string]bool)

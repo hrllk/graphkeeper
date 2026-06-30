@@ -35,7 +35,7 @@ func (m model) handleTargetPickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No target selected.", "Choose a branch, tag, or ref.")
 			return m, nil
 		}
-		m.status = state.New().WithLoading("Previewing...")
+		m.status = loadingToast("Previewing...")
 		return m, previewSelection(m.repo, m.repoStatus, action, target)
 	case "esc":
 		m.handshakeCommits = make(map[string]bool)

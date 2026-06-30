@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/graph"
@@ -84,13 +85,20 @@ func TestWindowResizeDoesNotIncreaseInitialGraphLoadLimit(t *testing.T) {
 	}
 }
 
-func TestSplitPaneWidthsAreBalanced(t *testing.T) {
-	left, right := splitPaneWidths(101)
+func TestSplitPaneWidthsUseThreeSevenRatio(t *testing.T) {
+	left, right := splitPaneWidths(100)
+	if left+right != 100 {
+		t.Fatalf("expected widths to sum to total, got %d and %d", left, right)
+	}
+	if left != 30 || right != 70 {
+		t.Fatalf("expected 3:7 split, got %d and %d", left, right)
+	}
+	left, right = splitPaneWidths(101)
 	if left+right != 101 {
 		t.Fatalf("expected widths to sum to total, got %d and %d", left, right)
 	}
-	if diff := right - left; diff < 0 || diff > 1 {
-		t.Fatalf("expected pane widths to stay balanced, got %d and %d", left, right)
+	if left < 30 || left > 31 {
+		t.Fatalf("expected left pane to stay near 3/10, got %d and %d", left, right)
 	}
 }
 
@@ -145,6 +153,20 @@ func TestShellLayoutAllocatesSmallHeaderAndLargeGraphRail(t *testing.T) {
 	}
 }
 
+func TestShellLayoutUsesTenPercentMargins(t *testing.T) {
+	m := model{width: 140, height: 60}
+	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
+	if hMargin != 14 {
+		t.Fatalf("expected horizontal margin to use 10%% of width, got %d", hMargin)
+	}
+	if topMargin != 6 {
+		t.Fatalf("expected top margin to use 10%% of height, got %d", topMargin)
+	}
+	if bottomMargin != 6 {
+		t.Fatalf("expected bottom margin to use 10%% of height, got %d", bottomMargin)
+	}
+}
+
 func TestGraphPageSizeMatchesGraphPaneHeight(t *testing.T) {
 	m := model{height: 80}
 	got := graphPageSize(&m)
@@ -161,6 +183,29 @@ func TestGraphPageSizeMatchesGraphPaneHeight(t *testing.T) {
 	want := graph.PageSize(boxHeight)
 	if got != want {
 		t.Fatalf("expected graph page size %d, got %d", want, got)
+	}
+}
+
+func TestRenderAppViewPlacesFooterAcrossFullWidth(t *testing.T) {
+	m := model{
+		width:  140,
+		height: 60,
+		status: state.New().WithBrowse(),
+	}
+	got := renderAppView(m)
+	lines := strings.Split(got, "\n")
+	lastVisible := ""
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		lastVisible = line
+	}
+	if lastVisible == "" {
+		t.Fatal("expected rendered output to contain visible content")
+	}
+	if w := lipgloss.Width(lastVisible); w != m.width {
+		t.Fatalf("expected footer line to be placed across full width, got %d want %d", w, m.width)
 	}
 }
 
@@ -364,7 +409,7 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	}
 }
 
-func TestRenderAppViewUsesGraphFirstLayout(t *testing.T) {
+func TestRenderAppViewUsesCenteredHeaderAndMainLayout(t *testing.T) {
 	m := model{
 		width:  140,
 		height: 60,
@@ -392,7 +437,7 @@ func TestRenderAppViewUsesGraphFirstLayout(t *testing.T) {
 	}
 
 	got := renderAppView(m)
-	for _, want := range []string{"Global", "Context", "Graph", "Local", "Remote", "Tags"} {
+	for _, want := range []string{"Mode - Global", "Mode - Local", "Graph", "Local", "Remote", "Tags"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected view to contain %q, got %q", want, got)
 		}
@@ -406,6 +451,27 @@ func TestRenderAppViewUsesGraphFirstLayout(t *testing.T) {
 	}
 	if !(localIdx < remoteIdx && remoteIdx < tagsIdx) {
 		t.Fatalf("expected Local / Remote / Tags to stack in order, got %d / %d / %d", localIdx, remoteIdx, tagsIdx)
+	}
+}
+
+func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch: "main",
+			Head:   "abc1234",
+			Remote: "origin",
+		},
+	}
+	got := m.renderGlobalContent(40, 14)
+	if !strings.Contains(got, "1 graph") || !strings.Contains(got, "2 local") || !strings.Contains(got, "3 remote") || !strings.Contains(got, "4 tags") {
+		t.Fatalf("expected updated digit mapping in global content, got %q", got)
+	}
+}
+
+func TestSectionNameUsesLocalLabel(t *testing.T) {
+	if got := sectionName(sectionCurrent); got != "Local" {
+		t.Fatalf("expected sectionCurrent to be labeled Local, got %q", got)
 	}
 }
 
@@ -453,6 +519,35 @@ func TestRenderAppViewUsesOuterMargins(t *testing.T) {
 	}
 	if !strings.HasPrefix(lastVisible, strings.Repeat(" ", 8)) {
 		t.Fatalf("expected bottom/footer margin of at least 8 spaces, got %q", lastVisible)
+	}
+}
+
+func TestRenderAppViewKeepsHeaderVisibleOnCompactScreens(t *testing.T) {
+	m := model{
+		width:  120,
+		height: 24,
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Root:     "/repo",
+			Branch:   "main",
+			Head:     "abc1234",
+			Upstream: "origin/main",
+			Remote:   "origin",
+			GraphCommits: []git.GraphCommit{
+				{Hash: "abc1234", Subject: "Commit 1"},
+			},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+
+	got := renderAppView(m)
+	if !strings.Contains(got, "Mode - Global") || !strings.Contains(got, "Mode - Local") {
+		t.Fatalf("expected compact render to keep the top header visible, got %q", got)
 	}
 }
 
@@ -571,8 +666,8 @@ func TestNumberKeysSwitchSections(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected section switch to be handled synchronously")
 	}
-	if got.activeSection != sectionCurrent {
-		t.Fatalf("expected 1 to switch to local/current section, got %v", got.activeSection)
+	if got.activeSection != sectionGraph {
+		t.Fatalf("expected 1 to switch to graph section, got %v", got.activeSection)
 	}
 
 	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
@@ -580,8 +675,8 @@ func TestNumberKeysSwitchSections(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected section switch to be handled synchronously")
 	}
-	if got.activeSection != sectionRemote {
-		t.Fatalf("expected 2 to switch to remote section, got %v", got.activeSection)
+	if got.activeSection != sectionCurrent {
+		t.Fatalf("expected 2 to switch to local/current section, got %v", got.activeSection)
 	}
 
 	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
@@ -589,8 +684,8 @@ func TestNumberKeysSwitchSections(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected section switch to be handled synchronously")
 	}
-	if got.activeSection != sectionTags {
-		t.Fatalf("expected 3 to switch to tags section, got %v", got.activeSection)
+	if got.activeSection != sectionRemote {
+		t.Fatalf("expected 3 to switch to remote section, got %v", got.activeSection)
 	}
 
 	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
@@ -598,8 +693,8 @@ func TestNumberKeysSwitchSections(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected section switch to be handled synchronously")
 	}
-	if got.activeSection != sectionGraph {
-		t.Fatalf("expected 4 to switch to graph section, got %v", got.activeSection)
+	if got.activeSection != sectionTags {
+		t.Fatalf("expected 4 to switch to tags section, got %v", got.activeSection)
 	}
 }
 
@@ -1234,7 +1329,7 @@ func TestPushNormalTriggeredWhenUpstreamExists(t *testing.T) {
 
 func TestPushRejectedShowsForcePushConfirmAndHighlights(t *testing.T) {
 	m := model{
-		status: state.New().WithLoading("Pushing..."),
+		status: loadingToast("Pushing..."),
 		repoStatus: git.Status{
 			Root:     "/repo",
 			Branch:   "develop",
@@ -1367,7 +1462,7 @@ func TestResetModePickerExecutesSelectedMode(t *testing.T) {
 
 func TestResetExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 	m := model{
-		status:        state.New().WithLoading("Hard reset..."),
+		status:        loadingToast("Hard reset..."),
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,

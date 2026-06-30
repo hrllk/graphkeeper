@@ -21,7 +21,7 @@ func (m model) renderGlobalContent(width, height int) string {
 
 	lines = append(lines, "")
 	lines = append(lines, title.Render("Hotkeys"))
-	lines = append(lines, "1 local  •  2 remote  •  3 tags  •  4 graph")
+	lines = append(lines, "1 graph  •  2 local  •  3 remote  •  4 tags")
 	lines = append(lines, "tab/shift+tab section  •  up/down/j/k move")
 	lines = append(lines, "f fetch  •  q quit")
 	return fitBlockLines(lines, height)

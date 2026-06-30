@@ -24,7 +24,7 @@ func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 	action := m.status.Action
 	target := m.status.Selected
 	resetMode := m.status.ResetMode
-	m.status = state.New().WithLoading("Running...")
+	m.status = loadingToast("Running...")
 	switch action {
 	case state.ActionPull:
 		return m, executePull(m.repo, m.commitLimit)

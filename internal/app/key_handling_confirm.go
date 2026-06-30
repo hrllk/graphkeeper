@@ -31,16 +31,16 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 	switch action {
 	case state.ActionPull:
 		if m.pullIsFastForward {
-			m.status = state.New().WithLoading("Pulling...")
+			m.status = loadingToast("Pulling...")
 			return m, executePull(m.repo, m.commitLimit)
 		}
-		m.status = state.New().WithLoading("Merging pull...")
+		m.status = loadingToast("Merging pull...")
 		return m, executePullMerge(m.repo, m.commitLimit)
 	case state.ActionSetUpstream:
-		m.status = state.New().WithLoading("Pushing and tracking...")
+		m.status = loadingToast("Pushing and tracking...")
 		return m, executePushSetUpstream(m.repo, m.repoStatus.Branch, m.commitLimit)
 	case state.ActionForcePush:
-		m.status = state.New().WithLoading("Force pushing...")
+		m.status = loadingToast("Force pushing...")
 		return m, executeForcePush(m.repo, m.repoStatus.Branch, m.commitLimit)
 	case state.ActionReset, state.ActionMerge, state.ActionRebase:
 		target := m.status.Selected
@@ -49,12 +49,12 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 			if mode == "" {
 				mode = state.ResetModeHard
 			}
-			m.status = state.New().WithLoading(strings.Title(string(mode)) + " reset...")
+			m.status = loadingToast(strings.Title(string(mode)) + " reset...")
 			return m, executeReset(m.repo, target, mode, m.commitLimit)
 		} else if action == state.ActionMerge {
-			m.status = state.New().WithLoading("Merging...")
+			m.status = loadingToast("Merging...")
 		} else {
-			m.status = state.New().WithLoading("Rebasing...")
+			m.status = loadingToast("Rebasing...")
 		}
 		return m, executeAction(m.repo, action, target, m.commitLimit)
 	default:
@@ -66,7 +66,7 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 func (m model) handleConfirmPullMerge() (tea.Model, tea.Cmd) {
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
 		m.handshakeCommits = make(map[string]bool)
-		m.status = state.New().WithLoading("Merging pull...")
+		m.status = loadingToast("Merging pull...")
 		return m, executePullMerge(m.repo, m.commitLimit)
 	}
 	return m, nil
@@ -75,7 +75,7 @@ func (m model) handleConfirmPullMerge() (tea.Model, tea.Cmd) {
 func (m model) handleConfirmPullRebase() (tea.Model, tea.Cmd) {
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
 		m.handshakeCommits = make(map[string]bool)
-		m.status = state.New().WithLoading("Rebasing pull...")
+		m.status = loadingToast("Rebasing pull...")
 		return m, executePullRebase(m.repo, m.commitLimit)
 	}
 	return m, nil

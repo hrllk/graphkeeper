@@ -14,7 +14,7 @@ func sectionName(section graphSection) string {
 	case sectionGraph:
 		return "Graph"
 	case sectionCurrent:
-		return "Branches"
+		return "Local"
 	case sectionRemote:
 		return "Remote"
 	case sectionTags:
