@@ -185,6 +185,17 @@ func fitBlockLines(lines []string, height int) string {
 	return strings.Join(lines, "\n")
 }
 
+func fitBlockWidth(lines []string, width int) []string {
+	if width <= 0 || len(lines) == 0 {
+		return lines
+	}
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		out = append(out, fitVisibleWidth(line, width))
+	}
+	return out
+}
+
 func max(a, b int) int {
 	if a > b {
 		return a

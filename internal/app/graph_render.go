@@ -9,9 +9,9 @@ import (
 	"hrllk/graphkeeper/internal/graph"
 )
 
-func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, isHandshake bool, stashCount int) string {
+func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
 	if row.Graph != "" {
-		return renderRawGraphLine(row, selected, graphActive, laneCursor, localBranches, graphColWidth, isHandshake, stashCount)
+		return renderRawGraphLine(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount)
 	}
 	var hash, refs string
 	var refInfo decorationInfo
@@ -57,12 +57,14 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	if selected {
-		return "> " + line
+		line = "> " + line
+	} else {
+		line = "  " + line
 	}
-	return "  " + line
+	return fitVisibleWidth(line, rowWidth)
 }
 
-func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, isHandshake bool, stashCount int) string {
+func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
 		graphCell := padRight(row.Graph, graphColWidth)
 		if isHandshake {
@@ -71,9 +73,11 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 		}
 		line := fmt.Sprintf("%-8s %-10s %s  %-7s %-10s", "", "", graphCell, "", "")
 		if selected {
-			return "> " + line
+			line = "> " + line
+		} else {
+			line = "  " + line
 		}
-		return "  " + line
+		return fitVisibleWidth(line, rowWidth)
 	}
 	var hash, refs string
 	var refInfo decorationInfo
@@ -138,9 +142,11 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	if selected {
-		return "> " + line
+		line = "> " + line
+	} else {
+		line = "  " + line
 	}
-	return "  " + line
+	return fitVisibleWidth(line, rowWidth)
 }
 
 func shouldHighlightStash(stashCount int, selected bool) bool {

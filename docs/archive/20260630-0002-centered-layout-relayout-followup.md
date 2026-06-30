@@ -63,6 +63,10 @@
 - 우측 레일은 `Local / Remote / Tags` 세 박스를 세로로 쌓는다.
 - `Graph` 는 우측 레일의 전체 높이와 시각적으로 맞물려야 한다.
 - 우측 레일의 마지막 박스가 remainder height 를 흡수한다.
+- 이 구조는 Bootstrap 스타일의 grid 처럼 생각하되, 실제 구현은 부모 row 가 outer height 를 결정하고 자식 cell 이 그 높이를 공유하는 방식이다.
+- 각 cell 은 독립적으로 높이를 정하지 않는다. `Graph` 와 right rail 은 같은 row height 를 받고, 내부 padding/border 만 각자 다르게 적용한다.
+- `Local / Remote / Tags` 는 right rail 내부의 nested grid cell 이며, 마지막 cell 이 remainder height 를 먹는다.
+- height 계약이 유지되려면 width overflow 로 인한 wrap 이 발생하지 않아야 한다.
 
 ### 4. 비율 규칙
 
@@ -70,6 +74,8 @@
 - `Graph / right rail` 은 `대략 7:3`.
 - `Local / Remote / Tags` 는 `1:1:1` 에 가까운 세로 분할.
 - 비율 계산에서 정수 반올림이 필요하면, remainder 는 우측 또는 마지막 row 에 흡수한다.
+- 비율은 각 cell 의 outer height 에 적용하고, inner height 는 border/padding 을 뺀 값으로 계산한다.
+- `Graph` cell 이나 right rail cell 이 별도로 content 높이를 키우면 grid 경계가 무너진다.
 
 ### 5. 최소 크기
 

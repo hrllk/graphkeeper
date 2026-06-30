@@ -13,19 +13,19 @@ func (m model) renderGraphContent(width, height int) string {
 	if len(rows) == 0 {
 		return fitBlockLines([]string{muted.Render("  (no graph to show yet)")}, height)
 	}
-	page := graphPageSize(&m)
+	page := graphPageSizeForRows(&m, rows, m.graphScroll, height)
 	start := clampScroll(m.graphScroll, len(rows), page)
 	end := start + page
 	if end > len(rows) {
 		end = len(rows)
 	}
 	lines := make([]string, 0, height)
-	lines = append(lines, "  "+muted.Render(fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))))
+	lines = append(lines, fitVisibleWidth("  "+muted.Render(fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))), width))
 	graphActive := m.activeSection == sectionGraph
 	graphColWidth := max(18, int(float64(width)*0.30))
 	rawGraph := len(rows) > 0 && rows[0].Graph != ""
 	if len(lines) < height {
-		lines = append(lines, "  "+muted.Render(fmt.Sprintf("%-8s %-10s %-*s %-7s %-10s", "commit", "branches", graphColWidth, "graph", "when", "title")))
+		lines = append(lines, fitVisibleWidth("  "+muted.Render(fmt.Sprintf("%-8s %-10s %-*s %-7s %-10s", "commit", "branches", graphColWidth, "graph", "when", "title")), width))
 	}
 	for i := start; i < end; i++ {
 		if len(lines) >= height {
@@ -33,7 +33,7 @@ func (m model) renderGraphContent(width, height int) string {
 		}
 		isHandshake := rows[i].Commit.Hash != "" && m.handshakeCommits[rows[i].Commit.Hash]
 		stashCount := len(m.stashesForCommit(rows[i].Commit.Hash))
-		lineStr := renderGraphLine(rows[i], graphActive && i == m.sectionCursor[sectionGraph], graphActive, m.graphLaneCursor, m.repoStatus.LocalBranches, graphColWidth, isHandshake, stashCount)
+		lineStr := renderGraphLine(rows[i], graphActive && i == m.sectionCursor[sectionGraph], graphActive, m.graphLaneCursor, m.repoStatus.LocalBranches, graphColWidth, width, isHandshake, stashCount)
 		lines = append(lines, lineStr)
 		if !rawGraph && i+1 < len(rows) {
 			isConnectorHandshake := rows[i].Commit.Hash != "" && m.handshakeCommits[rows[i].Commit.Hash] && rows[i+1].Commit.Hash != "" && m.handshakeCommits[rows[i+1].Commit.Hash]
@@ -46,7 +46,7 @@ func (m model) renderGraphContent(width, height int) string {
 					line = strings.ReplaceAll(line, "/", conflictColor.Render("/"))
 					line = strings.ReplaceAll(line, "\\", conflictColor.Render("\\"))
 				}
-				lines = append(lines, line)
+				lines = append(lines, fitVisibleWidth(line, width))
 			}
 		}
 	}

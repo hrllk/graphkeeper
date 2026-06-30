@@ -1564,8 +1564,8 @@ func TestRenderRightRailUsesRemainderOnLastCell(t *testing.T) {
 			t.Fatalf("expected right rail to contain %q, got %q", want, got)
 		}
 	}
-	if !strings.Contains(got, "─") {
-		t.Fatalf("expected right rail to include section dividers, got %q", got)
+	if strings.Contains(got, "─") {
+		t.Fatalf("expected right rail to stay in separate cards, got %q", got)
 	}
 }
 

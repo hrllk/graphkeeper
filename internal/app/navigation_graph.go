@@ -22,7 +22,47 @@ func findGraphRowByHash(rows []graphRow, hash string) int {
 }
 
 func graphPageSize(m *model) int {
-	return graph.PageSize(graphContentHeightForModel(m))
+	rows := graph.Rows(m.repoStatus)
+	return graphPageSizeForRows(m, rows, m.graphScroll, graphContentHeightForModel(m))
+}
+
+func graphPageSizeForRows(m *model, rows []graphRow, start, contentHeight int) int {
+	if len(rows) == 0 || contentHeight <= 0 {
+		return 0
+	}
+	if start < 0 || start >= len(rows) {
+		return 0
+	}
+	budget := contentHeight - 2
+	if budget < 1 {
+		budget = 1
+	}
+	used := 0
+	count := 0
+	rawGraph := rows[start].Graph != ""
+	for i := start; i < len(rows); i++ {
+		if used >= budget {
+			break
+		}
+		used++
+		count++
+		if rawGraph || i+1 >= len(rows) {
+			continue
+		}
+		isConnectorHandshake := rows[i].Commit.Hash != "" && m.handshakeCommits[rows[i].Commit.Hash] && rows[i+1].Commit.Hash != "" && m.handshakeCommits[rows[i+1].Commit.Hash]
+		connectorLines := renderGraphConnectorLines(rows[i], rows[i+1], isConnectorHandshake)
+		if len(connectorLines) == 0 {
+			continue
+		}
+		if used+len(connectorLines) > budget {
+			break
+		}
+		used += len(connectorLines)
+	}
+	if count < 1 {
+		count = 1
+	}
+	return count
 }
 
 func moveSelectableGraphPointer(current int, rows []graphRow, delta int) int {

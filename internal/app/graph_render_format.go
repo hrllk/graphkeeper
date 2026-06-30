@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 func hasHeadDecoration(decorations []string) bool {
@@ -179,6 +180,53 @@ func padRight(value string, width int) string {
 		return value
 	}
 	return value + strings.Repeat(" ", width-lipgloss.Width(value))
+}
+
+func fitVisibleWidth(value string, width int) string {
+	if width <= 0 || value == "" {
+		return ""
+	}
+	if lipgloss.Width(value) <= width {
+		return value
+	}
+	runes := []rune(value)
+	var b strings.Builder
+	visible := 0
+	sawANSI := false
+	for i := 0; i < len(runes) && visible < width; {
+		r := runes[i]
+		if r == '\x1b' && i+1 < len(runes) && runes[i+1] == '[' {
+			sawANSI = true
+			start := i
+			i += 2
+			for i < len(runes) {
+				ch := runes[i]
+				i++
+				if ch >= '@' && ch <= '~' {
+					break
+				}
+			}
+			b.WriteString(string(runes[start:i]))
+			continue
+		}
+		if r == '\x1b' {
+			sawANSI = true
+		}
+		w := runewidth.RuneWidth(r)
+		if w <= 0 {
+			w = 1
+		}
+		if visible+w > width {
+			break
+		}
+		b.WriteRune(r)
+		visible += w
+		i++
+	}
+	if sawANSI {
+		b.WriteString("\x1b[0m")
+	}
+	return b.String()
 }
 
 func focusParentLines(node graphNode, width int) []string {
