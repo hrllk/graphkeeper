@@ -99,11 +99,57 @@ func TestPullReadyCases(t *testing.T) {
 }
 
 func TestCanCreateBranch(t *testing.T) {
-	if !canCreateBranch(git.Status{}) {
-		t.Fatal("expected clean worktree to allow branch creation")
+	if !canCreateBranch(git.Status{Root: "/repo"}) {
+		t.Fatal("expected clean repo to allow branch creation")
 	}
 	if canCreateBranch(git.Status{WorktreeDirty: true}) {
 		t.Fatal("expected dirty worktree to block branch creation")
+	}
+	if canCreateBranch(git.Status{Root: "/repo", MergeInProgress: true}) {
+		t.Fatal("expected merge in progress to block branch creation")
+	}
+	if canCreateBranch(git.Status{Root: "/repo", RebaseInProgress: true}) {
+		t.Fatal("expected rebase in progress to block branch creation")
+	}
+}
+
+func TestBranchNameExistsAndValidation(t *testing.T) {
+	rs := git.Status{
+		Root:          "/repo",
+		Branch:        "main",
+		Branches:      []string{"main", "feature"},
+		LocalBranches: []string{"main", "feature"},
+	}
+	if !branchNameExists(rs, "main") {
+		t.Fatal("expected main to be detected as existing")
+	}
+	if !branchNameExists(rs, "feature") {
+		t.Fatal("expected feature to be detected as existing")
+	}
+	if branchNameExists(rs, "new-branch") {
+		t.Fatal("expected new-branch to be available")
+	}
+
+	if err := branchCreateValidationError(rs, "", "main"); err == nil || err.Error() != "branch name is empty" {
+		t.Fatalf("expected empty name error, got %v", err)
+	}
+	if err := branchCreateValidationError(rs, "new-branch", ""); err == nil || err.Error() != "branch base is empty" {
+		t.Fatalf("expected empty base error, got %v", err)
+	}
+	if err := branchCreateValidationError(git.Status{Root: "/repo", WorktreeDirty: true}, "new-branch", "main"); err == nil || err.Error() != "working tree is not clean" {
+		t.Fatalf("expected dirty worktree error, got %v", err)
+	}
+	if err := branchCreateValidationError(git.Status{Root: "/repo", MergeInProgress: true}, "new-branch", "main"); err == nil || err.Error() != "merge/rebase already in progress" {
+		t.Fatalf("expected merge error, got %v", err)
+	}
+	if err := branchCreateValidationError(git.Status{Root: "/repo", RebaseInProgress: true}, "new-branch", "main"); err == nil || err.Error() != "merge/rebase already in progress" {
+		t.Fatalf("expected rebase error, got %v", err)
+	}
+	if err := branchCreateValidationError(git.Status{}, "new-branch", "main"); err == nil || err.Error() != "not inside a git repository" {
+		t.Fatalf("expected no repo error, got %v", err)
+	}
+	if err := branchCreateValidationError(rs, "feature", "main"); err == nil || err.Error() != "branch name already exists" {
+		t.Fatalf("expected duplicate branch error, got %v", err)
 	}
 }
 

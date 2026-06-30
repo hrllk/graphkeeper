@@ -149,6 +149,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pullToastDoneMsg:
 		m.status = deriveStatus(m.repoStatus)
 		return m, nil
+	case branchToastDoneMsg:
+		m.status = deriveStatus(m.repoStatus)
+		return m, nil
 	default:
 		return m, nil
 	}

@@ -81,3 +81,5 @@ type pullPreviewReadyMsg struct {
 }
 
 type pullToastDoneMsg struct{}
+
+type branchToastDoneMsg struct{}

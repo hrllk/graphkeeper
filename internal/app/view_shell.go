@@ -85,6 +85,9 @@ func renderAppView(m model) string {
 			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
 		}
 	}
+	if m.branchOpen {
+		centeredBody = overlayPopup(centeredBody, renderBranchInputPopup(m, bodyWidth))
+	}
 	if m.status.Mode == state.ModeLoading && !m.branchOpen {
 		centeredBody = overlayPopup(centeredBody, renderLoadingPopup(m, bodyWidth))
 	}
@@ -169,15 +172,88 @@ func renderLoadingPopup(m model, bodyWidth int) string {
 	)
 }
 
+func renderBranchInputPopup(m model, bodyWidth int) string {
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	popupBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Padding(1, 2).
+		Width(popupWidthForBody(bodyWidth, 36, 56)).
+		Align(lipgloss.Center)
+	draft := m.branchDraft
+	if draft == "" {
+		draft = " "
+	}
+	base := m.branchBase
+	if base == "" {
+		base = "-"
+	}
+	lines := []string{
+		titleStyle.Render("Create branch"),
+		descStyle.Render("Enter a branch name."),
+		"",
+		descStyle.Render("name: " + draft),
+		descStyle.Render("base: " + shorten(base, 24)),
+	}
+	if m.branchError != "" {
+		lines = append(lines, "")
+		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true).Render(m.branchError))
+	}
+	lines = append(lines, "")
+	lines = append(lines, helpStyle.Render("esc: back"))
+	return popupBox.Render(strings.Join(lines, "\n"))
+}
+
 func (m model) renderRightRail(width, height int) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
-	localHeight, remoteHeight, tagsHeight := splitThreeHeights(height)
-	localBox := m.getBoxStyle(sectionCurrent).Width(width).Height(localHeight).Render("Local\n" + m.renderSectionContent(sectionCurrent, max(width-4, 0), max(localHeight-3, 0)))
-	remoteBox := m.getBoxStyle(sectionRemote).Width(width).Height(remoteHeight).Render("Remote\n" + m.renderSectionContent(sectionRemote, max(width-4, 0), max(remoteHeight-3, 0)))
-	tagsBox := m.getBoxStyle(sectionTags).Width(width).Height(tagsHeight).Render("Tags\n" + m.renderSectionContent(sectionTags, max(width-4, 0), max(tagsHeight-3, 0)))
-	return lipgloss.JoinVertical(lipgloss.Left, localBox, remoteBox, tagsBox)
+	outerHeight := height - 2
+	if outerHeight < 1 {
+		outerHeight = 1
+	}
+	contentHeight := outerHeight - 3
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	sectionOverhead := 5
+	itemBudget := contentHeight - sectionOverhead
+	if itemBudget < 0 {
+		itemBudget = 0
+	}
+	localHeight, remoteHeight, tagsHeight := splitThreeHeights(itemBudget)
+	divider := fitVisibleWidth(strings.Repeat("─", max(width-4, 0)), width)
+	lines := make([]string, 0, contentHeight)
+	lines = append(lines, fitVisibleWidth(title.Render("Targets"), width))
+	lines = append(lines, fitVisibleWidth(m.renderRightRailSectionTitle(sectionCurrent, "Local"), width))
+	lines = appendSectionLines(lines, m.renderSectionContent(sectionCurrent, max(width-4, 0), localHeight), localHeight)
+	lines = append(lines, divider)
+	lines = append(lines, fitVisibleWidth(m.renderRightRailSectionTitle(sectionRemote, "Remote"), width))
+	lines = appendSectionLines(lines, m.renderSectionContent(sectionRemote, max(width-4, 0), remoteHeight), remoteHeight)
+	lines = append(lines, divider)
+	lines = append(lines, fitVisibleWidth(m.renderRightRailSectionTitle(sectionTags, "Tags"), width))
+	lines = appendSectionLines(lines, m.renderSectionContent(sectionTags, max(width-4, 0), tagsHeight), tagsHeight)
+	boxStyle := baseBox
+	if m.activeSection != sectionGraph {
+		boxStyle = activeBox
+	}
+	return boxStyle.Width(width).Height(outerHeight).Render(strings.Join(lines, "\n"))
+}
+
+func (m model) renderRightRailSectionTitle(section graphSection, label string) string {
+	if m.activeSection == section {
+		return accent.Render(label)
+	}
+	return title.Render(label)
+}
+
+func appendSectionLines(lines []string, content string, height int) []string {
+	if height <= 0 || content == "" {
+		return lines
+	}
+	return append(lines, strings.Split(content, "\n")...)
 }
 
 func applyOuterMargins(content string, totalWidth, totalHeight, hMargin, topMargin, bottomMargin int) string {

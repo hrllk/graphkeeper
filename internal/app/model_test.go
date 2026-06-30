@@ -189,19 +189,48 @@ func TestShellLayoutUsesTwelvePercentMargins(t *testing.T) {
 	}
 }
 
-func TestGraphPageSizeMatchesGraphPaneHeight(t *testing.T) {
-	m := model{height: 80}
-	got := graphPageSize(&m)
+func TestGraphPageSizeAccountsForConnectorBudget(t *testing.T) {
+	m := model{height: 24}
+	rows := []graphRow{
+		{
+			Commit:       graphNode{Hash: "c10"},
+			Before:       []laneRef{{Hash: "x"}, {Hash: "c9"}},
+			After:        []laneRef{{Hash: "x"}, {Hash: "c9"}},
+			Lane:         0,
+			DisplayWidth: 2,
+		},
+		{
+			Commit:       graphNode{Hash: "c9"},
+			Before:       []laneRef{{Hash: "x"}, {Hash: "c9"}},
+			After:        []laneRef{{Hash: "c9"}},
+			Lane:         0,
+			DisplayWidth: 2,
+		},
+		{Commit: graphNode{Hash: "c8"}, Lane: 0, DisplayWidth: 1},
+		{Commit: graphNode{Hash: "c7"}, Lane: 0, DisplayWidth: 1},
+		{Commit: graphNode{Hash: "c6"}, Lane: 0, DisplayWidth: 1},
+		{Commit: graphNode{Hash: "c5"}, Lane: 0, DisplayWidth: 1},
+		{Commit: graphNode{Hash: "c4"}, Lane: 0, DisplayWidth: 1},
+		{Commit: graphNode{Hash: "c3"}, Lane: 0, DisplayWidth: 1},
+		{Commit: graphNode{Hash: "c2"}, Lane: 0, DisplayWidth: 1},
+		{Commit: graphNode{Hash: "c1"}, Lane: 0, DisplayWidth: 1},
+	}
+	foundConnector := false
+	for i := 0; i+1 < len(rows); i++ {
+		if len(renderGraphConnectorLines(rows[i], rows[i+1], false)) > 0 {
+			foundConnector = true
+			break
+		}
+	}
+	if !foundConnector {
+		t.Fatal("expected at least one merge transition to produce connector lines")
+	}
+	got := graphPageSizeForRows(&m, rows, 0, graphContentHeightForModel(&m))
 	if got <= 0 {
 		t.Fatalf("expected positive graph page size, got %d", got)
 	}
-	contentHeight := graphContentHeightForModel(&m)
-	if contentHeight <= 0 {
-		t.Fatalf("expected positive graph content height, got %d", contentHeight)
-	}
-	want := graph.PageSize(contentHeight)
-	if got != want {
-		t.Fatalf("expected graph page size %d, got %d", want, got)
+	if got != 5 {
+		t.Fatalf("expected connector-aware page size to account for two connector lines, got %d", got)
 	}
 }
 
@@ -419,6 +448,54 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	}
 }
 
+func TestRenderContextContentClipsToWidth(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch:        "main",
+			Head:          "abc1234",
+			Remote:        "origin",
+			WorktreeDirty: true,
+			LocalBranches: []string{"main", "feature/this-is-an-extremely-long-branch-name"},
+			Tags:          []string{"v1.0.0"},
+		},
+		activeSection: sectionCurrent,
+		sectionCursor: map[graphSection]int{sectionCurrent: 0},
+	}
+	got := m.renderContextContent(28, 18)
+	for i, line := range strings.Split(got, "\n") {
+		if width := lipgloss.Width(line); width > 28 {
+			t.Fatalf("expected context line %d to fit width, got width=%d line=%q", i, width, line)
+		}
+	}
+}
+
+func TestRenderDetailContentClipsToWidth(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch: "main",
+			Head:   "abc1234",
+			Remote: "origin",
+			GraphCommits: []git.GraphCommit{
+				{
+					Hash:        "abc1234",
+					Parents:     []string{"def5678", "9876543"},
+					Decorations: []string{"HEAD -> main", "origin/main"},
+				},
+			},
+			LocalBranches: []string{"main"},
+		},
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+	got := m.renderDetailContent(28, 18)
+	for i, line := range strings.Split(got, "\n") {
+		if width := lipgloss.Width(line); width > 28 {
+			t.Fatalf("expected detail line %d to fit width, got width=%d line=%q", i, width, line)
+		}
+	}
+}
+
 func TestRenderAppViewUsesCenteredHeaderAndMainLayout(t *testing.T) {
 	m := model{
 		width:  140,
@@ -512,6 +589,39 @@ func TestRenderLoadingShowsProgressToastOverlay(t *testing.T) {
 	}
 	if !strings.Contains(got, "Working...") || !strings.Contains(got, "Fetching upstream...") {
 		t.Fatalf("expected loading toast overlay, got %q", got)
+	}
+}
+
+func TestRenderBranchOpenShowsCenteredPopupOverlay(t *testing.T) {
+	m := model{
+		width:       120,
+		height:      40,
+		branchOpen:  true,
+		branchDraft: "feature/new-flow",
+		branchBase:  "abc1234",
+		branchError: "Branch name already exists.",
+		status:      loadingToast("Enter a branch name."),
+		repoStatus: git.Status{
+			Root:   "/repo",
+			Branch: "main",
+			Head:   "abc1234",
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+
+	got := renderAppView(m)
+	if strings.Contains(got, "Mode: Loading") || strings.Contains(got, "Loading | Enter a branch name.") {
+		t.Fatalf("expected branch input to stay out of the Global panel, got %q", got)
+	}
+	for _, want := range []string{"Create branch", "Enter a branch name.", "name: feature/new-flow", "base: abc1234", "Branch name already exists.", "esc: back"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected branch popup to contain %q, got %q", want, got)
+		}
 	}
 }
 
@@ -1038,7 +1148,7 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 	if graph.RowWidth(rows[0]) < 2 {
 		t.Fatalf("expected merge row to expand lanes, got %d", graph.RowWidth(rows[0]))
 	}
-	got := renderGraphLine(rows[0], true, true, 1, nil, 24, false, 0)
+	got := renderGraphLine(rows[0], true, true, 1, nil, 24, 80, false, 0)
 	if !strings.Contains(got, "*") || !strings.Contains(got, "|") {
 		t.Fatalf("unexpected rendered graph row: %q", got)
 	}
@@ -1057,12 +1167,18 @@ func TestFormatCompactDecorations(t *testing.T) {
 	}
 }
 
-func TestCanCreateBranchRequiresCleanWorktree(t *testing.T) {
-	if canCreateBranch(git.Status{WorktreeDirty: true}) {
+func TestCanCreateBranchRequiresReadyRepo(t *testing.T) {
+	if canCreateBranch(git.Status{Root: "/repo", WorktreeDirty: true}) {
 		t.Fatal("expected dirty worktree to block branch creation")
 	}
-	if !canCreateBranch(git.Status{WorktreeDirty: false}) {
-		t.Fatal("expected clean worktree to allow branch creation")
+	if !canCreateBranch(git.Status{Root: "/repo"}) {
+		t.Fatal("expected clean repo to allow branch creation")
+	}
+	if canCreateBranch(git.Status{Root: "/repo", MergeInProgress: true}) {
+		t.Fatal("expected merge in progress to block branch creation")
+	}
+	if canCreateBranch(git.Status{Root: "/repo", RebaseInProgress: true}) {
+		t.Fatal("expected rebase in progress to block branch creation")
 	}
 }
 
@@ -1107,7 +1223,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.HasPrefix(rows[0].Graph, "*") || rows[1].Commit.Hash != "" || !strings.HasPrefix(rows[2].Graph, "| *") {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
-	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, false, 0)
+	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 0)
 	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->main") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge b...") < 0 {
 		t.Fatalf("expected graph line to include hash, branches, when, title and graph, got %q", line)
 	}
@@ -1123,11 +1239,11 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Contains(line, "Merge branch") || strings.Contains(line, "origin/") || strings.Contains(line, "develop") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
 	}
-	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24, false, 0)
+	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24, 80, false, 0)
 	if !strings.Contains(connector, "|\\") {
 		t.Fatalf("expected connector graph line to stay visible, got %q", connector)
 	}
-	focused := renderGraphLine(rows[2], true, true, 0, []string{"main"}, 24, false, 0)
+	focused := renderGraphLine(rows[2], true, true, 0, []string{"main"}, 24, 80, false, 0)
 	if !strings.Contains(focused, pointerMark.Render("*")) {
 		t.Fatalf("expected branch row graph pointer to be highlighted, got %q", focused)
 	}
@@ -1180,7 +1296,7 @@ func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
 	if graph.RowWidth(rows[1]) != 1 {
 		t.Fatalf("expected linear child commit to stay in one lane, got %d", graph.RowWidth(rows[1]))
 	}
-	if got := renderGraphLine(rows[1], false, false, 0, nil, 24, false, 0); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
+	if got := renderGraphLine(rows[1], false, false, 0, nil, 24, 80, false, 0); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
 		t.Fatalf("expected single-lane render for linear DAG, got %q", got)
 	}
 }
@@ -1214,10 +1330,10 @@ func TestGraphRowsKeepsLocalAndOriginDivergedFamiliesSeparate(t *testing.T) {
 	if rows[2].Lane != 0 {
 		t.Fatalf("expected checkout branch family lane to stay leftmost, got lane %d", rows[2].Lane)
 	}
-	if got := renderGraphLine(rows[0], false, false, 0, nil, 24, false, 0); !strings.Contains(got, "| *") {
+	if got := renderGraphLine(rows[0], false, false, 0, nil, 24, 80, false, 0); !strings.Contains(got, "| *") {
 		t.Fatalf("expected top remote row to render as split branch, got %q", got)
 	}
-	if got := renderGraphLine(rows[2], false, false, 0, nil, 24, false, 0); !strings.Contains(got, "* |") {
+	if got := renderGraphLine(rows[2], false, false, 0, nil, 24, 80, false, 0); !strings.Contains(got, "* |") {
 		t.Fatalf("expected local head row to render as split branch, got %q", got)
 	}
 }
@@ -1331,7 +1447,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 	if parentIdx < 0 || parentIdx+1 >= len(rows) || rows[parentIdx+1].Commit.Hash != "efb164e" {
 		t.Fatalf("expected efb164e immediately after 37f0954, got index=%d rows=%v", parentIdx, rows)
 	}
-	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil, 24, false, 0)
+	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil, 24, 80, false, 0)
 	if !strings.Contains(parentLine, "efb164e") {
 		t.Fatalf("expected efb164e row to render, got %q", parentLine)
 	}
@@ -1340,7 +1456,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 	if rootIdx < 0 || rootIdx+1 >= len(rows) || rows[rootIdx+1].Commit.Hash != "5525707" {
 		t.Fatalf("expected 5525707 immediately after 4ba1faf, got index=%d rows=%v", rootIdx, rows)
 	}
-	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil, 24, false, 0)
+	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil, 24, 80, false, 0)
 	if !strings.Contains(rootLine, "5525707") {
 		t.Fatalf("expected common root row to render, got %q", rootLine)
 	}
@@ -1353,9 +1469,103 @@ func TestRenderGraphLineKeepsCollapsedCommitMarker(t *testing.T) {
 		After:  []laneRef{{Hash: "base"}},
 		Lane:   2,
 	}
-	got := renderGraphLine(row, false, false, 0, nil, 24, false, 0)
+	got := renderGraphLine(row, false, false, 0, nil, 24, 80, false, 0)
 	if !strings.Contains(got, "*") {
 		t.Fatalf("expected collapsed commit line to keep marker, got %q", got)
+	}
+}
+
+func TestFitVisibleWidthTruncatesAnsiTextSafely(t *testing.T) {
+	value := "\x1b[31mabcdef\x1b[0m"
+	got := fitVisibleWidth(value, 2)
+	if width := lipgloss.Width(got); width > 2 {
+		t.Fatalf("expected ANSI text to fit width, got width=%d value=%q", width, got)
+	}
+	if !strings.Contains(got, "\x1b[31m") {
+		t.Fatalf("expected ANSI prefix to be preserved, got %q", got)
+	}
+}
+
+func TestRenderGraphLineNeverWraps(t *testing.T) {
+	row := graphRow{
+		Commit: graphNode{
+			Hash:        "abcdef123456",
+			RelativeAge: "1 minute ago",
+			Subject:     "Merge branch 'feature/with-a-very-long-name' into main",
+			Decorations: []string{
+				"HEAD -> feature/with-a-very-long-name",
+				"origin/feature/with-a-very-long-name",
+			},
+		},
+		Graph: "*|||\\\\|||*",
+	}
+	got := renderGraphLine(row, true, true, 0, []string{"feature/with-a-very-long-name"}, 18, 40, false, 0)
+	if width := lipgloss.Width(got); width > 40 {
+		t.Fatalf("expected graph row to stay within width, got width=%d row=%q", width, got)
+	}
+	if !strings.Contains(got, "abcdef1") {
+		t.Fatalf("expected hash to remain visible, got %q", got)
+	}
+	if !strings.Contains(got, "*") {
+		t.Fatalf("expected graph marker to remain visible, got %q", got)
+	}
+}
+
+func TestRenderGraphContentClipsHeadersBeforeRows(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{
+				{
+					Hash:        "abcdef123456",
+					RelativeAge: "5 minutes ago",
+					Subject:     "Merge branch 'main' into a-feature-branch-that-is-way-too-long",
+					Decorations: []string{"HEAD -> feature-branch", "origin/feature-branch"},
+				},
+				{
+					Graph: "*|||\\\\|||*",
+					Hash:  "fedcba987654",
+				},
+			},
+		},
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+	got := m.renderGraphContent(40, 8)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 8 {
+		t.Fatalf("expected graph content to keep fixed height, got %d lines: %q", len(lines), got)
+	}
+	for i, line := range lines {
+		if width := lipgloss.Width(line); width > 40 {
+			t.Fatalf("expected line %d to fit width, got width=%d line=%q", i, width, line)
+		}
+	}
+}
+
+func TestRenderRightRailUsesRemainderOnLastCell(t *testing.T) {
+	m := model{
+		repoStatus: git.Status{
+			LocalBranches:  []string{"main"},
+			RemoteBranches: []string{"origin/main"},
+			Tags:           []string{"v1.0.0"},
+		},
+	}
+	got := m.renderRightRail(40, 10)
+	if got == "" {
+		t.Fatal("expected right rail to render")
+	}
+	lines := strings.Split(got, "\n")
+	if len(lines) != 10 {
+		t.Fatalf("expected right rail to keep fixed height, got %d lines: %q", len(lines), got)
+	}
+	for _, want := range []string{"Targets", "Local", "Remote", "Tags"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected right rail to contain %q, got %q", want, got)
+		}
+	}
+	if !strings.Contains(got, "─") {
+		t.Fatalf("expected right rail to include section dividers, got %q", got)
 	}
 }
 

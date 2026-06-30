@@ -259,22 +259,14 @@ func executeReset(repo *git.Repo, target string, mode state.ResetMode, limit int
 
 func createBranch(repo *git.Repo, name, base string, limit int) tea.Cmd {
 	return func() tea.Msg {
-		if name == "" {
-			return createdBranchMsg{err: fmt.Errorf("branch name is empty")}
-		}
+		name = strings.TrimSpace(name)
+		base = strings.TrimSpace(base)
 		status, err := repo.Status(context.Background(), limit)
 		if err != nil {
 			return createdBranchMsg{name: name, base: base, err: err}
 		}
-		if status.WorktreeDirty {
-			return createdBranchMsg{
-				name: name,
-				base: base,
-				err:  fmt.Errorf("working tree is not clean"),
-			}
-		}
-		if base == "" {
-			base = "HEAD"
+		if err := branchCreateValidationError(status, name, base); err != nil {
+			return createdBranchMsg{name: name, base: base, err: err}
 		}
 		if _, err := repo.Run("switch", "-c", name, base); err != nil {
 			return createdBranchMsg{name: name, base: base, err: err}

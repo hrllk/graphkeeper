@@ -21,6 +21,7 @@ type model struct {
 	branchOpen        bool
 	branchDraft       string
 	branchBase        string
+	branchError       string
 	width             int
 	height            int
 	commitLimit       int

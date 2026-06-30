@@ -10,7 +10,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return handleLifecycleUpdate(m, msg)
 	case stashLoadedMsg:
 		return handleStashUpdate(m, msg)
-	case fetchedMsg, preparedMsg, pullCheckedMsg, previewMsg, pushFetchedMsg, pullFetchedMsg, pullPreviewReadyMsg, pullToastDoneMsg:
+	case fetchedMsg, preparedMsg, pullCheckedMsg, previewMsg, pushFetchedMsg, pullFetchedMsg, pullPreviewReadyMsg, pullToastDoneMsg, branchToastDoneMsg:
 		return handleFetchUpdate(m, msg)
 	case executedMsg:
 		return handleExecutedUpdate(m, msg)

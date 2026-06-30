@@ -506,6 +506,17 @@ func TestCreateBranch(t *testing.T) {
 		}
 	})
 
+	t.Run("empty base blocks", func(t *testing.T) {
+		fixture := newCommandRepo(t)
+		got, ok := cmdResult(t, createBranch(fixture.repo, "feature", "", 40)).(createdBranchMsg)
+		if !ok {
+			t.Fatalf("expected createdBranchMsg, got %T", cmdResult(t, createBranch(fixture.repo, "feature", "", 40)))
+		}
+		if got.err == nil {
+			t.Fatal("expected empty base to block branch creation")
+		}
+	})
+
 	t.Run("clean worktree", func(t *testing.T) {
 		fixture := newCommandRepo(t)
 		got, ok := cmdResult(t, createBranch(fixture.repo, "feature", "main", 40)).(createdBranchMsg)
@@ -517,6 +528,19 @@ func TestCreateBranch(t *testing.T) {
 		}
 		if got.status.Branch != "feature" {
 			t.Fatalf("expected branch feature, got %+v", got.status)
+		}
+	})
+
+	t.Run("duplicate branch blocks", func(t *testing.T) {
+		fixture := newCommandRepo(t)
+		runGit(t, fixture.root, "checkout", "-b", "feature")
+		runGit(t, fixture.root, "checkout", "main")
+		got, ok := cmdResult(t, createBranch(fixture.repo, "feature", "main", 40)).(createdBranchMsg)
+		if !ok {
+			t.Fatalf("expected createdBranchMsg, got %T", cmdResult(t, createBranch(fixture.repo, "feature", "main", 40)))
+		}
+		if got.err == nil {
+			t.Fatal("expected duplicate branch name to block branch creation")
 		}
 	})
 

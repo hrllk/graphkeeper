@@ -9,6 +9,33 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
+func branchCreateBaseForActiveSection(m model) string {
+	switch m.activeSection {
+	case sectionGraph:
+		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
+			return ""
+		}
+		return focus.Hash
+	case sectionCurrent:
+		return activeSectionTarget(m)
+	default:
+		return ""
+	}
+}
+
+func startBranchCreateInput(m model, base string) (model, bool) {
+	if err := branchCreateBaseValidationError(m.repoStatus, base); err != nil {
+		m.status = branchCreateBlockedStatusFromError(err)
+		return m, false
+	}
+	m.branchBase = base
+	m.branchOpen = true
+	m.branchDraft = ""
+	m.status = loadingToast("Enter a branch name.")
+	return m, true
+}
+
 func (m model) handleBrowseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.awaitingGoTop && msg.String() != "g" {
 		m.awaitingGoTop = false
@@ -182,19 +209,8 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = loadingToast("Preparing reset...")
 		return m, previewSelection(m.repo, m.repoStatus, state.ActionReset, focus.Hash)
 	case "n":
-		if !canCreateBranch(m.repoStatus) {
-			m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first.")
-			return m, nil
-		}
-		base := activeSectionTarget(m)
-		if base == "" {
-			focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
-			base = focus.Hash
-		}
-		titleMsg := "Create new branch?"
-		m.status = state.New().WithConfirm(state.ActionCreateBranch, titleMsg, "Choose a branch name after confirming.")
-		m.status.Title = titleMsg
-		m.status.Selected = base
+		base := branchCreateBaseForActiveSection(m)
+		m, _ = startBranchCreateInput(m, base)
 		return m, nil
 	default:
 		return m, nil
@@ -253,19 +269,8 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "n":
 		if m.activeSection == sectionCurrent {
-			if !canCreateBranch(m.repoStatus) {
-				m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first.")
-				return m, nil
-			}
-			base := activeSectionTarget(m)
-			if base == "" {
-				focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
-				base = focus.Hash
-			}
-			titleMsg := "Create new branch?"
-			m.status = state.New().WithConfirm(state.ActionCreateBranch, titleMsg, "Choose a branch name after confirming.")
-			m.status.Title = titleMsg
-			m.status.Selected = base
+			base := branchCreateBaseForActiveSection(m)
+			m, _ = startBranchCreateInput(m, base)
 			return m, nil
 		}
 		return m, nil

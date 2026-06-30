@@ -11,7 +11,9 @@ func (m model) renderGlobalContent(width, height int) string {
 		return ""
 	}
 	lines := make([]string, 0, height)
-	if m.status.Mode == state.ModeLoading && !m.branchOpen {
+	if m.branchOpen {
+		lines = append(lines, "")
+	} else if m.status.Mode == state.ModeLoading {
 		lines = append(lines, "")
 	} else {
 		lines = append(lines, "Mode: "+renderStatusCompact(m.status))
@@ -24,6 +26,7 @@ func (m model) renderGlobalContent(width, height int) string {
 	lines = append(lines, "• k: down")
 	lines = append(lines, "• f: fetch")
 	lines = append(lines, "• q: quit")
+	lines = fitBlockWidth(lines, width)
 	return fitBlockLines(lines, height)
 }
 
@@ -84,6 +87,7 @@ func (m model) renderContextContent(width, height int) string {
 	lines = append(lines, "")
 	lines = append(lines, title.Render("Actions"))
 	lines = append(lines, renderActionHelpLines(m)...)
+	lines = fitBlockWidth(lines, width)
 	return fitBlockLines(lines, height)
 }
 
@@ -92,7 +96,9 @@ func (m model) renderDetailContent(width, height int) string {
 		return ""
 	}
 	lines := make([]string, 0, height)
-	if m.status.Mode == state.ModeLoading && !m.branchOpen {
+	if m.branchOpen {
+		lines = append(lines, "")
+	} else if m.status.Mode == state.ModeLoading {
 		lines = append(lines, "")
 	} else {
 		lines = append(lines, renderStatusCompact(m.status))
@@ -133,5 +139,6 @@ func (m model) renderDetailContent(width, height int) string {
 	lines = append(lines, "")
 	lines = append(lines, title.Render("Actions"))
 	lines = append(lines, renderActionHelpLines(m)...)
+	lines = fitBlockWidth(lines, width)
 	return fitBlockLines(lines, height)
 }

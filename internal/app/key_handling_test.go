@@ -48,7 +48,7 @@ func TestBranchOpenEscCancelsDraft(t *testing.T) {
 	}
 }
 
-func TestCreateBranchShortcutOpensConfirmBeforeInput(t *testing.T) {
+func TestCreateBranchShortcutOpensInputInGraphSection(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{
 		Root:          fixture.root,
@@ -63,32 +63,41 @@ func TestCreateBranchShortcutOpensConfirmBeforeInput(t *testing.T) {
 	if cmd != nil {
 		t.Fatalf("expected create branch shortcut to stay synchronous, got %v", cmd)
 	}
-	if got.status.Mode != state.ModeConfirm {
-		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
-	}
-	if got.status.Action != state.ActionCreateBranch {
-		t.Fatalf("expected create-branch action, got %s", got.status.Action)
-	}
-	if got.status.Title != "Create new branch?" {
-		t.Fatalf("expected confirm title, got %q", got.status.Title)
-	}
-	if got.status.Selected != fixture.initialHash {
-		t.Fatalf("expected branch base to be stored in confirm state, got %q", got.status.Selected)
-	}
-
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	got = gotModel.(model)
-	if cmd != nil {
-		t.Fatalf("expected confirm acceptance to stay synchronous, got %v", cmd)
-	}
 	if !got.branchOpen {
-		t.Fatal("expected branch name input to open after confirm")
+		t.Fatal("expected branch name input to open directly")
 	}
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Enter a branch name." {
 		t.Fatalf("expected branch prompt loading state, got %+v", got.status)
 	}
 	if got.branchBase != fixture.initialHash {
-		t.Fatalf("expected branch base to be copied into input state, got %q", got.branchBase)
+		t.Fatalf("expected branch base to be captured from graph focus, got %q", got.branchBase)
+	}
+}
+
+func TestCreateBranchShortcutOpensInputInLocalSection(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+	})
+	m.activeSection = sectionCurrent
+	m.sectionCursor[sectionCurrent] = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected create branch shortcut to stay synchronous, got %v", cmd)
+	}
+	if !got.branchOpen {
+		t.Fatal("expected branch name input to open directly")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Enter a branch name." {
+		t.Fatalf("expected branch prompt loading state, got %+v", got.status)
+	}
+	if got.branchBase != "main" {
+		t.Fatalf("expected local branch base to be captured, got %q", got.branchBase)
 	}
 }
 
@@ -112,6 +121,112 @@ func TestCreateBranchShortcutBlockedWhenDirty(t *testing.T) {
 	}
 	if got.status.Block != state.BlockDirtyTree {
 		t.Fatalf("expected dirty tree block, got %s", got.status.Block)
+	}
+}
+
+func TestCreateBranchShortcutBlockedWhenMergeInProgress(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:            fixture.root,
+		MergeInProgress: true,
+		Branch:          "main",
+		Head:            fixture.initialHash,
+		LocalBranches:   []string{"main"},
+	})
+	m.activeSection = sectionCurrent
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected merge-in-progress branch creation to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBlocked {
+		t.Fatalf("expected blocked mode, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Merge/rebase already in progress." {
+		t.Fatalf("expected merge/rebase block message, got %q", got.status.Message)
+	}
+}
+
+func TestBranchOpenRejectsDuplicateName(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+	})
+	m.branchOpen = true
+	m.branchBase = fixture.initialHash
+	m.branchDraft = "main"
+	m.status = loadingToast("Enter a branch name.")
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected duplicate branch name to stay synchronous, got %v", cmd)
+	}
+	if !got.branchOpen {
+		t.Fatal("expected branch modal to stay open on duplicate")
+	}
+	if got.branchError != "Branch name already exists." {
+		t.Fatalf("expected branch error to be stored, got %q", got.branchError)
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Enter a branch name." {
+		t.Fatalf("expected branch prompt to stay visible, got %+v", got.status)
+	}
+}
+
+func TestBranchOpenSuccessShowsCreatedToast(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+	})
+	m.branchOpen = true
+	m.branchBase = fixture.initialHash
+	m.branchDraft = "feature/new-flow"
+	m.status = loadingToast("Enter a branch name.")
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected branch creation command to be issued")
+	}
+	if got.branchOpen {
+		t.Fatal("expected branch modal to close on success path")
+	}
+	msg := cmd()
+	created, ok := msg.(createdBranchMsg)
+	if !ok {
+		t.Fatalf("expected createdBranchMsg, got %T", msg)
+	}
+	if created.err != nil {
+		t.Fatalf("expected branch creation to succeed, got %v", created.err)
+	}
+
+	gotModel2, cmd2 := got.Update(created)
+	got2 := gotModel2.(model)
+	if cmd2 == nil {
+		t.Fatal("expected branch success toast dismissal command")
+	}
+	if got2.status.Mode != state.ModeLoading || got2.status.Message != "Branch created." {
+		t.Fatalf("expected success toast, got %+v", got2.status)
+	}
+	done := cmd2()
+	doneMsg, ok := done.(branchToastDoneMsg)
+	if !ok {
+		t.Fatalf("expected branchToastDoneMsg, got %T", done)
+	}
+	gotModel3, cmd3 := got2.Update(doneMsg)
+	got3 := gotModel3.(model)
+	if cmd3 != nil {
+		t.Fatalf("expected no command after toast dismiss, got %v", cmd3)
+	}
+	if got3.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode after toast dismiss, got %s", got3.status.Mode)
 	}
 }
 
