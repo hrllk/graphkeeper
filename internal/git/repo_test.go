@@ -1,8 +1,12 @@
 package git
 
 import (
+	"bytes"
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -115,6 +119,93 @@ func TestParseBranchUpstreamLineKeepsValidUpstream(t *testing.T) {
 	}
 	if branch != "develop" || upstream != "origin/develop" {
 		t.Fatalf("unexpected parsed upstream: branch=%q upstream=%q", branch, upstream)
+	}
+}
+
+func TestParseBranchMetadataLineDropsGoneUpstream(t *testing.T) {
+	branch, upstream, tracking, ok := parseBranchMetadataLine("tmp3|origin/tmp3|[gone]")
+	if !ok {
+		t.Fatal("expected branch metadata line to parse")
+	}
+	if branch != "tmp3" {
+		t.Fatalf("unexpected branch name: %q", branch)
+	}
+	if upstream != "" {
+		t.Fatalf("expected gone upstream to be dropped, got %q", upstream)
+	}
+	if tracking.Ahead != 0 || tracking.Behind != 0 {
+		t.Fatalf("expected no tracking counts for gone upstream, got %+v", tracking)
+	}
+}
+
+func TestStatusIgnoresGoneUpstream(t *testing.T) {
+	base := t.TempDir()
+	remote := filepath.Join(base, "remote.git")
+	work := filepath.Join(base, "work")
+	clone := filepath.Join(base, "clone")
+
+	runGitGit(t, base, "init", "--bare", "remote.git")
+	runGitGit(t, base, "init", "-b", "main", "work")
+	configGitUser(t, work)
+	writeGitFile(t, work, "file.txt", "base\n")
+	runGitGit(t, work, "add", "file.txt")
+	runGitGit(t, work, "commit", "-m", "initial")
+	runGitGit(t, work, "remote", "add", "origin", remote)
+	runGitGit(t, work, "push", "-u", "origin", "main")
+	runGitGit(t, work, "checkout", "-b", "tmp3")
+	writeGitFile(t, work, "tmp3.txt", "tmp3\n")
+	runGitGit(t, work, "add", "tmp3.txt")
+	runGitGit(t, work, "commit", "-m", "tmp3")
+	runGitGit(t, work, "push", "-u", "origin", "tmp3")
+
+	runGitGit(t, base, "clone", remote, "clone")
+	configGitUser(t, clone)
+	runGitGit(t, clone, "checkout", "-b", "tmp3", "origin/tmp3")
+	runGitGit(t, clone, "push", "origin", "--delete", "tmp3")
+	runGitGit(t, work, "fetch", "--prune", "origin")
+
+	repo, err := Open(work)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	status, err := repo.Status(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if status.ErrorMessage != "" {
+		t.Fatalf("expected no graph error, got %q", status.ErrorMessage)
+	}
+	if len(status.GraphCommits) == 0 {
+		t.Fatalf("expected graph commits to remain available, got %+v", status)
+	}
+	if got := status.BranchUpstreams["tmp3"]; got != "" {
+		t.Fatalf("expected gone upstream to be normalized away, got %q", got)
+	}
+}
+
+func runGitGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, out.String())
+	}
+	return strings.TrimSpace(out.String())
+}
+
+func configGitUser(t *testing.T, dir string) {
+	t.Helper()
+	runGitGit(t, dir, "config", "user.name", "Test User")
+	runGitGit(t, dir, "config", "user.email", "test@example.com")
+}
+
+func writeGitFile(t *testing.T, dir, rel, content string) {
+	t.Helper()
+	path := filepath.Join(dir, rel)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write file %s failed: %v", path, err)
 	}
 }
 

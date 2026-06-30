@@ -20,6 +20,9 @@ func parseBranchMetadataLine(line string) (branchName string, upstream string, t
 	}
 	if len(parts) > 2 {
 		tracking.Ahead, tracking.Behind = parseTrackingInfo(parts[2])
+		if strings.Contains(parts[2], "gone") {
+			upstream = ""
+		}
 	}
 	return branchName, upstream, tracking, true
 }
