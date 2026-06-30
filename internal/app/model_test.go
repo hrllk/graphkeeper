@@ -1547,8 +1547,11 @@ func TestResetTriggeredResetModePicker(t *testing.T) {
 	if got.status.ResetMode != state.ResetModeMixed {
 		t.Fatalf("expected mixed reset to be the default, got %s", got.status.ResetMode)
 	}
-	if !strings.Contains(got.status.Detail, "Preview:") || !strings.Contains(got.status.Detail, "Worktree:") {
-		t.Fatalf("expected preview and worktree detail, got %q", got.status.Detail)
+	if got.status.Message != "Choose a reset mode." {
+		t.Fatalf("expected reset picker message, got %q", got.status.Message)
+	}
+	if got.status.Detail != "" {
+		t.Fatalf("expected reset picker detail to be empty, got %q", got.status.Detail)
 	}
 }
 
@@ -1556,7 +1559,7 @@ func TestResetModePickerExecutesSelectedMode(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := model{
 		repo:          fixture.repo,
-		status:        state.New().WithResetModePick("Choose reset mode.", "Preview..."),
+		status:        state.New().WithResetModePick("Choose a reset mode.", ""),
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
@@ -1574,7 +1577,7 @@ func TestResetModePickerExecutesSelectedMode(t *testing.T) {
 	m.status.Selected = fixture.initialHash
 	m.status.ResetMode = state.ResetModeSoft
 
-	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	got := gotModel.(model)
 	if cmd == nil {
 		t.Fatal("expected async reset execution command, got nil")
@@ -1582,8 +1585,36 @@ func TestResetModePickerExecutesSelectedMode(t *testing.T) {
 	if got.status.Mode != state.ModeLoading {
 		t.Fatalf("expected loading mode on execute, got %s", got.status.Mode)
 	}
-	if !strings.Contains(got.status.Message, "Soft reset...") {
+	if got.status.Message != "Soft reset..." {
 		t.Fatalf("expected soft reset running message, got %q", got.status.Message)
+	}
+}
+
+func TestResetModePickerRendersCompactResetOnly(t *testing.T) {
+	m := model{
+		status: state.Status{
+			Mode:      state.ModeResetModePick,
+			Action:    state.ActionReset,
+			Message:   "Choose a reset mode.",
+			Detail:    "",
+			ResetMode: state.ResetModeMixed,
+		},
+	}
+	if got := renderStatusCompact(m.status); got != ok.Render("Reset") {
+		t.Fatalf("expected compact reset status to hide extra text, got %q", got)
+	}
+}
+
+func TestRenderResetModePopupUsesSingleModeList(t *testing.T) {
+	got := renderResetModePopup(60)
+	if strings.Contains(got, "enter: execute") {
+		t.Fatalf("expected reset popup to hide enter trigger, got %q", got)
+	}
+	if strings.Count(got, "s: soft") != 1 || strings.Count(got, "m: mixed") != 1 || strings.Count(got, "h: hard") != 1 {
+		t.Fatalf("expected single-line mode list, got %q", got)
+	}
+	if !strings.Contains(got, "Reset mode") || !strings.Contains(got, "Choose a reset mode.") || !strings.Contains(got, "esc: back") {
+		t.Fatalf("expected reset popup to include title, body, and esc help, got %q", got)
 	}
 }
 

@@ -46,8 +46,8 @@ func buildRebasePreview(target string, currentOnly, targetOnly int) state.Status
 
 func buildResetPreview(target string, rs git.Status, currentOnly, targetOnly int) state.Status {
 	status := state.New().WithResetModePick(
-		"Choose reset mode.",
-		"Preview: HEAD "+shorten(rs.Head, 12)+" -> "+target+"  |  "+countDetail(currentOnly, targetOnly)+"\nWorktree: "+string(worktreeState(rs))+"\n\ns: soft  •  m: mixed  •  h: hard  •  enter: execute  •  esc: back",
+		"Choose a reset mode.",
+		"",
 	)
 	status.Selected = target
 	status.ResetMode = state.ResetModeMixed

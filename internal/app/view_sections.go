@@ -38,7 +38,7 @@ func renderStatusCompact(s state.Status) string {
 	case state.ModeLoading:
 		return accent.Render("Loading") + " | " + msg
 	case state.ModeResetModePick:
-		return ok.Render("Reset") + " | " + msg
+		return ok.Render("Reset")
 	case state.ModeBlocked:
 		return warn.Render("Blocked") + " | " + msg
 	default:
@@ -196,7 +196,7 @@ func renderActionHelpLines(m model) []string {
 	case state.ModeTargetPick:
 		return []string{"• up/down: choose target            • enter: preview", "• esc: back"}
 	case state.ModeResetModePick:
-		return []string{"• s: soft  •  m: mixed  •  h: hard", "• enter: execute        • esc: back"}
+		return []string{"• s: soft  •  m: mixed  •  h: hard", "• esc: back"}
 	case state.ModeOutcomePreview:
 		if m.status.CanExecute {
 			return []string{"• enter: execute                    • esc: back"}

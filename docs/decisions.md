@@ -26,6 +26,13 @@
 - Size graph paging from the actual graph rail height instead of an arbitrary 76% multiplier so the graph uses the full vertical space available beside the stacked side rail.
 - Keep the graph content area aligned to the graph rail's inner height so the rendered graph fills the same vertical envelope as the stacked Local / Remote / Tags rail.
 
+## 2026-06-30: Graph layout uses shared-height grid cells, not independent boxes
+
+- Treat the Graph area and the right rail as cells in one shared-height grid row.
+- Let the parent row determine the outer height, then let each cell consume that height with its own border and padding accounting.
+- Keep `Local / Remote / Tags` as stacked child cells that split the right rail height and let the last cell absorb remainder height.
+- Prevent width overflow inside any graph cell so wrapping cannot break the shared-height contract.
+
 ## 2026-06-30: Popup overlays must replace covered cells, not insert after them
 
 - Confirm and loading popups are rendered as body overlays, but the overlay layer must replace the covered region instead of inserting itself before the remaining line content.

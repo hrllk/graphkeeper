@@ -27,7 +27,7 @@ func TestBuildActionPreview(t *testing.T) {
 		{name: "rebase same commit", action: state.ActionRebase, target: "feature", rs: git.Status{Head: "abc123"}, wantAction: state.ActionRebase, wantMsg: "Already aligned.", wantDetail: "Target already matches HEAD.", wantCanExec: true},
 		{name: "rebase base history", action: state.ActionRebase, target: "feature", rs: git.Status{Head: "abc123"}, currentOnly: 4, targetOnly: 0, wantAction: state.ActionRebase, wantMsg: "Target already in history.", wantDetail: "Current commits will replay onto feature. Current: 4  Target: 0", wantCanExec: true},
 		{name: "rebase normal", action: state.ActionRebase, target: "feature", rs: git.Status{Head: "abc123"}, currentOnly: 4, targetOnly: 2, wantAction: state.ActionRebase, wantMsg: "Rebase onto target.", wantDetail: "Current: 4  Target: 2  |  target: feature", wantCanExec: true},
-		{name: "reset", action: state.ActionReset, target: "feature", rs: git.Status{Head: "abcdef123456", Root: "/repo"}, currentOnly: 1, targetOnly: 2, wantAction: state.ActionReset, wantMsg: "Choose reset mode.", wantDetail: "Preview: HEAD abcdef123456 -> feature  |  Current: 1  Target: 2\nWorktree: clean\n\ns: soft  •  m: mixed  •  h: hard  •  enter: execute  •  esc: back", wantCanExec: true},
+		{name: "reset", action: state.ActionReset, target: "feature", rs: git.Status{Head: "abcdef123456", Root: "/repo"}, currentOnly: 1, targetOnly: 2, wantAction: state.ActionReset, wantMsg: "Choose a reset mode.", wantDetail: "", wantCanExec: true},
 		{name: "unknown", action: state.ActionNone, target: "feature", rs: git.Status{Head: "abc123"}, wantAction: state.ActionNone, wantMsg: "No action selected.", wantDetail: "feature", wantCanExec: false},
 	}
 

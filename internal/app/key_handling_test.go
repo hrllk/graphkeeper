@@ -154,25 +154,42 @@ func TestTargetPickEnterStartsPreview(t *testing.T) {
 func TestResetModePickerKeyHandling(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root, Branch: "main", Head: fixture.initialHash})
-	m.status = state.New().WithResetModePick("Choose reset mode.", "Preview...")
+	m.status = state.New().WithResetModePick("Choose a reset mode.", "")
 	m.status.Selected = fixture.initialHash
 
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
 	got := gotModel.(model)
-	if cmd != nil {
-		t.Fatalf("expected reset mode toggle to stay synchronous, got %v", cmd)
+	if cmd == nil {
+		t.Fatal("expected hard reset key to trigger execution")
 	}
 	if got.status.ResetMode != state.ResetModeHard {
 		t.Fatalf("expected hard reset selection, got %s", got.status.ResetMode)
 	}
-
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	got = gotModel.(model)
-	if cmd == nil {
-		t.Fatal("expected reset execution command on enter")
-	}
 	if got.status.Mode != state.ModeLoading {
 		t.Fatalf("expected loading mode while executing reset, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Hard reset..." {
+		t.Fatalf("expected hard reset toast, got %q", got.status.Message)
+	}
+}
+
+func TestResetModePickerIgnoresEnter(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root, Branch: "main", Head: fixture.initialHash})
+	m.status = state.New().WithResetModePick("Choose a reset mode.", "")
+	m.status.Selected = fixture.initialHash
+	m.status.ResetMode = state.ResetModeMixed
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected enter to be ignored, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeResetModePick {
+		t.Fatalf("expected reset mode picker to stay open, got %s", got.status.Mode)
+	}
+	if got.status.ResetMode != state.ResetModeMixed {
+		t.Fatalf("expected reset mode to stay unchanged, got %s", got.status.ResetMode)
 	}
 }
 

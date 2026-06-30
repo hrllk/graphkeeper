@@ -79,7 +79,11 @@ func renderAppView(m model) string {
 	centeredBody := applyOuterMargins(body, bodyWidth, bodyHeight, hMargin, topMargin, max(bottomMargin-1, 0))
 
 	if m.status.Mode == state.ModeConfirm || m.status.Mode == state.ModeResetModePick {
-		centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
+		if m.status.Mode == state.ModeResetModePick {
+			centeredBody = overlayPopup(centeredBody, renderResetModePopup(bodyWidth))
+		} else {
+			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
+		}
 	}
 	if m.status.Mode == state.ModeLoading && !m.branchOpen {
 		centeredBody = overlayPopup(centeredBody, renderLoadingPopup(m, bodyWidth))
@@ -123,13 +127,29 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 	helpText := "y: yes  •  n: no"
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
 		helpText = "m: merge  •  r: rebase  •  esc: cancel"
-	} else if m.status.Mode == state.ModeResetModePick {
-		helpText = "s: soft  •  m: mixed  •  h: hard  •  enter: execute  •  esc: back"
 	}
 	return popupBox.Render(
 		titleStyle.Render(popupTitle) + "\n\n" +
 			descStyle.Render(m.status.Detail) + "\n\n" +
 			helpStyle.Render(helpText),
+	)
+}
+
+func renderResetModePopup(bodyWidth int) string {
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	bodyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	popupBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Padding(1, 2).
+		Width(popupWidthForBody(bodyWidth, 32, 50)).
+		Align(lipgloss.Center)
+	return popupBox.Render(
+		titleStyle.Render("Reset mode") + "\n" +
+			bodyStyle.Render("Choose a reset mode.") + "\n\n" +
+			bodyStyle.Render("s: soft  •  m: mixed  •  h: hard") + "\n\n" +
+			helpStyle.Render("esc: back"),
 	)
 }
 
