@@ -8,16 +8,16 @@ import (
 
 func layoutShellMargins(m model) (hMargin, topMargin, bottomMargin int) {
 	hMargin = int(float64(m.width) * 0.10)
-	topMargin = int(float64(m.height) * 0.10)
-	bottomMargin = int(float64(m.height) * 0.10)
+	topMargin = int(float64(m.height) * 0.12)
+	bottomMargin = int(float64(m.height) * 0.12)
 	if hMargin < 2 {
 		hMargin = 2
 	}
-	if topMargin < 1 {
-		topMargin = 1
+	if topMargin < 2 {
+		topMargin = 2
 	}
-	if bottomMargin < 1 {
-		bottomMargin = 1
+	if bottomMargin < 2 {
+		bottomMargin = 2
 	}
 	if maxMargin := (m.width - 80) / 2; maxMargin >= 0 && hMargin > maxMargin {
 		hMargin = maxMargin
@@ -47,15 +47,15 @@ func layoutHeaderHeight(bodyHeight int) int {
 	if bodyHeight <= 0 {
 		return 0
 	}
-	height := 9
+	height := 12
 	if bodyHeight < 24 {
-		height = 8
+		height = 11
 	}
 	if height > bodyHeight-12 {
 		height = bodyHeight - 12
 	}
-	if height < 7 {
-		height = 7
+	if height < 9 {
+		height = 9
 	}
 	if height >= bodyHeight {
 		height = bodyHeight - 1
@@ -78,6 +78,15 @@ func graphBoxHeightForModel(m *model) int {
 	hMargin, topMargin, bottomMargin := layoutShellMargins(*m)
 	_, bodyHeight := layoutShellBodySize(*m, hMargin, topMargin, bottomMargin)
 	return layoutGraphRailHeight(bodyHeight)
+}
+
+func graphContentHeightForModel(m *model) int {
+	railHeight := graphBoxHeightForModel(m)
+	contentHeight := railHeight - 3
+	if contentHeight < 1 {
+		return 1
+	}
+	return contentHeight
 }
 
 func paneWidth(total int, ratio float64) int {

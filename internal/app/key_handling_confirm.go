@@ -42,6 +42,21 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 	case state.ActionForcePush:
 		m.status = loadingToast("Force pushing...")
 		return m, executeForcePush(m.repo, m.repoStatus.Branch, m.commitLimit)
+	case state.ActionCheckout:
+		target := m.status.Selected
+		if target == "" {
+			m.status = deriveStatus(m.repoStatus)
+			return m, nil
+		}
+		m.status = loadingToast("Checking out...")
+		return m, executeCheckout(m.repo, target, m.commitLimit)
+	case state.ActionCreateBranch:
+		base := m.status.Selected
+		m.branchBase = base
+		m.branchOpen = true
+		m.branchDraft = ""
+		m.status = loadingToast("Enter a branch name.")
+		return m, nil
 	case state.ActionReset, state.ActionMerge, state.ActionRebase:
 		target := m.status.Selected
 		if action == state.ActionReset {

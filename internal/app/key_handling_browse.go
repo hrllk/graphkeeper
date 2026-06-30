@@ -191,10 +191,10 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 			base = focus.Hash
 		}
-		m.branchBase = base
-		m.branchOpen = true
-		m.branchDraft = ""
-		m.status = loadingToast("Enter a branch name.")
+		titleMsg := "Create new branch?"
+		m.status = state.New().WithConfirm(state.ActionCreateBranch, titleMsg, "Choose a branch name after confirming.")
+		m.status.Title = titleMsg
+		m.status.Selected = base
 		return m, nil
 	default:
 		return m, nil
@@ -206,8 +206,15 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "space", " ":
 		if m.activeSection == sectionCurrent || m.activeSection == sectionRemote {
 			if target := activeSectionTarget(m); target != "" {
-				m.status = loadingToast("Checking out " + target + "...")
-				return m, executeCheckout(m.repo, target, 0)
+				if m.repoStatus.WorktreeDirty {
+					m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first.")
+					return m, nil
+				}
+				titleMsg := "Checkout branch?"
+				m.status = state.New().WithConfirm(state.ActionCheckout, titleMsg, "Switch to "+target+".")
+				m.status.Title = titleMsg
+				m.status.Selected = target
+				return m, nil
 			}
 			m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move to a local or remote branch.")
 			return m, nil
@@ -233,7 +240,11 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.activeSection == sectionGraph {
-			if !pullReady(m.repoStatus) || !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+			if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+				return m, nil
+			}
+			if !pullReady(m.repoStatus) {
+				m.status = actionPull(m.repoStatus)
 				return m, nil
 			}
 			m.status = loadingToast("Fetching upstream...")
@@ -251,10 +262,10 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 				base = focus.Hash
 			}
-			m.branchBase = base
-			m.branchOpen = true
-			m.branchDraft = ""
-			m.status = loadingToast("Enter a branch name.")
+			titleMsg := "Create new branch?"
+			m.status = state.New().WithConfirm(state.ActionCreateBranch, titleMsg, "Choose a branch name after confirming.")
+			m.status.Title = titleMsg
+			m.status.Selected = base
 			return m, nil
 		}
 		return m, nil

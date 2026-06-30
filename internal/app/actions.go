@@ -31,6 +31,9 @@ func actionPull(rs git.Status) state.Status {
 	if rs.Root == "" {
 		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRepo, "Not inside a Git repository.", "Run this tool from a repo root."), rs)
 	}
+	if rs.WorktreeDirty {
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first."), rs)
+	}
 	if rs.Detached {
 		return applyRepoMetadata(state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pull needs a branch with an upstream."), rs)
 	}
@@ -47,7 +50,7 @@ func actionPull(rs git.Status) state.Status {
 }
 
 func pullReady(rs git.Status) bool {
-	return rs.Root != "" && !rs.Detached && !rs.NoRemote && !rs.NoUpstream && !rs.MergeInProgress
+	return rs.Root != "" && !rs.WorktreeDirty && !rs.Detached && !rs.NoRemote && !rs.NoUpstream && !rs.MergeInProgress
 }
 
 func canCreateBranch(rs git.Status) bool {

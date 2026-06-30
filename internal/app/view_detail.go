@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"hrllk/graphkeeper/internal/state"
 )
 
@@ -11,18 +13,8 @@ func (m model) renderGlobalContent(width, height int) string {
 		return ""
 	}
 	lines := make([]string, 0, height)
-	lines = append(lines, title.Render("Mode"))
-	lines = append(lines, renderStatusCompact(m.status))
-	lines = append(lines, "")
-	lines = append(lines, title.Render("Hotkeys"))
-	lines = append(lines, "tab / shift+tab   section")
-	lines = append(lines, "j / k             move")
-	lines = append(lines, "f                 fetch")
-	lines = append(lines, "q                 quit")
-	lines = append(lines, "")
-	lines = append(lines, title.Render("Repo"))
-	lines = append(lines, fmt.Sprintf("branch: %-12s • head: %s", shorten(m.repoStatus.Branch, 10), shorten(m.repoStatus.Head, 7)))
-	lines = append(lines, fmt.Sprintf("upstream: %-10s • remote: %s", shorten(emptyDash(m.repoStatus.Upstream), 10), shorten(emptyDash(m.repoStatus.Remote), 10)))
+	lines = append(lines, lipgloss.PlaceHorizontal(width, lipgloss.Center, "Mode: "+renderStatusCompact(m.status)))
+	lines = append(lines, lipgloss.PlaceHorizontal(width, lipgloss.Center, "tab / shift+tab  section  •  j / k  move  •  f / q  fetch / quit"))
 	return fitBlockLines(lines, height)
 }
 

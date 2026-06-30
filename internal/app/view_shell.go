@@ -68,8 +68,9 @@ func renderAppView(m model) string {
 		graphWidth = 0
 	}
 	rightWidth := bodyWidth - graphWidth
+	graphContentHeight := graphContentHeightForModel(&m)
 	graphBox := m.getBoxStyle(sectionGraph).Width(graphWidth).Height(graphRailHeight).Render(
-		"Graph\n" + m.renderGraphContent(max(graphWidth-4, 0), max(graphRailHeight-3, 0)),
+		"Graph\n" + m.renderGraphContent(max(graphWidth-4, 0), graphContentHeight),
 	)
 	rightRail := m.renderRightRail(rightWidth, graphRailHeight)
 	graphRow := lipgloss.JoinHorizontal(lipgloss.Top, graphBox, rightRail)

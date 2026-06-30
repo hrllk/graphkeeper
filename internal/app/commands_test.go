@@ -495,6 +495,17 @@ func TestExecuteResetModes(t *testing.T) {
 }
 
 func TestCreateBranch(t *testing.T) {
+	t.Run("empty name blocks", func(t *testing.T) {
+		fixture := newCommandRepo(t)
+		got, ok := cmdResult(t, createBranch(fixture.repo, "", "main", 40)).(createdBranchMsg)
+		if !ok {
+			t.Fatalf("expected createdBranchMsg, got %T", cmdResult(t, createBranch(fixture.repo, "", "main", 40)))
+		}
+		if got.err == nil {
+			t.Fatal("expected empty branch name to block branch creation")
+		}
+	})
+
 	t.Run("clean worktree", func(t *testing.T) {
 		fixture := newCommandRepo(t)
 		got, ok := cmdResult(t, createBranch(fixture.repo, "feature", "main", 40)).(createdBranchMsg)

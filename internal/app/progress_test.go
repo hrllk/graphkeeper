@@ -12,7 +12,7 @@ func TestLoadingToastUsesSharedDetail(t *testing.T) {
 		"Fetching for push...",
 		"Preparing reset...",
 		"Enter a branch name.",
-		"Checking out target...",
+		"Checking out...",
 		"Aborting...",
 		"Fetching upstream...",
 		"Previewing...",

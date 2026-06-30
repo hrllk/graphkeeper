@@ -49,6 +49,7 @@ func TestActionPullCases(t *testing.T) {
 		wantMsg string
 	}{
 		{name: "no repo", rs: git.Status{}, want: state.ModeBlocked, wantBlk: state.BlockNoRepo},
+		{name: "dirty worktree", rs: git.Status{Root: "/repo", WorktreeDirty: true}, want: state.ModeBlocked, wantBlk: state.BlockDirtyTree, wantMsg: "Working tree is dirty."},
 		{name: "detached", rs: git.Status{Root: "/repo", Detached: true}, want: state.ModeBlocked, wantBlk: state.BlockDetached},
 		{name: "merge in progress", rs: git.Status{Root: "/repo", MergeInProgress: true}, want: state.ModeBlocked, wantBlk: state.BlockUnknown},
 		{name: "rebase in progress", rs: git.Status{Root: "/repo", RebaseInProgress: true}, want: state.ModeBlocked, wantBlk: state.BlockUnknown},
@@ -81,6 +82,7 @@ func TestPullReadyCases(t *testing.T) {
 	}{
 		{name: "ready", rs: git.Status{Root: "/repo"}, want: true},
 		{name: "no repo", rs: git.Status{}, want: false},
+		{name: "dirty worktree", rs: git.Status{Root: "/repo", WorktreeDirty: true}, want: false},
 		{name: "detached", rs: git.Status{Root: "/repo", Detached: true}, want: false},
 		{name: "no remote", rs: git.Status{Root: "/repo", NoRemote: true}, want: false},
 		{name: "no upstream", rs: git.Status{Root: "/repo", NoUpstream: true}, want: false},

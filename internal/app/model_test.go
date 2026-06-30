@@ -163,17 +163,28 @@ func TestGraphRailMatchesStackedSideRailHeight(t *testing.T) {
 	}
 }
 
-func TestShellLayoutUsesTenPercentMargins(t *testing.T) {
+func TestGraphContentMatchesStackedSideRailContent(t *testing.T) {
+	m := model{width: 140, height: 60}
+	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
+	_, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	graphRailHeight := layoutGraphRailHeight(bodyHeight)
+	want := graphRailHeight - 3
+	if got := graphContentHeightForModel(&m); got != want {
+		t.Fatalf("expected graph content height %d, got %d", want, got)
+	}
+}
+
+func TestShellLayoutUsesTwelvePercentMargins(t *testing.T) {
 	m := model{width: 140, height: 60}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	if hMargin != 14 {
 		t.Fatalf("expected horizontal margin to use 10%% of width, got %d", hMargin)
 	}
-	if topMargin != 6 {
-		t.Fatalf("expected top margin to use 10%% of height, got %d", topMargin)
+	if topMargin != 7 {
+		t.Fatalf("expected top margin to use 12%% of height, got %d", topMargin)
 	}
-	if bottomMargin != 6 {
-		t.Fatalf("expected bottom margin to use 10%% of height, got %d", bottomMargin)
+	if bottomMargin != 7 {
+		t.Fatalf("expected bottom margin to use 12%% of height, got %d", bottomMargin)
 	}
 }
 
@@ -183,14 +194,11 @@ func TestGraphPageSizeMatchesGraphPaneHeight(t *testing.T) {
 	if got <= 0 {
 		t.Fatalf("expected positive graph page size, got %d", got)
 	}
-	boxHeight := graphBoxHeightForModel(&m)
-	if boxHeight <= 0 {
-		t.Fatalf("expected positive graph box height, got %d", boxHeight)
+	contentHeight := graphContentHeightForModel(&m)
+	if contentHeight <= 0 {
+		t.Fatalf("expected positive graph content height, got %d", contentHeight)
 	}
-	if boxHeight >= m.height {
-		t.Fatalf("expected graph box height to stay within shell height, got %d of %d", boxHeight, m.height)
-	}
-	want := graph.PageSize(boxHeight)
+	want := graph.PageSize(contentHeight)
 	if got != want {
 		t.Fatalf("expected graph page size %d, got %d", want, got)
 	}
@@ -203,7 +211,7 @@ func TestRenderAppViewKeepsShellPlacementFullWidth(t *testing.T) {
 		status: state.New().WithBrowse(),
 	}
 	got := renderAppView(m)
-	for _, want := range []string{"Global", "Hotkeys", "Mode"} {
+	for _, want := range []string{"Global", "Browse", "tab / shift+tab"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected render to contain %q, got %q", want, got)
 		}
@@ -465,7 +473,7 @@ func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
 		},
 	}
 	got := m.renderGlobalContent(40, 14)
-	for _, want := range []string{"Mode", "Hotkeys", "tab / shift+tab", "j / k", "f", "q"} {
+	for _, want := range []string{"Mode: Browse", "tab / shift+tab", "j / k  move", "f / q  fetch / quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected global hotkeys to include %q, got %q", want, got)
 		}
@@ -761,11 +769,14 @@ func TestSpaceChecksOutFromRemoteSection(t *testing.T) {
 	}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	got := gotModel.(model)
-	if cmd == nil {
-		t.Fatal("expected space to checkout from remote section")
+	if cmd != nil {
+		t.Fatalf("expected checkout confirm to stay synchronous, got %v", cmd)
 	}
-	if got.status.Mode != state.ModeLoading {
-		t.Fatalf("expected checkout to set loading mode, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected checkout confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionCheckout {
+		t.Fatalf("expected checkout action, got %s", got.status.Action)
 	}
 }
 

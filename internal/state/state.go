@@ -18,18 +18,19 @@ const (
 type Action string
 
 const (
-	ActionNone        Action = ""
-	ActionPull        Action = "pull"
-	ActionAbort       Action = "abort"
-	ActionCheckout    Action = "checkout"
-	ActionMerge       Action = "merge"
-	ActionRebase      Action = "rebase"
-	ActionReset       Action = "reset"
-	ActionPush        Action = "push"
-	ActionForcePush   Action = "force-push"
-	ActionSetUpstream Action = "set-upstream"
-	ActionPullMerge   Action = "pull-merge"
-	ActionPullRebase  Action = "pull-rebase"
+	ActionNone         Action = ""
+	ActionPull         Action = "pull"
+	ActionAbort        Action = "abort"
+	ActionCheckout     Action = "checkout"
+	ActionMerge        Action = "merge"
+	ActionRebase       Action = "rebase"
+	ActionReset        Action = "reset"
+	ActionCreateBranch Action = "create-branch"
+	ActionPush         Action = "push"
+	ActionForcePush    Action = "force-push"
+	ActionSetUpstream  Action = "set-upstream"
+	ActionPullMerge    Action = "pull-merge"
+	ActionPullRebase   Action = "pull-rebase"
 )
 
 type BlockReason string

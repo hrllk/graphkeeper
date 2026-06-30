@@ -143,9 +143,17 @@ func renderActionHelpLines(m model) []string {
 			lines = append(lines, "• s: reset         • ctrl+u/d: scroll")
 			lines = append(lines, "• gg: top         • G: bottom")
 			lines = append(lines, "• H: jump to HEAD")
-			lines = append(lines, "• n: new branch")
+			if canCreateBranch(m.repoStatus) {
+				lines = append(lines, "• n: new branch")
+			} else {
+				lines = append(lines, disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
+			}
 		case sectionCurrent, sectionRemote:
-			lines = append(lines, "• space: checkout")
+			if m.repoStatus.WorktreeDirty {
+				lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(dirty)"))
+			} else {
+				lines = append(lines, "• space: checkout")
+			}
 			if m.activeSection == sectionCurrent {
 				if pullReady(m.repoStatus) {
 					lines = append(lines, "• p: pull           • P: push")
@@ -173,7 +181,11 @@ func renderActionHelpLines(m model) []string {
 				}
 			}
 			if m.activeSection == sectionCurrent {
-				lines = append(lines, "• n: new branch")
+				if canCreateBranch(m.repoStatus) {
+					lines = append(lines, "• n: new branch")
+				} else {
+					lines = append(lines, disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
+				}
 			}
 		case sectionTags:
 			lines = append(lines, "• no section actions")

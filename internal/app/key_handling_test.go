@@ -48,6 +48,73 @@ func TestBranchOpenEscCancelsDraft(t *testing.T) {
 	}
 }
 
+func TestCreateBranchShortcutOpensConfirmBeforeInput(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+		GraphCommits:  []git.GraphCommit{{Hash: fixture.initialHash}},
+	})
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected create branch shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionCreateBranch {
+		t.Fatalf("expected create-branch action, got %s", got.status.Action)
+	}
+	if got.status.Title != "Create new branch?" {
+		t.Fatalf("expected confirm title, got %q", got.status.Title)
+	}
+	if got.status.Selected != fixture.initialHash {
+		t.Fatalf("expected branch base to be stored in confirm state, got %q", got.status.Selected)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected confirm acceptance to stay synchronous, got %v", cmd)
+	}
+	if !got.branchOpen {
+		t.Fatal("expected branch name input to open after confirm")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Enter a branch name." {
+		t.Fatalf("expected branch prompt loading state, got %+v", got.status)
+	}
+	if got.branchBase != fixture.initialHash {
+		t.Fatalf("expected branch base to be copied into input state, got %q", got.branchBase)
+	}
+}
+
+func TestCreateBranchShortcutBlockedWhenDirty(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		WorktreeDirty: true,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+	})
+	m.activeSection = sectionGraph
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected dirty branch creation to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBlocked {
+		t.Fatalf("expected blocked mode, got %s", got.status.Mode)
+	}
+	if got.status.Block != state.BlockDirtyTree {
+		t.Fatalf("expected dirty tree block, got %s", got.status.Block)
+	}
+}
+
 func TestTargetPickRejectsEmptySelection(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root})
@@ -134,6 +201,35 @@ func TestPullShortcutAvailableInCurrentSection(t *testing.T) {
 	}
 }
 
+func TestPullShortcutBlockedWhenDirty(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		Upstream:      "origin/main",
+		Remote:        "origin",
+		WorktreeDirty: true,
+		LocalBranches: []string{"main"},
+		Tracking: map[string]git.BranchTracking{
+			"main": {Behind: 1},
+		},
+	})
+	m.activeSection = sectionCurrent
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected dirty pull shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBlocked {
+		t.Fatalf("expected blocked mode, got %s", got.status.Mode)
+	}
+	if got.status.Block != state.BlockDirtyTree {
+		t.Fatalf("expected dirty tree block, got %s", got.status.Block)
+	}
+}
+
 func TestPullShortcutInGraphSectionRequiresLocalPointer(t *testing.T) {
 	m := testKeyHandlingModel(nil, git.Status{
 		Root:       "/repo",
@@ -157,6 +253,65 @@ func TestPullShortcutInGraphSectionRequiresLocalPointer(t *testing.T) {
 	}
 	if got.status.Mode != state.ModeBrowse {
 		t.Fatalf("expected browse mode unchanged, got %s", got.status.Mode)
+	}
+}
+
+func TestCheckoutShortcutOpensConfirmWhenClean(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:           fixture.root,
+		Branch:         "main",
+		Head:           fixture.initialHash,
+		RemoteBranches: []string{"origin/main"},
+		LocalBranches:  []string{"main"},
+		Remote:         "origin",
+		HasCommits:     true,
+	})
+	m.activeSection = sectionRemote
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected checkout shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionCheckout {
+		t.Fatalf("expected checkout action, got %s", got.status.Action)
+	}
+	if got.status.Title != "Checkout branch?" {
+		t.Fatalf("expected checkout confirm title, got %q", got.status.Title)
+	}
+	if got.status.Selected != "origin/main" {
+		t.Fatalf("expected selected checkout target to be stored, got %q", got.status.Selected)
+	}
+}
+
+func TestCheckoutShortcutBlockedWhenDirty(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:           fixture.root,
+		Branch:         "main",
+		Head:           fixture.initialHash,
+		RemoteBranches: []string{"origin/main"},
+		LocalBranches:  []string{"main"},
+		Remote:         "origin",
+		WorktreeDirty:  true,
+		HasCommits:     true,
+	})
+	m.activeSection = sectionRemote
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected dirty checkout to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBlocked {
+		t.Fatalf("expected blocked mode, got %s", got.status.Mode)
+	}
+	if got.status.Block != state.BlockDirtyTree {
+		t.Fatalf("expected dirty tree block, got %s", got.status.Block)
 	}
 }
 
