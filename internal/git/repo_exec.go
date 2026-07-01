@@ -33,6 +33,23 @@ func (r *Repo) DeleteRemoteBranch(ctx context.Context, remote, branch string) (s
 	return r.Run("push", remote, "--delete", branch)
 }
 
+func (r *Repo) StashAll(ctx context.Context, message string) error {
+	_, err := r.git(ctx, "stash", "push", "--include-untracked", "-m", message)
+	return err
+}
+
+func (r *Repo) CleanWorkingTree(ctx context.Context, includeIgnored bool) error {
+	if _, err := r.git(ctx, "reset", "--hard"); err != nil {
+		return err
+	}
+	args := []string{"clean", "-fd"}
+	if includeIgnored {
+		args = append(args, "-x")
+	}
+	_, err := r.git(ctx, args...)
+	return err
+}
+
 func (r *Repo) worktreeDirty(ctx context.Context) (bool, error) {
 	out, err := r.git(ctx, "status", "--porcelain")
 	if err != nil {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -190,6 +191,73 @@ func TestLoadStashState(t *testing.T) {
 	}
 	if got.entries[0].BaseHash == "" || got.entries[0].Ref == "" {
 		t.Fatalf("expected stash entry to include base hash and ref, got %+v", got.entries[0])
+	}
+}
+
+func TestExecuteStashAllIncludesUntracked(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, "tracked.txt", "tracked\n")
+	runGit(t, fixture.root, "add", "tracked.txt")
+	writeRepoFile(t, fixture.root, "untracked.txt", "untracked\n")
+
+	got, ok := cmdResult(t, executeStashAll(fixture.repo, 40, "graphkeeper: local cleanup")).(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeStashAll(fixture.repo, 40, "graphkeeper: local cleanup")))
+	}
+	if got.action != state.ActionStash {
+		t.Fatalf("expected stash action, got %s", got.action)
+	}
+	if got.err != nil {
+		t.Fatalf("executeStashAll err = %v", got.err)
+	}
+	if got.status.WorktreeDirty {
+		t.Fatalf("expected stash to leave worktree clean, got %+v", got.status)
+	}
+	if len(got.status.LocalBranches) == 0 {
+		t.Fatalf("expected status refresh after stash, got %+v", got.status)
+	}
+	stashes, err := fixture.repo.Stashes(context.Background())
+	if err != nil {
+		t.Fatalf("repo.Stashes err = %v", err)
+	}
+	if len(stashes) != 1 {
+		t.Fatalf("expected one stash entry, got %+v", stashes)
+	}
+}
+
+func TestExecuteCleanWorkingTreeRemovesTrackedAndUntracked(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, "file.txt", "changed\n")
+	writeRepoFile(t, fixture.root, "untracked.txt", "temp\n")
+
+	got, ok := cmdResult(t, executeCleanWorkingTree(fixture.repo, 40, false)).(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeCleanWorkingTree(fixture.repo, 40, false)))
+	}
+	if got.action != state.ActionCleanWorkingTree {
+		t.Fatalf("expected clean action, got %s", got.action)
+	}
+	if got.err != nil {
+		t.Fatalf("executeCleanWorkingTree err = %v", got.err)
+	}
+	if got.status.WorktreeDirty {
+		t.Fatalf("expected clean to leave worktree clean, got %+v", got.status)
+	}
+	if _, err := os.Stat(filepath.Join(fixture.root, "untracked.txt")); !os.IsNotExist(err) {
+		t.Fatalf("expected untracked file to be removed, stat err=%v", err)
+	}
+}
+
+func TestCleanWorkingTreeCanRemoveIgnoredFiles(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, ".gitignore", "ignored.txt\n")
+	writeRepoFile(t, fixture.root, "ignored.txt", "ignored\n")
+
+	if err := fixture.repo.CleanWorkingTree(context.Background(), true); err != nil {
+		t.Fatalf("CleanWorkingTree(includeIgnored=true) err = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(fixture.root, "ignored.txt")); !os.IsNotExist(err) {
+		t.Fatalf("expected ignored file to be removed, stat err=%v", err)
 	}
 }
 

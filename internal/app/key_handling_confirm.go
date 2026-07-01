@@ -47,6 +47,12 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 		remote := m.activeSection == sectionRemote
 		m.status = loadingToast(deleteBranchLoadingMessage(remote))
 		return m, executeDeleteBranch(m.repo, target, remote, m.commitLimit)
+	case state.ActionStash:
+		m.status = loadingToast("Stashing changes...")
+		return m, executeStashAll(m.repo, m.commitLimit, "graphkeeper: local cleanup")
+	case state.ActionCleanWorkingTree:
+		m.status = loadingToast("Cleaning working tree...")
+		return m, executeCleanWorkingTree(m.repo, m.commitLimit, false)
 	case state.ActionCheckout:
 		target := m.status.Selected
 		if target == "" {

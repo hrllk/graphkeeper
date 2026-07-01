@@ -21,6 +21,23 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			strings.Contains(msg2.err.Error(), "Authentication failed") ||
 			strings.Contains(msg2.err.Error(), "Could not read from remote repository")
 
+		if msg2.action == state.ActionStash || msg2.action == state.ActionCleanWorkingTree {
+			if msg2.status.Root != "" {
+				m.repoStatus = msg2.status
+				syncBrowseState(&m, msg2.status)
+			}
+			reason := state.BlockUnknown
+			message := "Action failed."
+			if msg2.action == state.ActionStash {
+				message = "Stash failed."
+			} else {
+				message = "Working tree cleanup failed."
+			}
+			m.status = state.New().WithBlocked(reason, message, msg2.err.Error())
+			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
+			return m, nil
+		}
+
 		if msg2.action == state.ActionPush && !isAuthError && (strings.Contains(msg2.err.Error(), "[rejected]") || strings.Contains(msg2.err.Error(), "non-fast-forward")) {
 			status := m.repoStatus
 			if msg2.status.Root != "" {
@@ -110,6 +127,26 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.repoStatus = msg2.status
+	if msg2.action == state.ActionStash {
+		syncBrowseState(&m, msg2.status)
+		m.status = deriveStatus(msg2.status)
+		m.status.Message = "Changes stashed."
+		telemetry.Log("app", "execute_action", map[string]string{
+			"action": string(msg2.action),
+			"head":   msg2.status.Head,
+		})
+		return m, loadStashState(m.repo)
+	}
+	if msg2.action == state.ActionCleanWorkingTree {
+		syncBrowseState(&m, msg2.status)
+		m.status = deriveStatus(msg2.status)
+		m.status.Message = "Working tree cleaned."
+		telemetry.Log("app", "execute_action", map[string]string{
+			"action": string(msg2.action),
+			"head":   msg2.status.Head,
+		})
+		return m, nil
+	}
 	if msg2.action == state.ActionPush || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream || msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase {
 		m.handshakeCommits = make(map[string]bool)
 		syncBrowseState(&m, msg2.status)

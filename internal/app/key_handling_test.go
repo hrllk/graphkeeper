@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -148,6 +150,62 @@ func TestCreateBranchShortcutBlockedWhenMergeInProgress(t *testing.T) {
 	}
 }
 
+func TestStashShortcutOpensConfirmForDirtyLocalSection(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, "stash.txt", "stash\n")
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+		WorktreeDirty: true,
+	})
+	m.activeSection = sectionCurrent
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected stash shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionStash {
+		t.Fatalf("expected stash action, got %s", got.status.Action)
+	}
+	if got.status.Title != "Stash changes?" {
+		t.Fatalf("expected stash confirm title, got %q", got.status.Title)
+	}
+}
+
+func TestCleanShortcutOpensConfirmForDirtyLocalSection(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, "dirty.txt", "dirty\n")
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+		WorktreeDirty: true,
+	})
+	m.activeSection = sectionCurrent
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected clean shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionCleanWorkingTree {
+		t.Fatalf("expected clean-working-tree action, got %s", got.status.Action)
+	}
+	if got.status.Title != "Clean working tree?" {
+		t.Fatalf("expected clean confirm title, got %q", got.status.Title)
+	}
+}
+
 func TestDeleteBranchShortcutOpensConfirmForLocalBranch(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{
@@ -185,6 +243,119 @@ func TestDeleteBranchShortcutOpensConfirmForLocalBranch(t *testing.T) {
 	}
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Deleting branch..." {
 		t.Fatalf("expected delete loading state, got %+v", got.status)
+	}
+}
+
+func TestStashShortcutRefreshesStashState(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, "dirty.txt", "dirty\n")
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+		WorktreeDirty: true,
+	})
+	m.activeSection = sectionCurrent
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected stash shortcut to stay synchronous, got %v", cmd)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected stash acceptance to execute")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Stashing changes..." {
+		t.Fatalf("expected stash loading state, got %+v", got.status)
+	}
+
+	msg := cmd()
+	executed, ok := msg.(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", msg)
+	}
+	if executed.action != state.ActionStash {
+		t.Fatalf("expected stash executed action, got %s", executed.action)
+	}
+	gotModel, cmd = got.Update(executed)
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected stash success to refresh stash state")
+	}
+	msg = cmd()
+	loaded, ok := msg.(stashLoadedMsg)
+	if !ok {
+		t.Fatalf("expected stashLoadedMsg, got %T", msg)
+	}
+	if loaded.err != nil {
+		t.Fatalf("expected stash refresh to succeed, got %v", loaded.err)
+	}
+	gotModel, cmd = got.Update(loaded)
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no follow-up command after stash refresh, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode after stash, got %s", got.status.Mode)
+	}
+	if len(got.stashEntries) == 0 {
+		t.Fatal("expected stash list to refresh after stash")
+	}
+}
+
+func TestCleanShortcutRemovesTrackedAndUntrackedFiles(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, "file.txt", "changed\n")
+	writeRepoFile(t, fixture.root, "untracked.txt", "temp\n")
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+		WorktreeDirty: true,
+	})
+	m.activeSection = sectionCurrent
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected clean shortcut to stay synchronous, got %v", cmd)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected clean acceptance to execute")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Cleaning working tree..." {
+		t.Fatalf("expected clean loading state, got %+v", got.status)
+	}
+
+	msg := cmd()
+	executed, ok := msg.(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", msg)
+	}
+	if executed.action != state.ActionCleanWorkingTree {
+		t.Fatalf("expected clean executed action, got %s", executed.action)
+	}
+	gotModel, cmd = got.Update(executed)
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no follow-up command after clean, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode after clean, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Working tree cleaned." {
+		t.Fatalf("expected clean success message, got %q", got.status.Message)
+	}
+	if _, err := os.Stat(filepath.Join(fixture.root, "untracked.txt")); !os.IsNotExist(err) {
+		t.Fatalf("expected untracked file to be removed, stat err=%v", err)
 	}
 }
 

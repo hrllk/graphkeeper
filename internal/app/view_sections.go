@@ -162,6 +162,15 @@ func renderActionHelpLines(m model) []string {
 				lines = append(lines, disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
 			}
 		case sectionCurrent, sectionRemote:
+			if m.activeSection == sectionCurrent {
+				if m.repoStatus.WorktreeDirty {
+					lines = append(lines, "• s: stash changes")
+					lines = append(lines, "• c: clean working tree")
+				} else {
+					lines = append(lines, disabled.Render("• s: stash changes")+" "+muted.Render("(dirty only)"))
+					lines = append(lines, disabled.Render("• c: clean working tree")+" "+muted.Render("(dirty only)"))
+				}
+			}
 			if m.repoStatus.WorktreeDirty {
 				lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(dirty)"))
 			} else {

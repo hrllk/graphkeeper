@@ -145,6 +145,8 @@ func executeStashAll(repo *git.Repo, limit int, message string) tea.Cmd {
 1. tracked 변경사항은 `git reset --hard` 로 되돌린다.
 2. untracked 파일은 별도 제거 단계를 거친다.
 
+`git reset --hard` 는 tracked 파일만 HEAD 상태로 되돌린다. `untracked` 는 남기 때문에, "완전 정리"를 만들려면 `git clean -fd` 같은 별도 단계가 꼭 필요하다.
+
 가능한 구현 후보:
 
 - `git clean -fd`
@@ -457,3 +459,16 @@ func TestCleanWorkingTreeConfirmExplainsDiscard(t *testing.T)
 이 기능은 단순히 stash 버튼을 추가하는 것이 아니다.
 
 핵심은 `dirty` 를 "정리해야 할 현재 작업 상태"로 보고, 이를 `보존(stash)` 과 `폐기(clean)` 두 경로로 명확히 나누는 것이다.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | issues_open | 0 issues, 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+**UNRESOLVED:** none.
+**VERDICT:** ENG REVIEW CLEARED — ready to implement.

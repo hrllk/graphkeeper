@@ -39,6 +39,28 @@ func loadStashState(repo *git.Repo) tea.Cmd {
 	}
 }
 
+func executeStashAll(repo *git.Repo, limit int, message string) tea.Cmd {
+	return func() tea.Msg {
+		err := repo.StashAll(context.Background(), message)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionStash, err: statusErr}
+		}
+		return executedMsg{action: state.ActionStash, status: status, err: err}
+	}
+}
+
+func executeCleanWorkingTree(repo *git.Repo, limit int, includeIgnored bool) tea.Cmd {
+	return func() tea.Msg {
+		err := repo.CleanWorkingTree(context.Background(), includeIgnored)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionCleanWorkingTree, err: statusErr}
+		}
+		return executedMsg{action: state.ActionCleanWorkingTree, status: status, err: err}
+	}
+}
+
 func fetchRepoState(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if err := repo.Fetch(context.Background()); err != nil {

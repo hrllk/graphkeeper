@@ -132,6 +132,10 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 		helpText = "m: merge  •  r: rebase  •  esc: cancel"
 	} else if m.status.Action == state.ActionDeleteBranch {
 		helpText = "y: delete  •  n: cancel"
+	} else if m.status.Action == state.ActionStash {
+		helpText = "y: stash  •  n: cancel"
+	} else if m.status.Action == state.ActionCleanWorkingTree {
+		helpText = "y: clean  •  n: cancel"
 	}
 	return popupBox.Render(
 		titleStyle.Render(popupTitle) + "\n\n" +

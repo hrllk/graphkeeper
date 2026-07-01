@@ -250,6 +250,26 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.status = state.New().WithBlocked(state.BlockUnknown, "Checkout unavailable here.", "Use the Local or Remote section.")
 		return m, nil
+	case "s":
+		if m.activeSection == sectionCurrent {
+			if !m.repoStatus.WorktreeDirty {
+				m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is clean.", "Nothing to stash.")
+				return m, nil
+			}
+			m.status = confirmStashChanges()
+			return m, nil
+		}
+		return m, nil
+	case "c":
+		if m.activeSection == sectionCurrent {
+			if !m.repoStatus.WorktreeDirty {
+				m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is clean.", "Nothing to clean.")
+				return m, nil
+			}
+			m.status = confirmCleanWorkingTree()
+			return m, nil
+		}
+		return m, nil
 	case "a":
 		if m.activeSection == sectionCurrent && (m.repoStatus.MergeInProgress || m.repoStatus.RebaseInProgress) {
 			m.status = loadingToast("Aborting...")
@@ -300,4 +320,24 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+func confirmStashChanges() state.Status {
+	status := state.New().WithConfirm(
+		state.ActionStash,
+		"Stash changes?",
+		"This will save staged, unstaged, and untracked files.",
+	)
+	status.Title = "Stash changes?"
+	return status
+}
+
+func confirmCleanWorkingTree() state.Status {
+	status := state.New().WithConfirm(
+		state.ActionCleanWorkingTree,
+		"Clean working tree?",
+		"This will discard local changes and untracked files.",
+	)
+	status.Title = "Clean working tree?"
+	return status
 }

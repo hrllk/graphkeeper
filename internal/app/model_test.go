@@ -992,6 +992,44 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	}
 }
 
+func TestRenderActionHelpLinesShowsCleanupActionsOnlyForDirtyCurrentSection(t *testing.T) {
+	dirty := renderActionHelpLines(model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionCurrent,
+		repoStatus: git.Status{
+			Branch:        "main",
+			LocalBranches: []string{"main"},
+			WorktreeDirty: true,
+		},
+		sectionCursor: map[graphSection]int{
+			sectionCurrent: 0,
+		},
+	})
+	dirtyJoined := strings.Join(dirty, " ")
+	if !strings.Contains(dirtyJoined, "s: stash changes") || !strings.Contains(dirtyJoined, "c: clean working tree") {
+		t.Fatalf("expected dirty local actions to include cleanup shortcuts, got %v", dirty)
+	}
+	if strings.Contains(dirtyJoined, "dirty only") {
+		t.Fatalf("expected dirty local actions to be enabled, got %v", dirty)
+	}
+
+	clean := renderActionHelpLines(model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionCurrent,
+		repoStatus: git.Status{
+			Branch:        "main",
+			LocalBranches: []string{"main"},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionCurrent: 0,
+		},
+	})
+	cleanJoined := strings.Join(clean, " ")
+	if !strings.Contains(cleanJoined, "dirty only") {
+		t.Fatalf("expected clean local actions to show dirty-only gating, got %v", clean)
+	}
+}
+
 func TestRTriggersRebaseOnlyInGraphSection(t *testing.T) {
 	// With no graph rows / no local lane -> 'r' should block with error message
 	graph := model{
