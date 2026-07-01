@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/graph"
@@ -177,13 +175,8 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return m, nil
 		}
-		titleMsg := "Merge into current branch?"
-		detailMsg := fmt.Sprintf("This will merge commit %s into %s.\nA merge commit will be created if histories have diverged.\n\nContinue? (y: yes  •  n: no)",
-			shorten(focus.Hash, 7), m.repoStatus.Branch)
-		m.status = m.status.WithConfirm(state.ActionMerge, titleMsg, detailMsg)
-		m.status.Title = titleMsg
-		m.status.Selected = focus.Hash
-		return m, nil
+		m.status = loadingToast("Analyzing graph target...")
+		return m, checkGraphActionTarget(m.repo, state.ActionMerge, focus.Hash, m.repoStatus)
 	case "r":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Rebase unavailable.", "Select a local branch.")
@@ -193,13 +186,8 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return m, nil
 		}
-		titleMsg := "Rebase onto this commit?"
-		detailMsg := fmt.Sprintf("This will rebase %s onto commit %s.\nLocal commits will be replayed on top of the target.\n\n⚠️ Conflicts may occur during rebase.\n\nContinue? (y: yes  •  n: no)",
-			m.repoStatus.Branch, shorten(focus.Hash, 7))
-		m.status = m.status.WithConfirm(state.ActionRebase, titleMsg, detailMsg)
-		m.status.Title = titleMsg
-		m.status.Selected = focus.Hash
-		return m, nil
+		m.status = loadingToast("Analyzing graph target...")
+		return m, checkGraphActionTarget(m.repo, state.ActionRebase, focus.Hash, m.repoStatus)
 	case "s":
 		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash == "" {

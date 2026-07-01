@@ -540,6 +540,129 @@ func TestDeleteBranchShortcutOpensConfirmFromGraph(t *testing.T) {
 	}
 }
 
+func TestGraphMergeShortcutChecksDivergenceBeforeConfirm(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "checkout", "-b", "feature")
+	featureHash := makeLocalCommit(t, fixture.root, "feature.txt", "feature\n", "feature commit")
+	runGit(t, fixture.root, "checkout", "main")
+	mainHash := makeLocalCommit(t, fixture.root, "main.txt", "main\n", "main commit")
+
+	rs := git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          mainHash,
+		LocalBranches: []string{"main", "feature"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: mainHash, Parents: []string{fixture.initialHash}, Decorations: []string{"HEAD -> main", "main"}},
+			{Hash: featureHash, Parents: []string{fixture.initialHash}, Decorations: []string{"feature"}},
+			{Hash: fixture.initialHash, Parents: []string{}},
+		},
+	}
+	rows := graphRows(rs)
+	featureCursor := findGraphRowByHash(rows, featureHash)
+	if featureCursor < 0 {
+		t.Fatalf("expected feature hash %s in graph rows", featureHash)
+	}
+
+	m := testKeyHandlingModel(fixture.repo, rs)
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = featureCursor
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected merge shortcut to start graph target analysis")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Analyzing graph target..." {
+		t.Fatalf("expected graph analysis loading state, got %+v", got.status)
+	}
+
+	msg := cmdResult(t, cmd)
+	check, ok := msg.(graphActionCheckMsg)
+	if !ok {
+		t.Fatalf("expected graphActionCheckMsg, got %T", msg)
+	}
+	if check.currentOnly == 0 || check.targetOnly == 0 {
+		t.Fatalf("expected diverged graph target, got currentOnly=%d targetOnly=%d", check.currentOnly, check.targetOnly)
+	}
+
+	gotModel, cmd = got.Update(check)
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no follow-up command after graph check, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode after diverged graph target, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionMerge {
+		t.Fatalf("expected merge action, got %s", got.status.Action)
+	}
+	if got.status.Selected != featureHash {
+		t.Fatalf("expected selected target %q, got %q", featureHash, got.status.Selected)
+	}
+}
+
+func TestGraphRebaseShortcutBlocksAncestorTarget(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "checkout", "-b", "feature")
+	featureHash := makeLocalCommit(t, fixture.root, "feature.txt", "feature\n", "feature commit")
+	runGit(t, fixture.root, "checkout", "main")
+	mainHash := makeLocalCommit(t, fixture.root, "main.txt", "main\n", "main commit")
+
+	rs := git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          mainHash,
+		LocalBranches: []string{"main", "feature"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: mainHash, Parents: []string{fixture.initialHash}, Decorations: []string{"HEAD -> main", "main"}},
+			{Hash: featureHash, Parents: []string{fixture.initialHash}, Decorations: []string{"feature"}},
+			{Hash: fixture.initialHash, Parents: []string{}},
+		},
+	}
+	rows := graphRows(rs)
+	ancestorCursor := findGraphRowByHash(rows, fixture.initialHash)
+	if ancestorCursor < 0 {
+		t.Fatalf("expected initial hash %s in graph rows", fixture.initialHash)
+	}
+
+	m := testKeyHandlingModel(fixture.repo, rs)
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = ancestorCursor
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected rebase shortcut to start graph target analysis")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Analyzing graph target..." {
+		t.Fatalf("expected graph analysis loading state, got %+v", got.status)
+	}
+
+	msg := cmdResult(t, cmd)
+	check, ok := msg.(graphActionCheckMsg)
+	if !ok {
+		t.Fatalf("expected graphActionCheckMsg, got %T", msg)
+	}
+	if check.targetOnly != 0 {
+		t.Fatalf("expected ancestor target to have no target-only commits, got %d", check.targetOnly)
+	}
+
+	gotModel, cmd = got.Update(check)
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no follow-up command after graph check, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBlocked {
+		t.Fatalf("expected blocked mode for ancestor target, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Target already included." {
+		t.Fatalf("expected ancestor block message, got %q", got.status.Message)
+	}
+}
+
 func TestTargetPickRejectsEmptySelection(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root})
@@ -850,5 +973,68 @@ func TestBrowseNavigationKeysDoNotSpawnLazyLoadCommands(t *testing.T) {
 	}
 	if got.sectionCursor[sectionGraph] != 1 {
 		t.Fatalf("expected ctrl+d to keep cursor on last row, got %d", got.sectionCursor[sectionGraph])
+	}
+}
+
+func TestDeleteBranchShortcutTargetsSelectedCurrentSectionBranch(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "tmp2",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"tmp2", "tmp1"},
+	})
+	m.activeSection = sectionCurrent
+	m.sectionCursor[sectionCurrent] = 1
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected delete shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Selected != "tmp1" {
+		t.Fatalf("expected delete target tmp1, got %q", got.status.Selected)
+	}
+}
+
+func TestDeleteBranchShortcutDeletesSelectedCurrentSectionBranch(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "checkout", "-b", "tmp2")
+	runGit(t, fixture.root, "checkout", "-b", "tmp1")
+	runGit(t, fixture.root, "checkout", "tmp2")
+
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "tmp2",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"tmp2", "tmp1"},
+		GraphCommits:  []git.GraphCommit{{Hash: fixture.initialHash}},
+	})
+	m.activeSection = sectionCurrent
+	m.sectionCursor[sectionCurrent] = 1
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected delete shortcut to stay synchronous, got %v", cmd)
+	}
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected delete acceptance to execute")
+	}
+	msg := cmd()
+	executed, ok := msg.(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", msg)
+	}
+	if executed.err != nil {
+		t.Fatalf("expected delete execution to succeed, got %v", executed.err)
+	}
+	if executed.target != "tmp1" {
+		t.Fatalf("expected executed delete target tmp1, got %q", executed.target)
 	}
 }

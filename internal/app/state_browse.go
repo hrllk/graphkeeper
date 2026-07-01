@@ -3,6 +3,7 @@ package app
 import (
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/graph"
+	"hrllk/graphkeeper/internal/state"
 )
 
 func syncBrowseStateFromGraph(m *model, rs git.Status) {
@@ -32,12 +33,12 @@ func syncBrowseStateSectionCursors(m *model, rs git.Status) {
 		if section == sectionGraph {
 			continue
 		}
-		limit := len(sectionTargets(rs, section))
-		if limit == 0 {
+		items := sectionTargets(rs, section)
+		if len(items) == 0 {
 			m.sectionCursor[section] = -1
 			continue
 		}
-		m.sectionCursor[section] = clampCursor(m.sectionCursor[section], limit)
+		m.sectionCursor[section] = syncSectionCursorByRef(m.sectionCursor[section], sectionTargets(m.repoStatus, section), items)
 	}
 }
 
@@ -46,4 +47,19 @@ func syncBrowseStateSelection(m *model, rs git.Status) {
 	if m.sectionCursor[sectionGraph] < 0 {
 		m.graphLaneCursor = 0
 	}
+}
+
+func syncSectionCursorByRef(current int, previousItems, nextItems []state.TargetItem) int {
+	if current >= 0 && current < len(previousItems) {
+		targetRef := previousItems[current].Ref
+		for i, item := range nextItems {
+			if item.Ref == targetRef {
+				return i
+			}
+		}
+	}
+	if len(nextItems) == 0 {
+		return -1
+	}
+	return clampCursor(current, len(nextItems))
 }

@@ -26,7 +26,7 @@ func (r *Repo) Push(ctx context.Context, branch string, force bool, setUpstream 
 }
 
 func (r *Repo) DeleteBranch(ctx context.Context, branch string) (string, error) {
-	return r.Run("branch", "-d", branch)
+	return r.Run("branch", "-D", branch)
 }
 
 func (r *Repo) DeleteRemoteBranch(ctx context.Context, remote, branch string) (string, error) {

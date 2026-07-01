@@ -260,6 +260,28 @@ func previewSelection(repo *git.Repo, rs git.Status, action state.Action, target
 	}
 }
 
+func checkGraphActionTarget(repo *git.Repo, action state.Action, target string, rs git.Status) tea.Cmd {
+	return func() tea.Msg {
+		if repo == nil {
+			return graphActionCheckMsg{action: action, target: target, repo: rs, err: fmt.Errorf("repo is nil")}
+		}
+		if target == "" {
+			return graphActionCheckMsg{action: action, target: target, repo: rs, err: fmt.Errorf("target is empty")}
+		}
+		currentOnly, targetOnly, err := repo.Divergence(context.Background(), "HEAD", target)
+		if err != nil {
+			return graphActionCheckMsg{action: action, target: target, repo: rs, err: err}
+		}
+		return graphActionCheckMsg{
+			action:      action,
+			target:      target,
+			repo:        rs,
+			currentOnly: currentOnly,
+			targetOnly:  targetOnly,
+		}
+	}
+}
+
 func executeAction(repo *git.Repo, action state.Action, target string, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if target == "" {

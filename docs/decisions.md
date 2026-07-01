@@ -51,3 +51,9 @@
 - Consider commits on a local branch's passed path as local for Graph highlighting and shortcut availability.
 - Require `HEAD...target` divergence analysis to decide whether merge/rebase is actually meaningful.
 - Do not enable Graph merge/rebase for fast-forward-only or already-contained ancestor cases.
+
+## 2026-07-01: Local branch delete uses force delete
+
+- Use `git branch -D <branch>` for local branch deletion so unmerged local branches can be removed without blocking on merge state.
+- Keep the current-branch guard in place so the active branch still cannot be deleted accidentally.
+- Keep remote deletion unchanged and continue to require an explicit `origin` target for remote deletes.

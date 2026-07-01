@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -74,6 +75,45 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			"action": string(msg.action),
 			"target": msg.target,
 			"mode":   string(msg.status.Mode),
+		})
+		return m, nil
+	case graphActionCheckMsg:
+		if msg.err != nil {
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Graph action check failed.", msg.err.Error())
+			telemetry.Log("app", "graph_action_check_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
+			return m, nil
+		}
+		m.repoStatus = msg.repo
+		syncBrowseState(&m, msg.repo)
+		switch {
+		case msg.currentOnly == 0 && msg.targetOnly == 0:
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Already aligned.", "Target already matches HEAD.")
+		case msg.currentOnly == 0:
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Fast-forward available.", "HEAD can move to "+msg.target+". Current: "+strconv.Itoa(msg.currentOnly)+"  Target: "+strconv.Itoa(msg.targetOnly))
+		case msg.targetOnly == 0:
+			reason := "Target already included."
+			detail := "Current branch already contains " + msg.target + ". Current: " + strconv.Itoa(msg.currentOnly) + "  Target: " + strconv.Itoa(msg.targetOnly)
+			m.status = state.New().WithBlocked(state.BlockUnknown, reason, detail)
+		default:
+			titleMsg := "Merge into current branch?"
+			if msg.action == state.ActionRebase {
+				titleMsg = "Rebase onto this commit?"
+			}
+			detailMsg := ""
+			if msg.action == state.ActionMerge {
+				detailMsg = "This will merge commit " + shorten(msg.target, 7) + " into " + msg.repo.Branch + ".\nA merge commit will be created if histories have diverged.\n\nContinue? (y: yes  •  n: no)"
+			} else {
+				detailMsg = "This will rebase " + msg.repo.Branch + " onto commit " + shorten(msg.target, 7) + ".\nLocal commits will be replayed on top of the target.\n\n⚠️ Conflicts may occur during rebase.\n\nContinue? (y: yes  •  n: no)"
+			}
+			m.status = m.status.WithConfirm(msg.action, titleMsg, detailMsg)
+			m.status.Title = titleMsg
+			m.status.Selected = msg.target
+		}
+		telemetry.Log("app", "graph_action_check", map[string]string{
+			"action":      string(msg.action),
+			"target":      msg.target,
+			"currentOnly": strconv.Itoa(msg.currentOnly),
+			"targetOnly":  strconv.Itoa(msg.targetOnly),
 		})
 		return m, nil
 	case pushFetchedMsg:

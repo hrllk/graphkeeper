@@ -360,6 +360,30 @@ func TestSyncBrowseStateRestoresGraphSelectionAndClampsSections(t *testing.T) {
 	}
 }
 
+func TestSyncBrowseStatePreservesCurrentSectionBranchByRef(t *testing.T) {
+	m := model{
+		repoStatus: git.Status{
+			Branch:          "tmp2",
+			LocalBranches:   []string{"tmp2", "tmp1"},
+			BranchUpstreams: map[string]string{"tmp2": "origin/tmp2", "tmp1": "origin/tmp1"},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionCurrent: 1,
+		},
+	}
+	rs := git.Status{
+		Branch:          "tmp2",
+		LocalBranches:   []string{"tmp2", "tmp1"},
+		BranchUpstreams: map[string]string{"tmp2": "origin/tmp2", "tmp1": "origin/tmp1"},
+	}
+
+	syncBrowseState(&m, rs)
+
+	if m.sectionCursor[sectionCurrent] != 1 {
+		t.Fatalf("expected current section cursor to stay on tmp1 by ref, got %d", m.sectionCursor[sectionCurrent])
+	}
+}
+
 func TestRenderGraphContentFixedHeight(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),
