@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -27,6 +28,11 @@ type decorationInfo struct {
 	HasLocalHead bool
 }
 
+type branchState struct {
+	local  bool
+	remote bool
+}
+
 func compactDecorationInfo(decorations []string, localBranches []string) decorationInfo {
 	if len(decorations) == 0 {
 		return decorationInfo{Text: "-"}
@@ -35,14 +41,10 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 	for _, branch := range localBranches {
 		localSet[branch] = struct{}{}
 	}
-	type branchState struct {
-		local  bool
-		remote bool
-	}
 	branches := make(map[string]*branchState)
-	order := make([]string, 0, len(decorations))
 	hasBranch := false
 	hasLocalHead := false
+	headBranch := ""
 
 	addBranch := func(name string) *branchState {
 		name = strings.TrimSpace(name)
@@ -53,7 +55,6 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 		if !ok {
 			state = &branchState{}
 			branches[name] = state
-			order = append(order, name)
 		}
 		return state
 	}
@@ -65,10 +66,12 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 		}
 		switch {
 		case strings.HasPrefix(decoration, "HEAD -> "):
-			if state := addBranch(strings.TrimPrefix(decoration, "HEAD -> ")); state != nil {
+			name := strings.TrimPrefix(decoration, "HEAD -> ")
+			if state := addBranch(name); state != nil {
 				state.local = true
 				hasBranch = true
 				hasLocalHead = true
+				headBranch = strings.TrimSpace(name)
 			}
 		case strings.HasPrefix(decoration, "origin/HEAD -> origin/"):
 			if state := addBranch(strings.TrimPrefix(decoration, "origin/HEAD -> origin/")); state != nil {
@@ -85,11 +88,9 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 			if name == "HEAD" {
 				continue
 			}
-			if _, ok := localSet[name]; ok {
-				if state := addBranch(name); state != nil {
-					state.remote = true
-					hasBranch = true
-				}
+			if state := addBranch(name); state != nil {
+				state.remote = true
+				hasBranch = true
 			}
 		case strings.HasPrefix(decoration, "tag: "):
 			continue
@@ -107,13 +108,7 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 			}
 		}
 	}
-	name := ""
-	for _, candidate := range order {
-		if state := branches[candidate]; state != nil && (state.local || state.remote) {
-			name = candidate
-			break
-		}
-	}
+	name := pickCompactBranchName(branches, headBranch)
 	if name == "" {
 		return decorationInfo{Text: "-", HasBranch: false}
 	}
@@ -128,7 +123,45 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 		runes := []rune(token)
 		token = string(runes[:9]) + "."
 	}
+	overflowCount := len(branches) - 1
+	if overflowCount > 0 {
+		candidate := fmt.Sprintf("%s +%d", token, overflowCount)
+		if len([]rune(candidate)) <= 10 {
+			token = candidate
+		}
+	}
 	return decorationInfo{Text: token, HasBranch: hasBranch, HasLocalHead: hasLocalHead}
+}
+
+func pickCompactBranchName(branches map[string]*branchState, headBranch string) string {
+	if headBranch != "" {
+		if state := branches[headBranch]; state != nil && (state.local || state.remote) {
+			return headBranch
+		}
+	}
+	localNames := make([]string, 0, len(branches))
+	remoteNames := make([]string, 0, len(branches))
+	for name, state := range branches {
+		if state == nil {
+			continue
+		}
+		if state.local {
+			localNames = append(localNames, name)
+			continue
+		}
+		if state.remote {
+			remoteNames = append(remoteNames, name)
+		}
+	}
+	if len(localNames) > 0 {
+		sort.Strings(localNames)
+		return localNames[0]
+	}
+	if len(remoteNames) > 0 {
+		sort.Strings(remoteNames)
+		return remoteNames[0]
+	}
+	return ""
 }
 
 func compactWhenText(relative string) string {

@@ -57,3 +57,9 @@
 - Use `git branch -D <branch>` for local branch deletion so unmerged local branches can be removed without blocking on merge state.
 - Keep the current-branch guard in place so the active branch still cannot be deleted accidentally.
 - Keep remote deletion unchanged and continue to require an explicit `origin` target for remote deletes.
+
+## 2026-07-01: Graph compact branch labels use representative plus overflow
+
+- When multiple branch decorations point at the same commit, choose the compact representative in this order: `HEAD` branch first, then alphabetical local branch name, then alphabetical remote branch name.
+- Show additional branch presence as `+N` only when the compact token still fits the existing 10-character branch column budget.
+- Keep the Graph row compact and let the detail panel carry the full branch list when the row cannot show every name.

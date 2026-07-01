@@ -1444,6 +1444,23 @@ func TestFormatCompactDecorations(t *testing.T) {
 	}
 }
 
+func TestFormatCompactDecorationsUsesHeadThenAlphabeticalWithOverflow(t *testing.T) {
+	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "release"}, []string{"main", "develop", "release"})
+	if got != "l->main +2" {
+		t.Fatalf("expected HEAD branch to lead with overflow count, got %q", got)
+	}
+
+	got = formatCompactDecorations([]string{"release", "develop", "main"}, []string{"main", "develop", "release"})
+	if got != "l->develop" {
+		t.Fatalf("expected alphabetical local branch fallback, got %q", got)
+	}
+
+	got = formatCompactDecorations([]string{"origin/release", "origin/develop"}, nil)
+	if got != "o->develop" {
+		t.Fatalf("expected alphabetical remote branch fallback, got %q", got)
+	}
+}
+
 func TestCanCreateBranchRequiresReadyRepo(t *testing.T) {
 	if canCreateBranch(git.Status{Root: "/repo", WorktreeDirty: true}) {
 		t.Fatal("expected dirty worktree to block branch creation")
@@ -2159,5 +2176,102 @@ func TestResetExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 	}
 	if got.repoStatus.Head != "c2" {
 		t.Fatalf("expected repoStatus.Head to be updated to c2, got %q", got.repoStatus.Head)
+	}
+}
+
+func TestMergeExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
+	m := model{
+		status: loadingToast("Merging..."),
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+		repoStatus: git.Status{
+			Root:       "/repo",
+			Branch:     "main",
+			Head:       "c1",
+			HasCommits: true,
+		},
+	}
+
+	msg := executedMsg{
+		action: state.ActionMerge,
+		target: "feature",
+		status: git.Status{
+			Root:       "/repo",
+			Branch:     "main",
+			Head:       "c2",
+			HasCommits: true,
+			GraphCommits: []git.GraphCommit{
+				{Hash: "c2", Subject: "Merge commit"},
+				{Hash: "c1", Subject: "Commit 1"},
+			},
+		},
+	}
+
+	gotModel, cmd := m.Update(msg)
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no async cmd on merge complete, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected Browse mode, got %s", got.status.Mode)
+	}
+	if !strings.Contains(got.status.Message, "Merge complete.") {
+		t.Fatalf("expected merge success message, got %q", got.status.Message)
+	}
+	if got.repoStatus.Head != "c2" {
+		t.Fatalf("expected repoStatus.Head to be updated to c2, got %q", got.repoStatus.Head)
+	}
+}
+
+func TestRebaseExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
+	m := model{
+		status: loadingToast("Rebasing..."),
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+		repoStatus: git.Status{
+			Root:       "/repo",
+			Branch:     "main",
+			Head:       "c1",
+			HasCommits: true,
+		},
+	}
+
+	msg := executedMsg{
+		action: state.ActionRebase,
+		target: "feature",
+		status: git.Status{
+			Root:       "/repo",
+			Branch:     "main",
+			Head:       "c3",
+			HasCommits: true,
+			GraphCommits: []git.GraphCommit{
+				{Hash: "c3", Subject: "Rebased head"},
+				{Hash: "c2", Subject: "Replay"},
+				{Hash: "c1", Subject: "Base"},
+			},
+		},
+	}
+
+	gotModel, cmd := m.Update(msg)
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no async cmd on rebase complete, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected Browse mode, got %s", got.status.Mode)
+	}
+	if !strings.Contains(got.status.Message, "Rebase complete.") {
+		t.Fatalf("expected rebase success message, got %q", got.status.Message)
+	}
+	if got.repoStatus.Head != "c3" {
+		t.Fatalf("expected repoStatus.Head to be updated to c3, got %q", got.repoStatus.Head)
 	}
 }
