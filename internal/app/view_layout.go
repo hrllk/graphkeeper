@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func layoutShellMargins(m model) (hMargin, topMargin, bottomMargin int) {
@@ -111,6 +112,30 @@ func splitPaneWidths(total int) (int, int) {
 	return left, right
 }
 
+func splitLocalPaneWidths(total int) (int, int, int) {
+	if total <= 0 {
+		return 0, 0, 0
+	}
+	if total == 1 {
+		return 1, 0, 0
+	}
+	if total == 2 {
+		return 1, 0, 1
+	}
+	separator := 1
+	inner := total - separator
+	left := inner / 2
+	if left < 1 {
+		left = 1
+	}
+	right := inner - left
+	if right < 1 {
+		right = 1
+		left = inner - right
+	}
+	return left, separator, right
+}
+
 func splitDashboardHeights(total int) (int, int) {
 	if total <= 0 {
 		return 0, 0
@@ -182,6 +207,66 @@ func fitBlockLines(lines []string, height int) string {
 		lines = append(lines, padding...)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func fitLineWidth(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(value) > width {
+		return ansi.Truncate(value, width, "")
+	}
+	return padRight(value, width)
+}
+
+func renderSplitColumns(leftLines, rightLines []string, width, height int) string {
+	if height <= 0 || width <= 0 {
+		return ""
+	}
+	leftWidth, separatorWidth, rightWidth := splitLocalPaneWidths(width)
+	if separatorWidth == 0 {
+		return fitBlockLines(leftLines, height)
+	}
+	leftLines = normalizeColumnLines(leftLines, leftWidth, height)
+	rightLines = normalizeColumnLines(rightLines, rightWidth, height)
+	separator := muted.Render("│")
+	if separatorWidth > 1 {
+		separator = padRight(separator, separatorWidth)
+	}
+	lines := make([]string, 0, height)
+	for i := 0; i < height; i++ {
+		lines = append(lines,
+			fitLineWidth(leftLines[i], leftWidth)+separator+fitLineWidth(rightLines[i], rightWidth),
+		)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func normalizeColumnLines(lines []string, width, height int) []string {
+	if height <= 0 {
+		return nil
+	}
+	lines = fitColumnHeight(lines, height)
+	for i, line := range lines {
+		lines[i] = fitLineWidth(line, width)
+	}
+	return lines
+}
+
+func fitColumnHeight(lines []string, height int) []string {
+	if height <= 0 {
+		return nil
+	}
+	out := make([]string, 0, height)
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	out = append(out, lines...)
+	if len(out) < height {
+		padding := make([]string, height-len(out))
+		out = append(out, padding...)
+	}
+	return out
 }
 
 func max(a, b int) int {

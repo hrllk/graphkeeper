@@ -31,7 +31,13 @@ func (m model) renderContextContent(width, height int) string {
 	if height <= 0 {
 		return ""
 	}
-	lines := make([]string, 0, height)
+	leftLines := m.renderContextInfoLines(width)
+	rightLines := renderActionHelpLines(m)
+	return renderSplitColumns(leftLines, rightLines, width, height)
+}
+
+func (m model) renderContextInfoLines(width int) []string {
+	lines := make([]string, 0, 8)
 	switch m.activeSection {
 	case sectionGraph:
 		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
@@ -51,40 +57,39 @@ func (m model) renderContextContent(width, height int) string {
 		items := sectionTargets(m.repoStatus, m.activeSection)
 		if len(items) == 0 {
 			lines = append(lines, muted.Render("  (empty)"))
-		} else {
-			cursor := m.sectionCursor[m.activeSection]
-			if cursor < 0 || cursor >= len(items) {
-				cursor = 0
-			}
-			lines = append(lines, fmt.Sprintf("target: %s", formatTargetItem(items[cursor])))
-			lines = append(lines, fmt.Sprintf("items: %d", len(items)))
-			if m.activeSection == sectionCurrent {
-				if m.status.WorktreeState != "" {
-					worktree := string(m.status.WorktreeState)
-					if m.status.WorktreeState == state.WorktreeStateDirty {
-						worktree = dirtyMark.Render(worktree)
-					}
-					lines = append(lines, fmt.Sprintf("worktree: %s", worktree))
+			return lines
+		}
+		cursor := m.sectionCursor[m.activeSection]
+		if cursor < 0 || cursor >= len(items) {
+			cursor = 0
+		}
+		lines = append(lines, fmt.Sprintf("target: %s", formatTargetItem(items[cursor])))
+		lines = append(lines, fmt.Sprintf("items: %d", len(items)))
+		if m.activeSection == sectionCurrent {
+			if m.status.WorktreeState != "" {
+				worktree := string(m.status.WorktreeState)
+				if m.status.WorktreeState == state.WorktreeStateDirty {
+					worktree = dirtyMark.Render(worktree)
 				}
-				if current := items[cursor]; current.Current {
-					if current.NeedsPull {
-						lines = append(lines, "sync: pull available")
-					}
-					if current.NeedsPush {
-						lines = append(lines, "sync: push required")
-					}
-					if current.NoUpstream {
-						lines = append(lines, "sync: no upstream")
-					}
+				lines = append(lines, fmt.Sprintf("worktree: %s", worktree))
+			}
+			if current := items[cursor]; current.Current {
+				if current.NeedsPull {
+					lines = append(lines, "sync: pull available")
+				}
+				if current.NeedsPush {
+					lines = append(lines, "sync: push required")
+				}
+				if current.NoUpstream {
+					lines = append(lines, "sync: no upstream")
 				}
 			}
 		}
 	}
-
-	lines = append(lines, "")
-	lines = append(lines, title.Render("Actions"))
-	lines = append(lines, renderActionHelpLines(m)...)
-	return fitBlockLines(lines, height)
+	if len(lines) == 0 {
+		lines = append(lines, muted.Render("  (empty)"))
+	}
+	return lines
 }
 
 func (m model) renderDetailContent(width, height int) string {

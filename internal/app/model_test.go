@@ -409,12 +409,164 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	m.activeSection = sectionCurrent
 	m.status.WorktreeState = state.WorktreeStateDirty
 
-	got := m.renderContextContent(40, 16)
-	if !strings.Contains(got, "target:") || !strings.Contains(got, "(dirty)") {
-		t.Fatalf("expected current branch context to show dirty target, got %q", got)
+	got := m.renderContextContent(50, 16)
+	if !strings.Contains(got, "target:") || !strings.Contains(got, "worktree:") {
+		t.Fatalf("expected current branch context to show target and worktree, got %q", got)
 	}
 	if !strings.Contains(got, "worktree:") || !strings.Contains(got, "sync: push required") {
 		t.Fatalf("expected worktree/sync details in context, got %q", got)
+	}
+}
+
+func TestRenderContextContentSplitsInfoAndActions(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch:        "main",
+			Head:          "abc1234",
+			Upstream:      "origin/main",
+			Remote:        "origin",
+			WorktreeDirty: true,
+			LocalBranches: []string{"main"},
+			Tracking: map[string]git.BranchTracking{
+				"main": {Behind: 1, Ahead: 2},
+			},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+		},
+	}
+	m.activeSection = sectionCurrent
+	m.status.WorktreeState = state.WorktreeStateDirty
+
+	got := m.renderContextContent(40, 12)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 12 {
+		t.Fatalf("expected split context to preserve fixed height, got %d lines: %q", len(lines), got)
+	}
+	if !strings.Contains(got, "│") {
+		t.Fatalf("expected split context to include a center separator, got %q", got)
+	}
+	if !strings.Contains(got, "target:") || !strings.Contains(got, "worktree:") {
+		t.Fatalf("expected left info column to include current branch details, got %q", got)
+	}
+	if !strings.Contains(got, "• space: checkout") || !strings.Contains(got, "• p: pull") {
+		t.Fatalf("expected right actions column to include browse actions, got %q", got)
+	}
+}
+
+func TestRenderContextContentKeepsSplitLayoutOnNarrowWidth(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch:        "main",
+			Head:          "abc1234",
+			Upstream:      "origin/main",
+			Remote:        "origin",
+			LocalBranches: []string{"main"},
+			GraphCommits: []git.GraphCommit{
+				{Hash: "abc1234", Subject: "Commit 1"},
+			},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+		},
+	}
+	m.activeSection = sectionGraph
+
+	got := m.renderContextContent(22, 8)
+	lines := strings.Split(got, "\n")
+	if len(lines) != 8 {
+		t.Fatalf("expected narrow split context to preserve height, got %d lines: %q", len(lines), got)
+	}
+	if !strings.Contains(got, "│") {
+		t.Fatalf("expected narrow split context to keep separator, got %q", got)
+	}
+	if !strings.Contains(got, "focus:") || !strings.Contains(got, "m: merge") {
+		t.Fatalf("expected narrow split context to keep info and actions visible, got %q", got)
+	}
+}
+
+func TestRenderContextContentSplitsAllSections(t *testing.T) {
+	tests := []struct {
+		name        string
+		active      graphSection
+		repoStatus  git.Status
+		wantInfo    string
+		wantActions string
+	}{
+		{
+			name:   "graph",
+			active: sectionGraph,
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{{Hash: "abc1234", Parents: []string{"def5678"}}},
+				LocalBranches: []string{
+					"main",
+				},
+			},
+			wantInfo:    "focus:",
+			wantActions: "m: merge",
+		},
+		{
+			name:   "current",
+			active: sectionCurrent,
+			repoStatus: git.Status{
+				Branch:        "main",
+				Head:          "abc1234",
+				Upstream:      "origin/main",
+				Remote:        "origin",
+				LocalBranches: []string{"main"},
+			},
+			wantInfo:    "target:",
+			wantActions: "space: checkout",
+		},
+		{
+			name:   "remote",
+			active: sectionRemote,
+			repoStatus: git.Status{
+				RemoteBranches: []string{"origin/main"},
+				Remote:         "origin",
+			},
+			wantInfo:    "target:",
+			wantActions: "space: checkout",
+		},
+		{
+			name:   "tags",
+			active: sectionTags,
+			repoStatus: git.Status{
+				Tags: []string{"v1.0.0"},
+			},
+			wantInfo:    "target:",
+			wantActions: "no section actions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := model{
+				status:     state.New().WithBrowse(),
+				repoStatus: tt.repoStatus,
+				sectionCursor: map[graphSection]int{
+					sectionGraph:   0,
+					sectionCurrent: 0,
+					sectionRemote:  0,
+					sectionTags:    0,
+				},
+			}
+			m.activeSection = tt.active
+			got := m.renderContextContent(48, 10)
+			if !strings.Contains(got, "│") {
+				t.Fatalf("expected split layout separator in %q", got)
+			}
+			if !strings.Contains(got, tt.wantInfo) {
+				t.Fatalf("expected info column to include %q, got %q", tt.wantInfo, got)
+			}
+			if !strings.Contains(got, tt.wantActions) {
+				t.Fatalf("expected actions column to include %q, got %q", tt.wantActions, got)
+			}
+		})
 	}
 }
 
