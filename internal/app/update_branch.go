@@ -45,6 +45,7 @@ func handleBranchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.branchError = ""
 		m.repoStatus = msg2.status
 		syncBrowseState(&m, msg2.status)
+		focusGraphHead(&m, msg2.status)
 		m.status = loadingToast("Branch created.")
 		telemetry.Log("app", "branch_create", map[string]string{"name": msg2.name, "base": msg2.base})
 		return m, tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {

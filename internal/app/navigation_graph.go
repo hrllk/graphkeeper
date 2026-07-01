@@ -81,6 +81,26 @@ func currentGraphFocus(rs git.Status, cursor int) graphNode {
 	return graph.CurrentFocus(rs, cursor)
 }
 
+func focusGraphHead(m *model, rs git.Status) {
+	m.activeSection = sectionGraph
+	rows := graph.Rows(rs)
+	if len(rows) == 0 {
+		m.sectionCursor[sectionGraph] = 0
+		m.graphScroll = 0
+		m.graphLaneCursor = 0
+		return
+	}
+
+	row := graph.FindRowByHash(rows, rs.Head)
+	if row < 0 {
+		row = graph.NearestSelectableGraphRow(rows, 0, 1)
+	}
+	m.sectionCursor[sectionGraph] = row
+	page := graphPageSizeForRows(m, rows, row, graphContentHeightForModel(m))
+	m.graphScroll = clampScroll(row, len(rows), page)
+	m.graphLaneCursor = graph.PointerLane(rows[row])
+}
+
 func moveGraphBrowseCursor(m model, delta int) model {
 	rows := graph.Rows(m.repoStatus)
 	cursor := graph.MoveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)

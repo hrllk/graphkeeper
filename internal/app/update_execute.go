@@ -179,13 +179,8 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if msg2.action == state.ActionCheckout {
 		m.commitLimit = 0
-		rows := graph.Rows(msg2.status)
-		if len(rows) > 0 {
-			m.sectionCursor[sectionGraph] = 0
-			m.graphScroll = 0
-			m.graphLaneCursor = graph.PointerLane(rows[0])
-		}
 		syncBrowseState(&m, msg2.status)
+		focusGraphHead(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		telemetry.Log("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
@@ -241,6 +236,15 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sectionCursor[sectionGraph] = rowIdx
 			m.graphScroll = clampScroll(rowIdx, len(rows), graphPageSize(&m))
 		}
+		syncBrowseState(&m, msg2.status)
+		m.status = deriveStatus(msg2.status)
+		m.status.Message = strings.TrimSuffix(executionDetail(msg2.action, msg2.target, msg2.status), ".")
+		telemetry.Log("app", "execute_action", map[string]string{
+			"action": string(msg2.action),
+			"target": msg2.target,
+			"head":   msg2.status.Head,
+		})
+		return m, nil
 	}
 	syncBrowseState(&m, msg2.status)
 	m.status = state.New().WithOutcome(msg2.action, "Complete.", executionDetail(msg2.action, msg2.target, msg2.status), false)
