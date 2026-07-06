@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -90,15 +91,20 @@ func renderAppView(m model) string {
 	body := lipgloss.JoinVertical(lipgloss.Left, headerRow, graphRow)
 	centeredBody := applyOuterMargins(body, bodyWidth, bodyHeight, hMargin, topMargin, max(bottomMargin-1, 0))
 
-	if m.status.Mode == state.ModeConfirm || m.status.Mode == state.ModeResetModePick {
+	if m.status.Mode == state.ModeConfirm || m.status.Mode == state.ModeReview || m.status.Mode == state.ModeResetModePick {
 		if m.status.Mode == state.ModeResetModePick {
 			centeredBody = overlayPopup(centeredBody, renderResetModePopup(bodyWidth))
+		} else if m.status.Mode == state.ModeReview {
+			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
 		} else {
 			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
 		}
 	}
 	if m.branchOpen {
 		centeredBody = overlayPopup(centeredBody, renderBranchInputPopup(m, bodyWidth))
+	}
+	if m.graphSearchOpen {
+		centeredBody = overlayPopup(centeredBody, renderGraphSearchPopup(m, bodyWidth))
 	}
 	if m.status.Mode == state.ModeLoading && !m.branchOpen {
 		centeredBody = overlayPopup(centeredBody, renderLoadingPopup(m, bodyWidth))
@@ -131,18 +137,31 @@ func popupWidthForBody(bodyWidth, minWidth, maxWidth int) int {
 func renderConfirmPopup(m model, bodyWidth int) string {
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	width := popupWidthForBody(bodyWidth, 32, 54)
+	align := lipgloss.Center
+	if m.status.Mode == state.ModeReview {
+		width = popupWidthForBody(bodyWidth, 44, 78)
+		align = lipgloss.Left
+	}
 	popupBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
 		Padding(1, 2).
-		Width(popupWidthForBody(bodyWidth, 32, 54)).
-		Align(lipgloss.Center)
+		Width(width).
+		Align(align)
 	popupTitle := m.status.Title
-	if popupTitle == "" || popupTitle == "Confirm" {
+	if m.status.Mode == state.ModeReview {
+		popupTitle = m.status.Message
+		if popupTitle == "" {
+			popupTitle = "분기점 확인하기"
+		}
+	} else if popupTitle == "" || popupTitle == "Confirm" {
 		popupTitle = "Continue?"
 	}
 	helpText := "y: yes  •  n: no"
-	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
+	if m.status.Mode == state.ModeReview {
+		helpText = "y: continue  •  n: cancel"
+	} else if m.status.Action == state.ActionPull && !m.pullIsFastForward {
 		helpText = "m: merge  •  r: rebase  •  esc: cancel"
 	} else if m.status.Action == state.ActionDeleteBranch {
 		helpText = "y: delete  •  n: cancel"
@@ -158,7 +177,7 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 			descStyle.Render(m.status.Detail),
 			helpStyle.Render(helpText),
 		}, "\n\n"),
-		popupWidthForBody(bodyWidth, 32, 54),
+		width,
 	)
 }
 
@@ -236,6 +255,41 @@ func renderBranchInputPopup(m model, bodyWidth int) string {
 		"Create branch",
 		strings.Join(lines, "\n"),
 		popupWidthForBody(bodyWidth, 36, 56),
+	)
+}
+
+func renderGraphSearchPopup(m model, bodyWidth int) string {
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	popupBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Padding(1, 2).
+		Width(popupWidthForBody(bodyWidth, 38, 58)).
+		Align(lipgloss.Center)
+	query := m.graphSearchDraft
+	if query == "" {
+		query = " "
+	}
+	lines := []string{
+		descStyle.Render("query: " + query),
+		"",
+		helpStyle.Render("enter: jump  •  n/N: next/prev  •  esc: cancel"),
+	}
+	if m.graphSearchError != "" {
+		lines = append(lines, "")
+		lines = append(lines, errStyle.Render(m.graphSearchError))
+	} else {
+		matches := graphSearchMatches(buildGraphSearchIndex(m.repoStatus), m.graphSearchDraft)
+		lines = append(lines, "")
+		lines = append(lines, descStyle.Render(fmt.Sprintf("%d matches", len(matches))))
+	}
+	return renderFloatingTitlePopup(
+		popupBox,
+		"Search Graph",
+		strings.Join(lines, "\n"),
+		popupWidthForBody(bodyWidth, 38, 58),
 	)
 }
 

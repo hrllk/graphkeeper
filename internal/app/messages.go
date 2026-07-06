@@ -53,6 +53,7 @@ type graphActionCheckMsg struct {
 	action      state.Action
 	target      string
 	repo        git.Status
+	base        string
 	currentOnly int
 	targetOnly  int
 	err         error

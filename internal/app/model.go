@@ -17,6 +17,12 @@ type model struct {
 	sectionCursor     map[graphSection]int
 	graphLaneCursor   int
 	graphScroll       int
+	graphSearchOpen   bool
+	graphSearchDraft  string
+	graphSearchQuery  string
+	graphSearchIndex  []graphSearchEntry
+	graphSearchCursor int
+	graphSearchError  string
 	awaitingGoTop     bool
 	branchOpen        bool
 	branchDraft       string

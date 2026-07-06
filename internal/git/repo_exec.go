@@ -110,6 +110,17 @@ func (r *Repo) Divergence(ctx context.Context, left, right string) (leftOnly int
 	return leftOnly, rightOnly, nil
 }
 
+func (r *Repo) MergeBase(ctx context.Context, left, right string) (string, error) {
+	if left == "" || right == "" {
+		return "", fmt.Errorf("merge base requires two refs")
+	}
+	out, err := r.git(ctx, "merge-base", left, right)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 func (r *Repo) Run(args ...string) (string, error) {
 	return r.runner.Run(args...)
 }

@@ -7,6 +7,7 @@ const (
 	ModePullCheck      Mode = "pull_check"
 	ModeTargetPick     Mode = "target_pick"
 	ModeOutcomePreview Mode = "outcome_preview"
+	ModeReview         Mode = "review"
 	ModeResetModePick  Mode = "reset_mode_pick"
 	ModeBlocked        Mode = "blocked"
 	ModeLoading        Mode = "loading"
@@ -158,6 +159,17 @@ func (s Status) WithOutcome(action Action, message, detail string, canExecute bo
 	s.Message = message
 	s.Detail = detail
 	s.CanExecute = canExecute
+	return s
+}
+
+func (s Status) WithReview(action Action, message, detail string) Status {
+	s.Mode = ModeReview
+	s.Action = action
+	s.Block = BlockNone
+	s.Title = "Review"
+	s.Message = message
+	s.Detail = detail
+	s.CanExecute = false
 	return s
 }
 

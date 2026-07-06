@@ -10,11 +10,16 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.branchOpen {
 		return m.handleBranchOpenKey(msg)
 	}
+	if m.graphSearchOpen {
+		return m.handleGraphSearchKey(msg)
+	}
 	switch m.status.Mode {
 	case state.ModeTargetPick:
 		return m.handleTargetPickKey(msg)
 	case state.ModeConfirm:
 		return m.handleConfirmKey(msg)
+	case state.ModeReview:
+		return m.handleReviewKey(msg)
 	case state.ModeResetModePick:
 		return m.handleResetModePickKey(msg)
 	case state.ModeOutcomePreview:

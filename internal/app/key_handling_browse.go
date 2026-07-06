@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/graph"
@@ -166,6 +168,16 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 
 func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "esc":
+		if strings.TrimSpace(m.graphSearchQuery) != "" || m.graphSearchOpen {
+			m.graphSearchOpen = false
+			m.graphSearchDraft = ""
+			m.graphSearchQuery = ""
+			m.graphSearchCursor = 0
+			m.graphSearchError = ""
+			return m, nil
+		}
+		return m, nil
 	case "m":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Merge unavailable.", "Select a local branch.")
@@ -196,9 +208,23 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.status = loadingToast("Preparing reset...")
 		return m, previewSelection(m.repo, m.repoStatus, state.ActionReset, focus.Hash)
+	case "/", "?":
+		m.graphSearchOpen = true
+		m.graphSearchDraft = m.graphSearchQuery
+		m.graphSearchIndex = buildGraphSearchIndex(m.repoStatus)
+		m.graphSearchError = ""
+		return m, nil
 	case "n":
+		if strings.TrimSpace(m.graphSearchQuery) != "" {
+			return applyGraphSearchRepeat(m, 1), nil
+		}
 		base := branchCreateBaseForActiveSection(m)
 		m, _ = startBranchCreateInput(m, base)
+		return m, nil
+	case "N":
+		if strings.TrimSpace(m.graphSearchQuery) != "" {
+			return applyGraphSearchRepeat(m, -1), nil
+		}
 		return m, nil
 	case "d":
 		selection := deleteBranchSelection(m)
@@ -286,11 +312,25 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "n":
+		if m.activeSection == sectionGraph && m.status.Mode == state.ModeBrowse && m.graphSearchOpen == false {
+			if strings.TrimSpace(m.graphSearchQuery) != "" {
+				return applyGraphSearchRepeat(m, 1), nil
+			}
+		}
 		if m.activeSection == sectionCurrent {
 			base := branchCreateBaseForActiveSection(m)
 			m, _ = startBranchCreateInput(m, base)
 			return m, nil
 		}
+		return m, nil
+	case "/":
+		if m.activeSection != sectionGraph || m.status.Mode != state.ModeBrowse {
+			return m, nil
+		}
+		m.graphSearchOpen = true
+		m.graphSearchDraft = m.graphSearchQuery
+		m.graphSearchIndex = buildGraphSearchIndex(m.repoStatus)
+		m.graphSearchError = ""
 		return m, nil
 	case "d":
 		if m.activeSection == sectionGraph || m.activeSection == sectionCurrent || m.activeSection == sectionRemote {

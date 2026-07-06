@@ -63,3 +63,10 @@
 - When multiple branch decorations point at the same commit, choose the compact representative in this order: `HEAD` branch first, then alphabetical local branch name, then alphabetical remote branch name.
 - Show additional branch presence as `+N` only when the compact token still fits the existing 10-character branch column budget.
 - Keep the Graph row compact and let the detail panel carry the full branch list when the row cannot show every name.
+
+## 2026-07-06: Graph search is popup-only and repeats with n/N
+
+- Keep graph search scoped to the `Graph` section only.
+- Use `/` to open a transient search popup, `enter` to jump to the first match, and `n` / `N` to repeat the last confirmed search.
+- Keep branch creation on `n` when no graph search query is active.
+- Do not add a result list; keep the popup focused on query entry, match count, and no-match feedback.

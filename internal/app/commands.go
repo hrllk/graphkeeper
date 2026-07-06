@@ -268,6 +268,10 @@ func checkGraphActionTarget(repo *git.Repo, action state.Action, target string, 
 		if target == "" {
 			return graphActionCheckMsg{action: action, target: target, repo: rs, err: fmt.Errorf("target is empty")}
 		}
+		base, err := repo.MergeBase(context.Background(), "HEAD", target)
+		if err != nil {
+			return graphActionCheckMsg{action: action, target: target, repo: rs, err: err}
+		}
 		currentOnly, targetOnly, err := repo.Divergence(context.Background(), "HEAD", target)
 		if err != nil {
 			return graphActionCheckMsg{action: action, target: target, repo: rs, err: err}
@@ -276,6 +280,7 @@ func checkGraphActionTarget(repo *git.Repo, action state.Action, target string, 
 			action:      action,
 			target:      target,
 			repo:        rs,
+			base:        base,
 			currentOnly: currentOnly,
 			targetOnly:  targetOnly,
 		}

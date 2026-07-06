@@ -634,6 +634,9 @@ func TestGraphMergeShortcutChecksDivergenceBeforeConfirm(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected graphActionCheckMsg, got %T", msg)
 	}
+	if check.base == "" {
+		t.Fatalf("expected merge base to be populated")
+	}
 	if check.currentOnly == 0 || check.targetOnly == 0 {
 		t.Fatalf("expected diverged graph target, got currentOnly=%d targetOnly=%d", check.currentOnly, check.targetOnly)
 	}
@@ -643,14 +646,23 @@ func TestGraphMergeShortcutChecksDivergenceBeforeConfirm(t *testing.T) {
 	if cmd != nil {
 		t.Fatalf("expected no follow-up command after graph check, got %v", cmd)
 	}
-	if got.status.Mode != state.ModeConfirm {
-		t.Fatalf("expected confirm mode after diverged graph target, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeReview {
+		t.Fatalf("expected review mode after diverged graph target, got %s", got.status.Mode)
 	}
 	if got.status.Action != state.ActionMerge {
 		t.Fatalf("expected merge action, got %s", got.status.Action)
 	}
 	if got.status.Selected != featureHash {
 		t.Fatalf("expected selected target %q, got %q", featureHash, got.status.Selected)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no command while opening final confirm, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected final confirm mode after review accept, got %s", got.status.Mode)
 	}
 }
 
@@ -696,6 +708,9 @@ func TestGraphRebaseShortcutBlocksAncestorTarget(t *testing.T) {
 	check, ok := msg.(graphActionCheckMsg)
 	if !ok {
 		t.Fatalf("expected graphActionCheckMsg, got %T", msg)
+	}
+	if check.base == "" {
+		t.Fatalf("expected merge base to be populated")
 	}
 	if check.targetOnly != 0 {
 		t.Fatalf("expected ancestor target to have no target-only commits, got %d", check.targetOnly)

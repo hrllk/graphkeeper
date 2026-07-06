@@ -156,10 +156,12 @@ func renderActionHelpLines(m model) []string {
 					lines = append(lines, deleteLabel)
 				}
 			}
-			if canCreateBranch(m.repoStatus) {
-				lines = append(lines, "• n: new branch")
+			if strings.TrimSpace(m.graphSearchQuery) != "" {
+				lines = append(lines, "• /: search          • n/N: repeat search")
+			} else if canCreateBranch(m.repoStatus) {
+				lines = append(lines, "• / ?: search        • n: new branch")
 			} else {
-				lines = append(lines, disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
+				lines = append(lines, "• / ?: search        "+disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
 			}
 		case sectionCurrent, sectionRemote:
 			if m.activeSection == sectionCurrent {
@@ -225,6 +227,8 @@ func renderActionHelpLines(m model) []string {
 		return []string{"• up/down: choose target            • enter: preview", "• esc: back"}
 	case state.ModeResetModePick:
 		return []string{"• s: soft  •  m: mixed  •  h: hard", "• esc: back"}
+	case state.ModeReview:
+		return []string{"• y: continue                    • n: cancel"}
 	case state.ModeOutcomePreview:
 		if m.status.CanExecute {
 			return []string{"• enter: execute                    • esc: back"}

@@ -10,8 +10,12 @@ import (
 )
 
 func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
+	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount, "")
+}
+
+func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
 	if row.Graph != "" {
-		return renderRawGraphLine(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount)
+		return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount, searchQuery)
 	}
 	var hash, refs string
 	var refInfo decorationInfo
@@ -19,20 +23,20 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 		hash = "        "
 		refs = "          "
 	} else {
-		hash = fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
 		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
-		refs = fmt.Sprintf("%-10s", refInfo.Text)
+		hash = renderSearchField(shorten(row.Commit.Hash, 7), searchQuery, 8, selected && graphActive)
+		refs = renderSearchField(refInfo.Text, searchQuery, 10, selected && graphActive)
 		isHead := hasHeadDecoration(row.Commit.Decorations)
 		pointerFocused := graphActive && selected
-		if isHead {
+		if searchQuery == "" && isHead {
 			refs = headMark.Render(refs)
-		} else if pointerFocused && refInfo.HasBranch {
+		} else if searchQuery == "" && pointerFocused && refInfo.HasBranch {
 			refs = branchMark.Render(refs)
 		}
 		if shouldHighlightStash(stashCount, selected) {
 			refs = stashMark.Render(refs)
 		}
-		if graphActive && selected {
+		if searchQuery == "" && graphActive && selected {
 			hash = pointerMark.Render(hash)
 		}
 	}
@@ -53,7 +57,7 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 		title = conflictColor.Render(row.Commit.Subject)
 	} else {
 		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
-		title = fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
+		title = renderSearchField(compactTitleText(row.Commit.Subject), searchQuery, 10, selected && graphActive)
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	if selected {
@@ -65,6 +69,10 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 }
 
 func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
+	return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount, "")
+}
+
+func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
 		graphCell := padRight(row.Graph, graphColWidth)
 		if isHandshake {
@@ -94,15 +102,15 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 			cursorLane = width - 1
 		}
 		pointerFocused = graphActive && selected && cursorLane == lane
-		hash = fmt.Sprintf("%-8s", shorten(row.Commit.Hash, 7))
-		if pointerFocused {
+		hash = renderSearchField(shorten(row.Commit.Hash, 7), searchQuery, 8, selected && graphActive)
+		if searchQuery == "" && pointerFocused {
 			hash = pointerMark.Render(hash)
 		}
 		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
-		refs = fmt.Sprintf("%-10s", refInfo.Text)
-		if refInfo.HasLocalHead {
+		refs = renderSearchField(refInfo.Text, searchQuery, 10, selected && graphActive)
+		if searchQuery == "" && refInfo.HasLocalHead {
 			refs = headMark.Render(refs)
-		} else if pointerFocused && refInfo.HasBranch {
+		} else if searchQuery == "" && pointerFocused && refInfo.HasBranch {
 			refs = branchMark.Render(refs)
 		}
 		if shouldHighlightStash(stashCount, selected) {
@@ -138,7 +146,7 @@ func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCurso
 		title = conflictColor.Render(row.Commit.Subject)
 	} else {
 		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
-		title = fmt.Sprintf("%-10s", compactTitleText(row.Commit.Subject))
+		title = renderSearchField(compactTitleText(row.Commit.Subject), searchQuery, 10, selected && graphActive)
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	if selected {

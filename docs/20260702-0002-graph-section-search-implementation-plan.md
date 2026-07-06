@@ -8,8 +8,9 @@
 
 1. 검색 대상은 `Graph` row 중심이다.
 2. 검색어는 title, hash, branch decoration 에 모두 매칭된다.
-3. 결과 선택 시 해당 row 로 즉시 이동한다.
-4. 검색은 화면 상태를 바꾸지 않고, cursor / scroll 만 바꾼다.
+3. `/` 는 transient search popup 을 열고, `enter` 는 첫 매치를 확정한다.
+4. `n` / `N` 은 확정된 검색을 반복 이동한다.
+5. 검색은 화면 상태를 바꾸지 않고, cursor / scroll 만 바꾼다.
 
 ## 사용 시나리오
 
@@ -24,7 +25,7 @@
 
 - `Graph` 검색 input
 - title / hash / branch 매칭
-- result cycle
+- committed search repeat cycle
 - graph cursor / scroll jump
 - 관련 tests
 
@@ -49,12 +50,16 @@ case "/":
 		return m, nil
 	}
 	m.graphSearchOpen = true
-	m.graphSearchDraft = ""
+	m.graphSearchDraft = m.graphSearchQuery
 	m.graphSearchIndex = buildGraphSearchIndex(m.repoStatus)
-	m.graphSearchCursor = 0
-	m.status = loadingToast("Search graph...")
+	m.graphSearchError = ""
 	return m, nil
 ```
+
+`Graph` 외부에서는 `/` 가 기존 섹션 navigation 을 건드리지 않는다.
+
+검색 popup 은 transient 이고, `enter` 로 첫 매치를 확정하면 닫힌다. 이후 `n` / `N` 은 마지막으로 확정된 검색을 반복 탐색한다.
+`Graph` 의 기존 `n`(branch create) 과 충돌하므로, `graphSearchQuery` 가 비어 있을 때만 기존 branch create 를 유지하고, query 가 살아 있으면 repeat search 가 우선한다.
 
 ### 2. 검색 대상은 graph row 와 branch decoration 이다
 
@@ -93,15 +98,17 @@ branch name 은 decoration 에 포함된 값으로 본다.
 
 ## 모델 추가
 
-검색은 branch input 과 별도 상태로 두는 편이 낫다.
+검색은 branch input 과 별도 상태로 두는 편이 낫다. popup 입력 상태와 확정된 repeat 상태를 분리하면 `n/N` 을 vim 처럼 만들 수 있다.
 
 ```go
 type model struct {
 	// existing fields...
-	graphSearchOpen   bool
-	graphSearchDraft  string
-	graphSearchIndex  []graphSearchEntry
-	graphSearchCursor int
+	graphSearchOpen    bool
+	graphSearchDraft   string
+	graphSearchQuery   string
+	graphSearchIndex   []graphSearchEntry
+	graphSearchCursor  int
+	graphSearchError   string
 }
 
 type graphSearchEntry struct {
@@ -116,15 +123,18 @@ type graphSearchEntry struct {
 의도는 단순하다.
 
 - `graphSearchOpen`: overlay 표시 여부
-- `graphSearchDraft`: 입력 문자열
+- `graphSearchDraft`: popup 에서 편집 중인 문자열
+- `graphSearchQuery`: 마지막으로 확정된 검색 문자열
 - `graphSearchIndex`: 현재 repoStatus 기준 검색 후보
-- `graphSearchCursor`: 결과 목록에서 선택된 항목
+- `graphSearchCursor`: 확정된 검색에서 현재 반복 중인 match 위치
+- `graphSearchError`: 매치가 없을 때 popup 안에 보여 줄 메시지
 
 `Row` 는 `graph.Rows()` 기준 row index 이다.
 
 ## 인덱스 생성
 
 인덱스는 별도 저장소가 아니라 현재 repo status 로부터 매번 만든다.
+`n` / `N` 반복 이동도 현재 `repoStatus` 기준으로 다시 계산한다. refresh 후에도 stale search index 를 붙잡지 않는다.
 
 ```go
 func buildGraphSearchIndex(rs git.Status) []graphSearchEntry {
@@ -172,7 +182,7 @@ func buildGraphSearchIndex(rs git.Status) []graphSearchEntry {
 
 ## 매칭 규칙
 
-검색은 prefix + contains 혼합으로 두되, score 기반 정렬로 결과를 고정한다.
+검색은 prefix + contains 혼합으로 두되, score 기반 정렬로 매치를 고정한다. 결과 목록 UI 는 만들지 않는다. popup 은 입력에만 집중하고, 반복 탐색은 `n/N` 이 책임진다.
 
 ```go
 func scoreGraphSearchEntry(entry graphSearchEntry, q string) (int, bool) {
@@ -222,7 +232,7 @@ func anyContains(items []string, q string) bool {
 
 ## 검색 실행
 
-검색은 `enter` 시점에 현재 선택 결과로 점프한다.
+검색은 `enter` 시점에 현재 query 의 첫 매치로 점프한다.
 
 ```go
 func applyGraphSearchSelection(m model) model {
@@ -233,14 +243,13 @@ func applyGraphSearchSelection(m model) model {
 
 	matched := graphSearchMatches(m.graphSearchIndex, m.graphSearchDraft)
 	if len(matched) == 0 {
-		m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No graph match.", "Try a different query.")
+		m.graphSearchError = "No graph match."
 		return m
 	}
 
-	entry := matched[m.graphSearchCursor%len(matched)]
+	entry := matched[0]
 	m.graphSearchOpen = false
-	m.graphSearchDraft = ""
-	m.graphSearchIndex = nil
+	m.graphSearchQuery = strings.TrimSpace(m.graphSearchDraft)
 	m.graphSearchCursor = 0
 	m.activeSection = sectionGraph
 	m.sectionCursor[sectionGraph] = entry.Row
@@ -252,7 +261,7 @@ func applyGraphSearchSelection(m model) model {
 }
 ```
 
-이때 `graphSearchMatches()` 는 score 내림차순으로 정렬한다.
+이때 `graphSearchMatches()` 는 score 내림차순으로 정렬한다. `n` / `N` 은 `graphSearchQuery` 와 `graphSearchCursor` 를 기준으로 다음 / 이전 match 로 순환한다.
 
 ```go
 func graphSearchMatches(index []graphSearchEntry, q string) []graphSearchEntry {
@@ -278,7 +287,7 @@ func graphSearchMatches(index []graphSearchEntry, q string) []graphSearchEntry {
 
 ## key handling
 
-검색 overlay 는 기존 branch input 과 같은 방식으로 별도 handler 로 분리한다.
+검색 overlay 는 기존 branch input 과 같은 방식으로 별도 handler 로 분리한다. popup 이 열려 있을 때는 문자 입력만 처리하고, `n` / `N` 은 그저 query 문자열의 일부다.
 
 ```go
 func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -301,10 +310,11 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 핵심 키 계약은 다음과 같다.
 
 - `esc`: 닫기
-- `enter`: 현재 result 로 점프
+- `enter`: query 를 확정하고 첫 match 로 점프
 - `backspace`: query 삭제
 - printable rune: query 추가
-- `up/down` 또는 `j/k`: result cursor 이동
+- `n` / `N`: popup 이 닫힌 뒤 마지막 search 를 next / prev 로 반복 이동
+- `n` 의 기존 branch create 는 `graphSearchQuery` 가 비어 있을 때만 유지한다
 
 예시 구현:
 
@@ -314,34 +324,21 @@ func (m model) handleGraphSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.graphSearchOpen = false
 		m.graphSearchDraft = ""
-		m.graphSearchIndex = nil
-		m.graphSearchCursor = 0
-		m.status = deriveStatus(m.repoStatus)
+		m.graphSearchError = ""
 		return m, nil
 	case "enter":
 		return applyGraphSearchSelection(m), nil
-	case "up", "k":
-		if m.graphSearchCursor > 0 {
-			m.graphSearchCursor--
-		}
-		return m, nil
-	case "down", "j":
-		matches := graphSearchMatches(m.graphSearchIndex, m.graphSearchDraft)
-		if len(matches) > 0 {
-			m.graphSearchCursor = min(m.graphSearchCursor+1, len(matches)-1)
-		}
-		return m, nil
 	case "backspace":
 		if len(m.graphSearchDraft) > 0 {
 			runes := []rune(m.graphSearchDraft)
 			m.graphSearchDraft = string(runes[:len(runes)-1])
-			m.graphSearchCursor = 0
+			m.graphSearchError = ""
 		}
 		return m, nil
 	default:
 		if len(msg.Runes) > 0 {
 			m.graphSearchDraft += string(msg.Runes)
-			m.graphSearchCursor = 0
+			m.graphSearchError = ""
 			return m, nil
 		}
 	}
@@ -351,15 +348,14 @@ func (m model) handleGraphSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 ## 화면 렌더링
 
-검색은 `Graph` content 위에 얹는 얇은 overlay 로 충분하다.
+검색은 `Graph` content 위에 얹는 얇은 overlay 로 충분하다. popup 에는 query, help text, match count, 그리고 no-match 에러만 보여 준다. 결과 리스트는 보여 주지 않는다.
 
 권장 표시는 다음 수준이다.
 
 ```text
 Search graph: feature/login
-1. a1b2c3d feature/login
-2. d4e5f6a fix login redirect
-3. 9f8e7d6 origin/feature/login
+enter: jump  |  n/N: next/prev  |  esc: cancel
+3 matches
 ```
 
 렌더링은 기존 graph panel 위 또는 context/detail panel 내부에 두어도 된다.
@@ -375,13 +371,12 @@ func (m model) renderGraphSearchOverlay(width int) []string {
 	lines := []string{
 		title.Render("Search"),
 		"query: " + m.graphSearchDraft,
+		"enter: jump  |  n/N: next/prev  |  esc: cancel",
 	}
-	for i, match := range matches {
-		prefix := "  "
-		if i == m.graphSearchCursor {
-			prefix = "> "
-		}
-		lines = append(lines, prefix+shorten(match.Hash, 7)+" "+shorten(match.Title, max(width-12, 0)))
+	if m.graphSearchError != "" {
+		lines = append(lines, warn.Render(m.graphSearchError))
+	} else {
+		lines = append(lines, fmt.Sprintf("%d matches", len(matches)))
 	}
 	return lines
 }
@@ -389,11 +384,13 @@ func (m model) renderGraphSearchOverlay(width int) []string {
 
 ## 상세 동작
 
-### 1. query 가 비어 있으면 최근 graph 순서를 그대로 보여준다
+### 1. query 가 비어 있으면 popup 만 연다
 
-빈 query 는 전체 목록을 보여 주거나, 최소한 현재 `HEAD` 와 가까운 순서를 유지한다.
+빈 query 에서는 결과를 강조하지 않는다. popup 에서 빈 query 로 `enter` 하면 `graphSearchQuery` 와 `graphSearchCursor` 를 clear 하고 popup 만 닫는다. 그 뒤 `n` 은 기존 branch create 로 돌아간다.
 
-### 2. hash prefix 가 7자 이상이면 hash 검색을 우선한다
+### 2. `n` / `N` 은 마지막으로 확정된 search 를 반복한다
+
+`n` 은 다음 match, `N` 은 이전 match 이다. 현재 graph cursor 가 match 리스트 중간이 아니어도 마지막으로 확정된 search 기준으로 순환한다.
 
 hash 는 보통 `7`자 이상에서 식별 가능성이 높다.
 짧은 값도 허용하되, score 는 hash 우선으로 잡는다.
@@ -414,8 +411,12 @@ cursor 만 바꾸면 사용자가 위치를 잃는다.
 ```go
 func TestGraphSearchMatchesHashTitleAndBranch(t *testing.T)
 func TestGraphSearchSelectionMovesCursorScrollAndLane(t *testing.T)
+func TestGraphSearchNAndPrevCycleThroughMatches(t *testing.T)
+func TestGraphSearchEmptyEnterClearsRepeatMode(t *testing.T)
 func TestGraphSearchEscRestoresBrowseState(t *testing.T)
 func TestGraphSearchIsGraphSectionOnly(t *testing.T)
+func TestGraphSearchNoMatchKeepsPopupOpen(t *testing.T)
+func TestGraphSearchBranchCreateStillWorksWhenRepeatCleared(t *testing.T)
 ```
 
 각 테스트에서 확인할 내용은 명확하다.
@@ -423,8 +424,12 @@ func TestGraphSearchIsGraphSectionOnly(t *testing.T)
 - hash prefix 가 title 보다 우선하는지
 - branch decoration 이 title 보다 우선하는지
 - enter 시 `sectionCursor[sectionGraph]`, `graphScroll`, `graphLaneCursor` 가 동기화되는지
-- `esc` 시 검색 상태가 완전히 초기화되는지
+- `n` / `N` 이 마지막 검색을 기준으로 순환하는지
+- 빈 query enter 가 search repeat 를 clear 하는지
+- `esc` 시 popup 입력 상태가 완전히 초기화되는지
 - Graph 바깥에서는 shortcut 이 무시되는지
+- no-match 에서는 popup 이 닫히지 않고 query 를 바로 고칠 수 있는지
+- repeat mode 가 꺼진 뒤 Graph 기존 branch create 가 다시 동작하는지
 
 ## 구현 순서
 
@@ -432,7 +437,7 @@ func TestGraphSearchIsGraphSectionOnly(t *testing.T)
 2. `graph.Rows()` 기반 검색 인덱스를 만든다.
 3. `handleKeyMsg()` 에 search overlay 분기를 추가한다.
 4. 검색 입력 handler 를 분리한다.
-5. 검색 결과 점프 helper 를 추가한다.
+5. 검색 확정 및 repeat jump helper 를 추가한다.
 6. overlay 렌더를 추가한다.
 7. 검색 관련 테스트를 추가한다.
 
@@ -440,6 +445,7 @@ func TestGraphSearchIsGraphSectionOnly(t *testing.T)
 
 - Graph 에서 `/` 로 검색을 열 수 있다.
 - title, hash, branch name 으로 commit 을 찾을 수 있다.
-- 결과를 선택하면 해당 row 로 즉시 이동한다.
+- `enter` 는 첫 match 로 점프하고 popup 을 닫는다.
+- `n` / `N` 은 마지막 검색을 반복 이동한다.
 - 검색 중에도 기존 graph navigation 은 망가지지 않는다.
 - 구현 기준이 테스트로 고정된다.

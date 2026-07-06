@@ -95,23 +95,13 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			detail := "Current branch already contains " + msg.target + ". Current: " + strconv.Itoa(msg.currentOnly) + "  Target: " + strconv.Itoa(msg.targetOnly)
 			m.status = state.New().WithBlocked(state.BlockUnknown, reason, detail)
 		default:
-			titleMsg := "Merge into current branch?"
-			if msg.action == state.ActionRebase {
-				titleMsg = "Rebase onto this commit?"
-			}
-			detailMsg := ""
-			if msg.action == state.ActionMerge {
-				detailMsg = "This will merge commit " + shorten(msg.target, 7) + " into " + msg.repo.Branch + ".\nA merge commit will be created if histories have diverged.\n\nContinue? (y: yes  •  n: no)"
-			} else {
-				detailMsg = "This will rebase " + msg.repo.Branch + " onto commit " + shorten(msg.target, 7) + ".\nLocal commits will be replayed on top of the target.\n\n⚠️ Conflicts may occur during rebase.\n\nContinue? (y: yes  •  n: no)"
-			}
-			m.status = m.status.WithConfirm(msg.action, titleMsg, detailMsg)
-			m.status.Title = titleMsg
+			m.status = buildGraphActionReviewStatus(msg.action, msg.repo, msg.target, msg.base, msg.currentOnly, msg.targetOnly)
 			m.status.Selected = msg.target
 		}
 		telemetry.Log("app", "graph_action_check", map[string]string{
 			"action":      string(msg.action),
 			"target":      msg.target,
+			"base":        msg.base,
 			"currentOnly": strconv.Itoa(msg.currentOnly),
 			"targetOnly":  strconv.Itoa(msg.targetOnly),
 		})

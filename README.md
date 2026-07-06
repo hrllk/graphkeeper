@@ -126,6 +126,8 @@ You stop guessing which ref is safe to move.
 - `tab` / `shift+tab` switch sections
 - `up` / `down` / `j` / `k` move
 - `enter` inspect or execute the current action
+- `/` search the graph section
+- `n` / `N` repeat the last graph search
 - `f` fetch
 - `q` quit
 
