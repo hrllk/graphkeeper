@@ -148,7 +148,7 @@ func popupWidthForBody(bodyWidth, minWidth, maxWidth int) int {
 func renderConfirmPopup(m model, bodyWidth int) string {
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	width := popupWidthForBody(bodyWidth, 32, 54)
+	width := popupWidthForBody(bodyWidth, 28, 42)
 	align := lipgloss.Center
 	popupBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -282,11 +282,11 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
 		Padding(1, 2).
-		Width(popupWidthForBody(bodyWidth, 34, 52)).
+		Width(popupWidthForBody(bodyWidth, 28, 40)).
 		Align(lipgloss.Left)
-	helpText := "up/down: choose target  •  enter: preview  •  esc: back"
+	helpText := "enter: preview  •  esc: back"
 	if m.status.Action == state.ActionCheckout {
-		helpText = "up/down: choose branch  •  enter: checkout  •  esc: back"
+		helpText = "enter: checkout  •  esc: back"
 	}
 	lines := []string{
 		descStyle.Render(m.status.Message),
@@ -299,7 +299,7 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 		popupBox,
 		m.status.Title,
 		strings.Join(lines, "\n"),
-		popupWidthForBody(bodyWidth, 34, 52),
+		popupWidthForBody(bodyWidth, 28, 40),
 	)
 }
 
