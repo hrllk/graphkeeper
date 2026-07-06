@@ -30,6 +30,14 @@ var (
 	highlight     = lipgloss.NewStyle().Reverse(true).Bold(true)
 	conflictColor = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 	conflictMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	reviewCurrent = headMark
+	reviewTarget  = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+	reviewBase    = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Bold(true)
+	reviewHash    = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
+	reviewBranch  = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	reviewMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	reviewCount   = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
+	reviewFooter  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
 func (m model) getBoxStyle(section graphSection) lipgloss.Style {
@@ -95,7 +103,7 @@ func renderAppView(m model) string {
 		if m.status.Mode == state.ModeResetModePick {
 			centeredBody = overlayPopup(centeredBody, renderResetModePopup(bodyWidth))
 		} else if m.status.Mode == state.ModeReview {
-			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
+			centeredBody = overlayPopup(centeredBody, renderReviewPopup(m, bodyWidth))
 		} else {
 			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
 		}
@@ -139,10 +147,6 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	width := popupWidthForBody(bodyWidth, 32, 54)
 	align := lipgloss.Center
-	if m.status.Mode == state.ModeReview {
-		width = popupWidthForBody(bodyWidth, 44, 78)
-		align = lipgloss.Left
-	}
 	popupBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
@@ -150,18 +154,11 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 		Width(width).
 		Align(align)
 	popupTitle := m.status.Title
-	if m.status.Mode == state.ModeReview {
-		popupTitle = m.status.Message
-		if popupTitle == "" {
-			popupTitle = "분기점 확인하기"
-		}
-	} else if popupTitle == "" || popupTitle == "Confirm" {
+	if popupTitle == "" || popupTitle == "Confirm" {
 		popupTitle = "Continue?"
 	}
 	helpText := "y: yes  •  n: no"
-	if m.status.Mode == state.ModeReview {
-		helpText = "y: continue  •  n: cancel"
-	} else if m.status.Action == state.ActionPull && !m.pullIsFastForward {
+	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
 		helpText = "m: merge  •  r: rebase  •  esc: cancel"
 	} else if m.status.Action == state.ActionDeleteBranch {
 		helpText = "y: delete  •  n: cancel"
@@ -179,6 +176,58 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 		}, "\n\n"),
 		width,
 	)
+}
+
+func renderReviewPopup(m model, bodyWidth int) string {
+	width := popupWidthForBody(bodyWidth, 26, 40)
+	popupBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Padding(1, 2).
+		Width(width).
+		Align(lipgloss.Left)
+	popupTitle := m.status.Message
+	if popupTitle == "" {
+		popupTitle = "Branch has diverged"
+	}
+	body := centerReviewFooterLine(m.status.Detail, width-4)
+	return renderFloatingTitlePopup(
+		popupBox,
+		popupTitle,
+		body,
+		width,
+	)
+}
+
+func centerReviewFooterLine(body string, width int) string {
+	if width <= 0 || body == "" {
+		return body
+	}
+	lines := strings.Split(body, "\n")
+	last := -1
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) != "" {
+			last = i
+			break
+		}
+	}
+	if last < 0 {
+		return body
+	}
+	lines[last] = centerReviewLineInWidth(lines[last], width)
+	return strings.Join(lines, "\n")
+}
+
+func centerReviewLineInWidth(line string, width int) string {
+	visible := lipgloss.Width(line)
+	if visible >= width {
+		return line
+	}
+	leftPad := (width - visible) / 2
+	if leftPad < 0 {
+		leftPad = 0
+	}
+	return strings.Repeat(" ", leftPad) + line
 }
 
 func renderResetModePopup(bodyWidth int) string {

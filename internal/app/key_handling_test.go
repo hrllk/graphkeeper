@@ -649,6 +649,9 @@ func TestGraphMergeShortcutChecksDivergenceBeforeConfirm(t *testing.T) {
 	if got.status.Mode != state.ModeReview {
 		t.Fatalf("expected review mode after diverged graph target, got %s", got.status.Mode)
 	}
+	if got.status.Message != "Branch has diverged" {
+		t.Fatalf("expected diverged review title, got %q", got.status.Message)
+	}
 	if got.status.Action != state.ActionMerge {
 		t.Fatalf("expected merge action, got %s", got.status.Action)
 	}

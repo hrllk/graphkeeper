@@ -70,3 +70,18 @@
 - Use `/` to open a transient search popup, `enter` to jump to the first match, and `n` / `N` to repeat the last confirmed search.
 - Keep branch creation on `n` when no graph search query is active.
 - Do not add a result list; keep the popup focused on query entry, match count, and no-match feedback.
+
+## 2026-07-06: Graph stash visualization should read as a pinned moment in the graph
+
+- Treat stash as graph metadata, not a separate global concept.
+- Use a strong stash highlight in the Graph row so stash-bearing commits read as recoverable points in history.
+- Keep the focused commit's stash summary in the detail panel and enable `p` only when that pointer has stash entries.
+- Make the follow-through obvious in the inspect view: create branch, checkout, then pop, with `pop only` as an explicit secondary action.
+- The detailed Graph stash flow lives in `docs/graph-stash-interaction.md` so the system design stays separate from the feature contract.
+
+## 2026-07-06: Diverged merge/rebase review uses a dedicated status inspection modal
+
+- Keep the final confirm dialog unchanged for merge and rebase execution.
+- Render the diverged-branch review as a wider left-aligned inspection modal so it reads as state awareness, not execution.
+- Use the `CURRENT hash (branch • mark)` summary format for the current, target, and base rows so hash, branch, and role are scanned in one pass.
+- Keep `CURRENT`, `TARGET`, and `BASE` as the primary visual anchors and treat the graph excerpt as supporting evidence.

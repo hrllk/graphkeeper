@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/state"
 )
 
 func buildGraphActionReviewStatus(action state.Action, rs git.Status, target, base string, currentOnly, targetOnly int) state.Status {
-	status := state.New().WithReview(action, "분기점 확인하기", buildGraphActionReviewDetail(rs, target, base, currentOnly, targetOnly))
+	status := state.New().WithReview(action, "Branch has diverged", buildGraphActionReviewDetail(action, rs, target, base, currentOnly, targetOnly))
 	status.Selected = target
 	return status
 }
@@ -31,114 +33,163 @@ func buildGraphActionConfirmStatus(action state.Action, rs git.Status, target st
 	return status
 }
 
-func buildGraphActionReviewDetail(rs git.Status, target, base string, currentOnly, targetOnly int) string {
-	lines := []string{
-		fmt.Sprintf("target: %s", describeGraphActionRef(rs, target)),
-		fmt.Sprintf("base:   %s", describeGraphActionRef(rs, base)),
-		fmt.Sprintf("currentOnly: %d", currentOnly),
-		fmt.Sprintf("targetOnly:  %d", targetOnly),
-		"",
+func buildGraphActionReviewDetail(action state.Action, rs git.Status, target, base string, currentOnly, targetOnly int) string {
+	subtitle := "Review before continuing."
+	switch action {
+	case state.ActionMerge:
+		subtitle = "Review before merge."
+	case state.ActionRebase:
+		subtitle = "Review before rebase."
 	}
-	lines = append(lines, buildGraphActionReviewDiagram(rs, target, base, currentOnly, targetOnly)...)
-	lines = append(lines, "")
-	lines = append(lines, "y: continue  •  n: cancel")
-	return strings.Join(lines, "\n")
+
+	return strings.Join([]string{
+		centerReviewLine(subtitle),
+		"",
+		buildGraphActionReviewDiagram(rs, target, base, currentOnly, targetOnly),
+		"",
+		centerReviewLine("y: continue  •  n: cancel"),
+	}, "\n")
 }
 
-func describeGraphActionRef(rs git.Status, hash string) string {
-	if hash == "" {
-		return "-"
+func centerReviewLine(text string) string {
+	return reviewFooter.Render(text)
+}
+
+func reviewCurrentBranch(rs git.Status) string {
+	branch := strings.TrimSpace(rs.Branch)
+	if branch != "" {
+		return branch
 	}
-	if rows := graphRows(rs); len(rows) > 0 {
-		if idx := findGraphRowByHash(rows, hash); idx >= 0 {
-			subject := strings.TrimSpace(rows[idx].Commit.Subject)
-			if subject != "" {
-				return shorten(hash, 7) + "  " + subject
+	if rs.Detached && rs.Head != "" {
+		return "HEAD"
+	}
+	return ""
+}
+
+func reviewBranchNameForHash(rs git.Status, hash string) string {
+	if hash == "" {
+		return ""
+	}
+	rows := graphRows(rs)
+	idx := findGraphRowByHash(rows, hash)
+	if idx < 0 {
+		return ""
+	}
+	return reviewBranchNameFromDecorations(rows[idx].Commit.Decorations, rs.LocalBranches)
+}
+
+func reviewBranchNameFromDecorations(decorations []string, localBranches []string) string {
+	if len(decorations) == 0 {
+		return ""
+	}
+	localSet := make(map[string]struct{}, len(localBranches))
+	for _, branch := range localBranches {
+		localSet[strings.TrimSpace(branch)] = struct{}{}
+	}
+	branches := make(map[string]*branchState)
+	headBranch := ""
+
+	addBranch := func(name string) *branchState {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return nil
+		}
+		state, ok := branches[name]
+		if !ok {
+			state = &branchState{}
+			branches[name] = state
+		}
+		return state
+	}
+
+	for _, decoration := range decorations {
+		decoration = strings.TrimSpace(decoration)
+		if decoration == "" {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(decoration, "HEAD -> "):
+			name := strings.TrimPrefix(decoration, "HEAD -> ")
+			if state := addBranch(name); state != nil {
+				state.local = true
+				headBranch = strings.TrimSpace(name)
+			}
+		case strings.HasPrefix(decoration, "origin/HEAD -> origin/"):
+			if state := addBranch(strings.TrimPrefix(decoration, "origin/HEAD -> origin/")); state != nil {
+				state.remote = true
+			}
+		case decoration == "origin/HEAD":
+			if state := addBranch("HEAD"); state != nil {
+				state.remote = true
+			}
+		case strings.HasPrefix(decoration, "origin/"):
+			name := strings.TrimPrefix(decoration, "origin/")
+			if name == "HEAD" {
+				continue
+			}
+			if state := addBranch(name); state != nil {
+				state.remote = true
+			}
+		case strings.HasPrefix(decoration, "tag: "):
+			continue
+		default:
+			if _, ok := localSet[decoration]; ok {
+				if state := addBranch(decoration); state != nil {
+					state.local = true
+				}
+			} else if !strings.Contains(decoration, "/") {
+				if state := addBranch(decoration); state != nil {
+					state.local = true
+				}
 			}
 		}
 	}
-	return shorten(hash, 7)
+
+	name := pickCompactBranchName(branches, headBranch)
+	if name == "" || name == "HEAD" {
+		return ""
+	}
+	return name
 }
 
-func buildGraphActionReviewDiagram(rs git.Status, target, base string, currentOnly, targetOnly int) []string {
-	rows := graphRows(rs)
-	if excerpt := compactGraphActionReviewExcerpt(rows, rs.Head, target, base); len(excerpt) > 0 {
-		return excerpt
+func buildGraphActionReviewDiagram(rs git.Status, target, base string, currentOnly, targetOnly int) string {
+	currentBranch := reviewCurrentBranch(rs)
+	targetBranch := reviewBranchNameForHash(rs, target)
+	if targetBranch == "" {
+		targetBranch = "requested branch"
 	}
-	return []string{
-		"* " + shorten(rs.Head, 7) + "  current branch",
+	lines := []string{
+		"*    " + reviewCurrent.Render(shorten(rs.Head, 7)) + " " + reviewCurrent.Render("CURRENT") + " " + reviewCount.Render(fmt.Sprintf("+%d", currentOnly)) + reviewBranchSuffix(currentBranch),
 		"|",
-		"| + " + fmt.Sprintf("%d commits", currentOnly),
-		"|",
-		"| * " + shorten(base, 7) + "  merge base",
-		"| | + " + fmt.Sprintf("%d commits", targetOnly),
+		"| *  " + reviewTarget.Render(shorten(target, 7)) + " " + reviewTarget.Render("TARGET") + " " + reviewCount.Render(fmt.Sprintf("+%d", targetOnly)) + reviewBranchSuffix(targetBranch),
+		"| |",
 		"|/",
-		"* " + shorten(target, 7) + "  target branch",
+		"*    " + reviewBase.Render(shorten(base, 7)) + " " + reviewBase.Render("BASE"),
 	}
+	return strings.Join(padReviewDiagramLines(lines), "\n")
 }
 
-func compactGraphActionReviewExcerpt(rows []graphRow, head, target, base string) []string {
-	if len(rows) == 0 {
-		return nil
+func reviewBranchSuffix(branch string) string {
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		return ""
 	}
-	if !rowsHaveGraphPrefix(rows) {
-		return nil
-	}
-	indices := []int{
-		findGraphRowByHash(rows, head),
-		findGraphRowByHash(rows, target),
-		findGraphRowByHash(rows, base),
-	}
-	minIdx, maxIdx := -1, -1
-	for _, idx := range indices {
-		if idx < 0 {
-			continue
-		}
-		if minIdx < 0 || idx < minIdx {
-			minIdx = idx
-		}
-		if idx > maxIdx {
-			maxIdx = idx
-		}
-	}
-	if minIdx < 0 || maxIdx < 0 {
-		return nil
-	}
-	if maxIdx-minIdx > 5 {
-		return nil
-	}
-	start := max(0, minIdx-1)
-	end := min(len(rows), maxIdx+2)
-	lines := make([]string, 0, end-start+1)
-	for i := start; i < end; i++ {
-		row := rows[i]
-		if row.Commit.Hash == "" {
-			continue
-		}
-		marker := ""
-		switch row.Commit.Hash {
-		case head:
-			marker = "HEAD"
-		case target:
-			marker = "TARGET"
-		case base:
-			marker = "BASE"
-		}
-		graphCell := row.Graph
-		if graphCell == "" {
-			graphCell = "*"
-		}
-		line := fmt.Sprintf("  %-7s %-6s %-10s %s", shorten(row.Commit.Hash, 7), marker, graphCell, shorten(row.Commit.Subject, 32))
-		lines = append(lines, strings.TrimRight(line, " "))
-	}
-	return lines
+	return " (" + reviewBranch.Render(branch) + ")"
 }
 
-func rowsHaveGraphPrefix(rows []graphRow) bool {
-	for _, row := range rows {
-		if row.Graph != "" {
-			return true
+func padReviewDiagramLines(lines []string) []string {
+	maxWidth := 0
+	for _, line := range lines {
+		if w := lipgloss.Width(line); w > maxWidth {
+			maxWidth = w
 		}
 	}
-	return false
+	if maxWidth == 0 {
+		return lines
+	}
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		out[i] = padRight(line, maxWidth)
+	}
+	return out
 }
