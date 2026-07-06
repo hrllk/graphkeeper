@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/graph"
@@ -58,6 +59,15 @@ func TestNavigationClampHelpers(t *testing.T) {
 	if got := clampLaneCursor(7, row); got != 0 {
 		t.Fatalf("expected lane cursor to clamp to pointer lane, got %d", got)
 	}
+}
+
+func forceTrueColorProfile(t *testing.T) {
+	t.Helper()
+	previous := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() {
+		lipgloss.SetColorProfile(previous)
+	})
 }
 
 func TestMoveSelectableGraphPointerSkipsConnectors(t *testing.T) {
@@ -1801,6 +1811,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 }
 
 func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
+	forceTrueColorProfile(t)
 	rows := graph.Rows(git.Status{
 		LocalBranches: []string{"main"},
 		GraphCommits: []git.GraphCommit{

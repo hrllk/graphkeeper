@@ -232,6 +232,9 @@ func renderActionHelpLines(m model) []string {
 		}
 		return lines
 	case state.ModeTargetPick:
+		if m.status.Action == state.ActionCheckout {
+			return []string{"• up/down: choose branch            • enter: checkout", "• esc: back"}
+		}
 		return []string{"• up/down: choose target            • enter: preview", "• esc: back"}
 	case state.ModeResetModePick:
 		return []string{"• s: soft  •  m: mixed  •  h: hard", "• esc: back"}

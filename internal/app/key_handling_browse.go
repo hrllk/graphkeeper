@@ -209,18 +209,27 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = loadingToast("Preparing reset...")
 		return m, previewSelection(m.repo, m.repoStatus, state.ActionReset, focus.Hash)
 	case "space", " ":
-		target, ok := graphCheckoutTarget(m)
-		if !ok {
+		targets := graphCheckoutTargets(m)
+		if len(targets) == 0 {
 			return m, nil
 		}
 		if m.repoStatus.WorktreeDirty {
 			m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first.")
 			return m, nil
 		}
-		titleMsg := "Checkout branch?"
-		m.status = state.New().WithConfirm(state.ActionCheckout, titleMsg, "Switch to "+target+".")
-		m.status.Title = titleMsg
-		m.status.Selected = target
+		if len(targets) == 1 {
+			target := targets[0].Ref
+			titleMsg := "Checkout branch?"
+			m.status = state.New().WithConfirm(state.ActionCheckout, titleMsg, "Switch to "+target+".")
+			m.status.Title = titleMsg
+			m.status.Selected = target
+			return m, nil
+		}
+		status := state.New().WithTargetPick(state.ActionCheckout, targets)
+		status.Title = "Checkout branch"
+		status.Message = "Choose a local branch."
+		status.Detail = "Enter confirms. Esc returns."
+		m.status = status
 		return m, nil
 	case "/", "?":
 		m.graphSearchOpen = true
@@ -271,9 +280,6 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.status = state.New().WithBlocked(state.BlockUnknown, "No checkout target.", "Move to a local or remote branch.")
-			return m, nil
-		}
-		if m.activeSection == sectionGraph {
 			return m, nil
 		}
 		m.status = state.New().WithBlocked(state.BlockUnknown, "Checkout unavailable here.", "Use the Context or Remote section.")

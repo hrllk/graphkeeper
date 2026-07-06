@@ -283,6 +283,10 @@ func focusBranchSummaryLines(node graphNode, width int) []string {
 	}
 	lines := make([]string, 0, len(node.Decorations))
 	for _, dec := range node.Decorations {
+		trimmed := strings.TrimSpace(dec)
+		if trimmed == "" || strings.HasPrefix(trimmed, "origin/") || strings.HasPrefix(trimmed, "tag: ") {
+			continue
+		}
 		lines = append(lines, fmt.Sprintf("  - %s", shorten(dec, max(width-6, 0))))
 	}
 	return lines

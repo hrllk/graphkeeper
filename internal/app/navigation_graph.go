@@ -1,8 +1,12 @@
 package app
 
 import (
+	"sort"
+	"strings"
+
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/graph"
+	"hrllk/graphkeeper/internal/state"
 )
 
 func graphNodes(rs git.Status) []graphNode {
@@ -82,15 +86,86 @@ func currentGraphFocus(rs git.Status, cursor int) graphNode {
 }
 
 func graphCheckoutTarget(m model) (string, bool) {
-	if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+	targets := graphCheckoutTargets(m)
+	if len(targets) == 0 {
 		return "", false
+	}
+	return targets[0].Ref, true
+}
+
+func graphCheckoutTargets(m model) []state.TargetItem {
+	if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+		return nil
 	}
 	focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
-	target := checkoutTargetFromFocus(focus)
-	if target == "" {
-		return "", false
+	names := graphLocalBranchNames(focus.Decorations, m.repoStatus.LocalBranches)
+	if len(names) == 0 {
+		return nil
 	}
-	return target, true
+	if len(names) > 1 {
+		sort.SliceStable(names, func(i, j int) bool {
+			if names[i] == m.repoStatus.Branch {
+				return true
+			}
+			if names[j] == m.repoStatus.Branch {
+				return false
+			}
+			return names[i] < names[j]
+		})
+	}
+	targets := make([]state.TargetItem, 0, len(names))
+	for _, name := range names {
+		targets = append(targets, state.TargetItem{
+			Kind:    state.TargetKindLocal,
+			Name:    name,
+			Ref:     name,
+			Current: !m.repoStatus.Detached && name == m.repoStatus.Branch,
+		})
+	}
+	return targets
+}
+
+func graphLocalBranchNames(decorations []string, localBranches []string) []string {
+	localSet := make(map[string]struct{}, len(localBranches))
+	for _, branch := range localBranches {
+		branch = strings.TrimSpace(branch)
+		if branch != "" {
+			localSet[branch] = struct{}{}
+		}
+	}
+	seen := make(map[string]struct{}, len(decorations))
+	names := make([]string, 0, len(decorations))
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || name == "HEAD" {
+			return
+		}
+		if strings.HasPrefix(name, "origin/") || strings.HasPrefix(name, "tag: ") {
+			return
+		}
+		if len(localSet) > 0 {
+			if _, ok := localSet[name]; !ok {
+				return
+			}
+		}
+		if _, ok := seen[name]; ok {
+			return
+		}
+		seen[name] = struct{}{}
+		names = append(names, name)
+	}
+	for _, decoration := range decorations {
+		decoration = strings.TrimSpace(decoration)
+		if decoration == "" {
+			continue
+		}
+		if strings.HasPrefix(decoration, "HEAD -> ") {
+			add(strings.TrimPrefix(decoration, "HEAD -> "))
+			continue
+		}
+		add(decoration)
+	}
+	return names
 }
 
 func focusGraphHead(m *model, rs git.Status) {

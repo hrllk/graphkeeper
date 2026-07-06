@@ -35,6 +35,13 @@ func (m model) handleTargetPickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No target selected.", "Choose a branch, tag, or ref.")
 			return m, nil
 		}
+		if action == state.ActionCheckout {
+			titleMsg := "Checkout branch?"
+			m.status = state.New().WithConfirm(action, titleMsg, "Switch to "+target+".")
+			m.status.Title = titleMsg
+			m.status.Selected = target
+			return m, nil
+		}
 		m.status = loadingToast("Previewing...")
 		return m, previewSelection(m.repo, m.repoStatus, action, target)
 	case "esc":
