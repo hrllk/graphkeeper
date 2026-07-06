@@ -949,6 +949,68 @@ func TestCheckoutShortcutBlockedWhenDirty(t *testing.T) {
 	}
 }
 
+func TestGraphCheckoutShortcutOpensConfirmWhenClean(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+		GraphCommits: []git.GraphCommit{{
+			Graph:       "*",
+			Hash:        fixture.initialHash,
+			Decorations: []string{"HEAD -> main"},
+		}},
+	})
+	m.sectionCursor[sectionGraph] = 0
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected graph checkout shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionCheckout {
+		t.Fatalf("expected checkout action, got %s", got.status.Action)
+	}
+	if got.status.Selected != "main" {
+		t.Fatalf("expected graph checkout target to be stored, got %q", got.status.Selected)
+	}
+}
+
+func TestGraphCheckoutShortcutBlockedWhenDirty(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main"},
+		WorktreeDirty: true,
+		GraphCommits: []git.GraphCommit{{
+			Graph:       "*",
+			Hash:        fixture.initialHash,
+			Decorations: []string{"HEAD -> main"},
+		}},
+	})
+	m.sectionCursor[sectionGraph] = 0
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected dirty graph checkout to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeBlocked {
+		t.Fatalf("expected blocked mode, got %s", got.status.Mode)
+	}
+	if got.status.Block != state.BlockDirtyTree {
+		t.Fatalf("expected dirty tree block, got %s", got.status.Block)
+	}
+}
+
 func TestConfirmPullShortcutVariants(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root, Branch: "main", Head: fixture.initialHash})

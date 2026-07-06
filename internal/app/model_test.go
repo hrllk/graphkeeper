@@ -1134,11 +1134,26 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	graph := renderActionHelpLines(model{
 		status:        state.New().WithBrowse(),
 		activeSection: sectionGraph,
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{{
+				Graph:       "*",
+				Hash:        "abc1234",
+				Parents:     []string{"def5678"},
+				Decorations: []string{"HEAD -> main"},
+			}},
+			LocalBranches: []string{"main"},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph: 0,
+		},
 	})
 	// merge/rebase labels must be present (may be styled disabled when no local lane)
 	graphJoined := strings.Join(graph, " ")
 	if !strings.Contains(graphJoined, "m: merge") || !strings.Contains(graphJoined, "r: rebase") {
 		t.Fatalf("expected graph actions to include merge/rebase labels, got %v", graph)
+	}
+	if !containsLine(graph, "• space: checkout") {
+		t.Fatalf("expected graph actions to include checkout when a local pointer is focused, got %v", graph)
 	}
 	if !containsLine(graph, "• s: reset         • ctrl+u/d: scroll") {
 		t.Fatalf("expected graph actions to include reset/scroll, got %v", graph)
@@ -1149,10 +1164,6 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	if !strings.Contains(strings.Join(graph, " "), "d: delete branch") {
 		t.Fatalf("expected graph actions to include delete branch, got %v", graph)
 	}
-	if containsLine(graph, "• space: checkout") {
-		t.Fatalf("expected graph actions to exclude checkout, got %v", graph)
-	}
-
 	current := renderActionHelpLines(model{
 		status:        state.New().WithBrowse(),
 		activeSection: sectionCurrent,
@@ -1337,7 +1348,7 @@ func TestNumberKeysSwitchSections(t *testing.T) {
 	}
 }
 
-func TestSpaceDoesNotCheckoutFromGraphSection(t *testing.T) {
+func TestSpaceChecksOutFromGraphSection(t *testing.T) {
 	m := model{
 		status:        state.New().WithBrowse(),
 		activeSection: sectionGraph,
@@ -1347,7 +1358,11 @@ func TestSpaceDoesNotCheckoutFromGraphSection(t *testing.T) {
 			Branch:        "main",
 			Head:          "head",
 			LocalBranches: []string{"main"},
-			GraphCommits:  []git.GraphCommit{{Hash: "head"}},
+			GraphCommits: []git.GraphCommit{{
+				Graph:       "*",
+				Hash:        "head",
+				Decorations: []string{"HEAD -> main"},
+			}},
 		},
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
@@ -1355,14 +1370,21 @@ func TestSpaceDoesNotCheckoutFromGraphSection(t *testing.T) {
 			sectionRemote:  0,
 			sectionTags:    0,
 		},
+		graphLaneCursor: 0,
 	}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	got := gotModel.(model)
 	if cmd != nil {
-		t.Fatal("expected space to be disabled in graph section")
+		t.Fatalf("expected space checkout to stay synchronous, got %v", cmd)
 	}
-	if got.status.Mode != state.ModeBrowse {
-		t.Fatalf("expected browse mode to remain unchanged, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionCheckout {
+		t.Fatalf("expected checkout action, got %s", got.status.Action)
+	}
+	if got.status.Selected != "main" {
+		t.Fatalf("expected graph checkout target to be stored, got %q", got.status.Selected)
 	}
 }
 

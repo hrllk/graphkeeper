@@ -208,6 +208,20 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.status = loadingToast("Preparing reset...")
 		return m, previewSelection(m.repo, m.repoStatus, state.ActionReset, focus.Hash)
+	case "space", " ":
+		target, ok := graphCheckoutTarget(m)
+		if !ok {
+			return m, nil
+		}
+		if m.repoStatus.WorktreeDirty {
+			m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is dirty.", "Commit or stash changes first.")
+			return m, nil
+		}
+		titleMsg := "Checkout branch?"
+		m.status = state.New().WithConfirm(state.ActionCheckout, titleMsg, "Switch to "+target+".")
+		m.status.Title = titleMsg
+		m.status.Selected = target
+		return m, nil
 	case "/", "?":
 		m.graphSearchOpen = true
 		m.graphSearchDraft = m.graphSearchQuery

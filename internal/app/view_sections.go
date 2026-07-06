@@ -136,6 +136,15 @@ func renderActionHelpLines(m model) []string {
 			} else {
 				lines = append(lines, disabled.Render(mergeLabel)+"         "+disabled.Render(rebaseLabel)+" "+muted.Render("(local lane only)"))
 			}
+			if _, ok := graphCheckoutTarget(m); ok {
+				if m.repoStatus.WorktreeDirty {
+					lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(dirty)"))
+				} else {
+					lines = append(lines, "• space: checkout")
+				}
+			} else {
+				lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(local lane only)"))
+			}
 			if pullReady(m.repoStatus) && isLocal {
 				lines = append(lines, "• p: pull")
 			} else {
@@ -148,8 +157,7 @@ func renderActionHelpLines(m model) []string {
 			if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 				lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(local lane only)"))
 			} else {
-				focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
-				target := checkoutTargetFromFocus(focus)
+				target, _ := graphCheckoutTarget(m)
 				if target != "" && !m.repoStatus.Detached && target == m.repoStatus.Branch {
 					lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(current branch)"))
 				} else {

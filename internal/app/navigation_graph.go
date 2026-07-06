@@ -81,6 +81,18 @@ func currentGraphFocus(rs git.Status, cursor int) graphNode {
 	return graph.CurrentFocus(rs, cursor)
 }
 
+func graphCheckoutTarget(m model) (string, bool) {
+	if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
+		return "", false
+	}
+	focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+	target := checkoutTargetFromFocus(focus)
+	if target == "" {
+		return "", false
+	}
+	return target, true
+}
+
 func focusGraphHead(m *model, rs git.Status) {
 	m.activeSection = sectionGraph
 	rows := graph.Rows(rs)
