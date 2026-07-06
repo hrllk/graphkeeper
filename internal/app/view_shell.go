@@ -108,6 +108,9 @@ func renderAppView(m model) string {
 			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
 		}
 	}
+	if m.status.Mode == state.ModeTargetPick {
+		centeredBody = overlayPopup(centeredBody, renderTargetPickPopup(m, bodyWidth))
+	}
 	if m.branchOpen {
 		centeredBody = overlayPopup(centeredBody, renderBranchInputPopup(m, bodyWidth))
 	}
@@ -160,6 +163,8 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 	helpText := "y: yes  •  n: no"
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
 		helpText = "m: merge  •  r: rebase  •  esc: cancel"
+	} else if m.status.Message == "Fast-forward available." {
+		helpText = "enter: fast-forward  •  esc: dismiss"
 	} else if m.status.Action == state.ActionDeleteBranch {
 		helpText = "y: delete  •  n: cancel"
 	} else if m.status.Action == state.ActionStash {
@@ -267,6 +272,34 @@ func renderLoadingPopup(m model, bodyWidth int) string {
 			descStyle.Render(m.status.Detail),
 		}, "\n"),
 		popupWidthForBody(bodyWidth, 28, 44),
+	)
+}
+
+func renderTargetPickPopup(m model, bodyWidth int) string {
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	popupBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Padding(1, 2).
+		Width(popupWidthForBody(bodyWidth, 34, 52)).
+		Align(lipgloss.Left)
+	helpText := "up/down: choose target  •  enter: preview  •  esc: back"
+	if m.status.Action == state.ActionCheckout {
+		helpText = "up/down: choose branch  •  enter: checkout  •  esc: back"
+	}
+	lines := []string{
+		descStyle.Render(m.status.Message),
+		"",
+		renderTargets(m.status),
+		"",
+		helpStyle.Render(helpText),
+	}
+	return renderFloatingTitlePopup(
+		popupBox,
+		m.status.Title,
+		strings.Join(lines, "\n"),
+		popupWidthForBody(bodyWidth, 34, 52),
 	)
 }
 

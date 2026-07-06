@@ -75,8 +75,8 @@
 
 - Treat stash as graph metadata, not a separate global concept.
 - Use a strong stash highlight in the Graph row so stash-bearing commits read as recoverable points in history.
-- Keep the focused commit's stash summary in the detail panel and enable `p` only when that pointer has stash entries.
-- Make the follow-through obvious in the inspect view: create branch, checkout, then pop, with `pop only` as an explicit secondary action.
+- Keep the focused commit's stash summary in the detail panel so the Graph surface stays visual-first.
+- Keep Graph stash behavior separate from the session stash list UI, pop execution, and branch continuation docs.
 - The detailed Graph stash flow lives in `docs/graph-stash-interaction.md` so the system design stays separate from the feature contract.
 
 ## 2026-07-06: Diverged merge/rebase review uses a dedicated status inspection modal
@@ -85,3 +85,9 @@
 - Render the diverged-branch review as a wider left-aligned inspection modal so it reads as state awareness, not execution.
 - Use the `CURRENT hash (branch • mark)` summary format for the current, target, and base rows so hash, branch, and role are scanned in one pass.
 - Keep `CURRENT`, `TARGET`, and `BASE` as the primary visual anchors and treat the graph excerpt as supporting evidence.
+
+## 2026-07-06: Graph fast-forward confirmations use enter to execute and omit count noise
+
+- Keep graph merge/rebase fast-forward cases on the execution path instead of the blocked-alert path so `enter` performs the action and `esc` dismisses it.
+- Keep the fast-forward modal concise: title plus a single `HEAD can move to ...` sentence, without `Current` or `Target` counts.
+- Leave the diverged merge/rebase review modal unchanged so the richer comparison still applies when the histories have both sides.

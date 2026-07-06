@@ -33,6 +33,13 @@ func buildGraphActionConfirmStatus(action state.Action, rs git.Status, target st
 	return status
 }
 
+func buildGraphActionFastForwardStatus(action state.Action, target string) state.Status {
+	status := state.New().WithConfirm(action, "Fast-forward available.", "HEAD can move to "+target+".")
+	status.Title = "Fast-forward available."
+	status.Selected = target
+	return status
+}
+
 func buildGraphActionReviewDetail(action state.Action, rs git.Status, target, base string, currentOnly, targetOnly int) string {
 	subtitle := "Review before continuing."
 	switch action {

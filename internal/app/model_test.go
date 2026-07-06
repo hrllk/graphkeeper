@@ -474,7 +474,7 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 	if !strings.Contains(got, "parent: (multi parent)") || !strings.Contains(got, "  - def5678") || !strings.Contains(got, "  - 9876543") {
 		t.Fatalf("expected focus block to include multi-parent list, got %q", got)
 	}
-	if !strings.Contains(got, "branches:") || !strings.Contains(got, "  - HEAD -> main") || !strings.Contains(got, "  - origin/main") {
+	if !strings.Contains(got, "branches:") || !strings.Contains(got, "  - HEAD -> main") || strings.Contains(got, "origin/main") {
 		t.Fatalf("expected focus block to include branches list, got %q", got)
 	}
 	if strings.Contains(got, "hash:") {
@@ -877,6 +877,34 @@ func TestRenderBlockedShowsAlertOverlay(t *testing.T) {
 	}
 	if !strings.Contains(got, "esc/enter: dismiss") {
 		t.Fatalf("expected blocked alert dismiss help, got %q", got)
+	}
+}
+
+func TestRenderFastForwardConfirmShowsConciseHelp(t *testing.T) {
+	m := model{
+		width:  120,
+		height: 40,
+		status: state.New().WithConfirm(state.ActionMerge, "Fast-forward available.", "HEAD can move to feature."),
+		repoStatus: git.Status{
+			Root:   "/repo",
+			Branch: "main",
+			Head:   "abc1234",
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+	m.status.Selected = "feature"
+
+	got := renderAppView(m)
+	if strings.Contains(got, "Current:") || strings.Contains(got, "Target:") {
+		t.Fatalf("expected fast-forward popup to omit count detail, got %q", got)
+	}
+	if !strings.Contains(got, "enter: fast-forward") || !strings.Contains(got, "esc: dismiss") {
+		t.Fatalf("expected fast-forward confirm help, got %q", got)
 	}
 }
 
@@ -1769,6 +1797,58 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	}
 	if !shouldHighlightStash(1, true) || shouldHighlightStash(1, false) || shouldHighlightStash(0, true) {
 		t.Fatalf("expected stash highlight gating to depend on selection and count")
+	}
+}
+
+func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
+	rows := graph.Rows(git.Status{
+		LocalBranches: []string{"main"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Add stash marker", Decorations: []string{"main"}},
+		},
+	})
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	withoutStash := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 0)
+	withStash := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 1)
+	if withStash == withoutStash {
+		t.Fatalf("expected stash highlight to change focused graph row rendering\nwithout: %q\nwith:    %q", withoutStash, withStash)
+	}
+	if !strings.Contains(ansi.Strip(withStash), "l->main") {
+		t.Fatalf("expected focused graph row to keep branch text visible, got %q", ansi.Strip(withStash))
+	}
+}
+
+func TestGraphDetailShowsStashSummaryForFocusedCommit(t *testing.T) {
+	m := model{
+		repoStatus: git.Status{
+			LocalBranches: []string{"main"},
+			GraphCommits: []git.GraphCommit{
+				{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Add stash marker", Decorations: []string{"main"}},
+			},
+		},
+		stashByBase: map[string][]git.StashEntry{
+			"abc1234": {
+				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+				{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
+			},
+		},
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+
+	got := m.renderDetailContent(80, 24)
+	if !strings.Contains(got, "stashes:") {
+		t.Fatalf("expected detail panel to include stash section, got %q", got)
+	}
+	if !strings.Contains(got, "stash@{0} - latest change") {
+		t.Fatalf("expected newest stash to be listed first, got %q", got)
+	}
+	if !strings.Contains(got, "stash@{1} - older change") {
+		t.Fatalf("expected older stash to remain visible in summary, got %q", got)
+	}
+	if strings.Index(got, "stash@{0} - latest change") > strings.Index(got, "stash@{1} - older change") {
+		t.Fatalf("expected stash summary to keep newest-first order, got %q", got)
 	}
 }
 

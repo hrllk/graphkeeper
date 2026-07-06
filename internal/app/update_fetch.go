@@ -89,7 +89,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.currentOnly == 0 && msg.targetOnly == 0:
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Already aligned.", "Target already matches HEAD.")
 		case msg.currentOnly == 0:
-			m.status = state.New().WithBlocked(state.BlockUnknown, "Fast-forward available.", "HEAD can move to "+msg.target+". Current: "+strconv.Itoa(msg.currentOnly)+"  Target: "+strconv.Itoa(msg.targetOnly))
+			m.status = buildGraphActionFastForwardStatus(msg.action, msg.target)
 		case msg.targetOnly == 0:
 			reason := "Target already included."
 			detail := "Current branch already contains " + msg.target + ". Current: " + strconv.Itoa(msg.currentOnly) + "  Target: " + strconv.Itoa(msg.targetOnly)

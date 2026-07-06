@@ -69,3 +69,19 @@ func TestBuildGraphActionReviewStatusUsesBranchHasDivergedTitle(t *testing.T) {
 		t.Fatalf("expected target selection to be preserved, got %q", got.Selected)
 	}
 }
+
+func TestBuildGraphActionFastForwardStatusUsesConciseCopy(t *testing.T) {
+	got := buildGraphActionFastForwardStatus(state.ActionRebase, "def5678")
+	if got.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.Mode)
+	}
+	if got.Message != "Fast-forward available." {
+		t.Fatalf("expected fast-forward message, got %q", got.Message)
+	}
+	if got.Detail != "HEAD can move to def5678." {
+		t.Fatalf("expected concise detail, got %q", got.Detail)
+	}
+	if got.Selected != "def5678" {
+		t.Fatalf("expected selected target to be preserved, got %q", got.Selected)
+	}
+}

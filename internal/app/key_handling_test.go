@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -669,6 +670,73 @@ func TestGraphMergeShortcutChecksDivergenceBeforeConfirm(t *testing.T) {
 	}
 }
 
+func TestGraphMergeShortcutUsesFastForwardConfirm(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "checkout", "-b", "feature")
+	featureHash := makeLocalCommit(t, fixture.root, "feature.txt", "feature\n", "feature commit")
+	runGit(t, fixture.root, "checkout", "main")
+
+	rs := git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main", "feature"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: featureHash, Parents: []string{fixture.initialHash}, Decorations: []string{"feature"}},
+			{Hash: fixture.initialHash, Parents: []string{}, Decorations: []string{"HEAD -> main", "main"}},
+		},
+	}
+	rows := graphRows(rs)
+	featureCursor := findGraphRowByHash(rows, featureHash)
+	if featureCursor < 0 {
+		t.Fatalf("expected feature hash %s in graph rows", featureHash)
+	}
+
+	m := testKeyHandlingModel(fixture.repo, rs)
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = featureCursor
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected merge shortcut to start graph target analysis")
+	}
+
+	msg := cmdResult(t, cmd)
+	check, ok := msg.(graphActionCheckMsg)
+	if !ok {
+		t.Fatalf("expected graphActionCheckMsg, got %T", msg)
+	}
+	if check.currentOnly != 0 || check.targetOnly == 0 {
+		t.Fatalf("expected fast-forward graph target, got currentOnly=%d targetOnly=%d", check.currentOnly, check.targetOnly)
+	}
+
+	gotModel, cmd = got.Update(check)
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no follow-up command after graph check, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode for fast-forward graph target, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Fast-forward available." {
+		t.Fatalf("expected fast-forward title, got %q", got.status.Message)
+	}
+	if got.status.Detail != "HEAD can move to "+featureHash+"." {
+		t.Fatalf("expected concise fast-forward detail, got %q", got.status.Detail)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected enter to execute the fast-forward action")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Merging..." {
+		t.Fatalf("expected merge loading state after enter, got %+v", got.status)
+	}
+}
+
 func TestGraphRebaseShortcutBlocksAncestorTarget(t *testing.T) {
 	fixture := newCommandRepo(t)
 	runGit(t, fixture.root, "checkout", "-b", "feature")
@@ -765,6 +833,30 @@ func TestTargetPickEnterStartsPreview(t *testing.T) {
 	}
 	if got.status.Message != "Previewing..." {
 		t.Fatalf("expected preview message, got %q", got.status.Message)
+	}
+}
+
+func TestTargetPickEnterConfirmsCheckout(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root, Branch: "main", Head: fixture.initialHash, LocalBranches: []string{"main", "feature"}})
+	m.status = state.New().WithTargetPick(state.ActionCheckout, []state.TargetItem{
+		{Kind: state.TargetKindLocal, Name: "main", Ref: "main"},
+		{Kind: state.TargetKindLocal, Name: "feature", Ref: "feature"},
+	})
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected checkout selection to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionCheckout {
+		t.Fatalf("expected checkout action, got %s", got.status.Action)
+	}
+	if got.status.Selected != "main" {
+		t.Fatalf("expected checkout selection to remain on first target, got %q", got.status.Selected)
 	}
 }
 
@@ -1008,6 +1100,46 @@ func TestGraphCheckoutShortcutBlockedWhenDirty(t *testing.T) {
 	}
 	if got.status.Block != state.BlockDirtyTree {
 		t.Fatalf("expected dirty tree block, got %s", got.status.Block)
+	}
+}
+
+func TestGraphCheckoutShortcutOpensTargetPickWhenMultipleBranches(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main", "feature"},
+		GraphCommits: []git.GraphCommit{{
+			Graph:       "*",
+			Hash:        fixture.initialHash,
+			Decorations: []string{"HEAD -> main", "feature", "origin/main"},
+		}},
+	})
+	m.sectionCursor[sectionGraph] = 0
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected graph checkout target pick to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeTargetPick {
+		t.Fatalf("expected target pick mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionCheckout {
+		t.Fatalf("expected checkout action, got %s", got.status.Action)
+	}
+	if len(got.status.Targets) != 2 {
+		t.Fatalf("expected local-only branch targets, got %d", len(got.status.Targets))
+	}
+	for _, target := range got.status.Targets {
+		if target.Kind != state.TargetKindLocal {
+			t.Fatalf("expected local target only, got %+v", target)
+		}
+		if strings.HasPrefix(target.Ref, "origin/") {
+			t.Fatalf("expected origin refs to be hidden, got %+v", target)
+		}
 	}
 }
 
