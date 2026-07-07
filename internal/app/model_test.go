@@ -451,6 +451,46 @@ func TestRenderGraphContentFixedHeight(t *testing.T) {
 	}
 }
 
+func TestRenderGraphContentStartsAtLeftEdge(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{
+				{Hash: "c2", Parents: []string{"c1"}},
+				{Hash: "c1"},
+			},
+		},
+		activeSection: sectionCurrent,
+	}
+	got := ansi.Strip(m.renderGraphContent(40, 6))
+	lines := strings.Split(got, "\n")
+	if len(lines) == 0 {
+		t.Fatal("expected graph content to render at least one line")
+	}
+	if strings.HasPrefix(lines[0], " ") {
+		t.Fatalf("expected graph content to start without extra left margin, got %q", lines[0])
+	}
+}
+
+func TestRenderGraphContentOmitsSelectionArrow(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{
+				{Hash: "c2", Parents: []string{"c1"}},
+				{Hash: "c1"},
+			},
+		},
+		activeSection:   sectionGraph,
+		sectionCursor:   map[graphSection]int{sectionGraph: 0},
+		graphLaneCursor: 0,
+	}
+	got := ansi.Strip(m.renderGraphContent(40, 6))
+	if strings.Contains(got, ">") {
+		t.Fatalf("expected graph content to omit selection arrow, got %q", got)
+	}
+}
+
 func TestRenderDetailContentFixedHeight(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),
@@ -1519,6 +1559,53 @@ func TestRemoteSectionSkipsBareRemoteName(t *testing.T) {
 	}
 	if !strings.Contains(got, "o->main") {
 		t.Fatalf("expected remote branch to remain visible, got %q", got)
+	}
+}
+
+func TestRenderSectionContentStartsAtLeftEdge(t *testing.T) {
+	tests := []struct {
+		name    string
+		section graphSection
+		repo    git.Status
+	}{
+		{
+			name:    "current",
+			section: sectionCurrent,
+			repo:    git.Status{LocalBranches: []string{"main"}},
+		},
+		{
+			name:    "remote",
+			section: sectionRemote,
+			repo:    git.Status{RemoteBranches: []string{"origin/main"}},
+		},
+		{
+			name:    "tags",
+			section: sectionTags,
+			repo:    git.Status{Tags: []string{"v1.0.0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := model{
+				status:     state.New().WithBrowse(),
+				repoStatus: tt.repo,
+				sectionCursor: map[graphSection]int{
+					sectionGraph:   0,
+					sectionCurrent: 0,
+					sectionRemote:  0,
+					sectionTags:    0,
+				},
+				activeSection: sectionGraph,
+			}
+			got := ansi.Strip(m.renderSectionContent(tt.section, 40, 4))
+			lines := strings.Split(got, "\n")
+			if len(lines) == 0 {
+				t.Fatal("expected section content to render at least one line")
+			}
+			if strings.HasPrefix(lines[0], " ") {
+				t.Fatalf("expected section content to start without extra left margin, got %q", lines[0])
+			}
+		})
 	}
 }
 

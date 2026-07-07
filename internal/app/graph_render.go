@@ -60,11 +60,6 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		title = renderSearchField(compactTitleText(row.Commit.Subject), searchQuery, 10, selected && graphActive)
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
-	if selected {
-		line = "> " + line
-	} else {
-		line = "  " + line
-	}
 	return fitVisibleWidth(line, rowWidth)
 }
 
@@ -80,11 +75,6 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 			graphCell = strings.ReplaceAll(graphCell, "*", pinkBg.Render("*"))
 		}
 		line := fmt.Sprintf("%-8s %-10s %s  %-7s %-10s", "", "", graphCell, "", "")
-		if selected {
-			line = "> " + line
-		} else {
-			line = "  " + line
-		}
 		return fitVisibleWidth(line, rowWidth)
 	}
 	var hash, refs string
@@ -149,11 +139,6 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		title = renderSearchField(compactTitleText(row.Commit.Subject), searchQuery, 10, selected && graphActive)
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
-	if selected {
-		line = "> " + line
-	} else {
-		line = "  " + line
-	}
 	return fitVisibleWidth(line, rowWidth)
 }
 
