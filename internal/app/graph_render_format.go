@@ -119,16 +119,27 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 	} else if state.remote {
 		token = "o->" + name
 	}
-	if len([]rune(token)) > 10 {
-		runes := []rune(token)
-		token = string(runes[:9]) + "."
-	}
 	overflowCount := len(branches) - 1
 	if overflowCount > 0 {
-		candidate := fmt.Sprintf("%s +%d", token, overflowCount)
+		suffix := fmt.Sprintf(" +%d", overflowCount)
+		candidate := token + suffix
 		if len([]rune(candidate)) <= 10 {
 			token = candidate
+		} else {
+			maxBaseWidth := 10 - len([]rune(suffix))
+			if maxBaseWidth < 1 {
+				maxBaseWidth = 1
+			}
+			base := []rune(token)
+			if len(base) > maxBaseWidth {
+				token = string(base[:maxBaseWidth]) + suffix
+			} else {
+				token = token + suffix
+			}
 		}
+	} else if len([]rune(token)) > 10 {
+		runes := []rune(token)
+		token = string(runes[:9]) + "."
 	}
 	return decorationInfo{Text: token, HasBranch: hasBranch, HasLocalHead: hasLocalHead}
 }

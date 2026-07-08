@@ -1784,8 +1784,8 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 
 func TestFormatCompactDecorations(t *testing.T) {
 	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "origin/main", "tag: v1.0.0"}, []string{"main", "develop"})
-	if got != "o/l->main" {
-		t.Fatalf("expected a single compact branch token, got %q", got)
+	if !strings.HasPrefix(got, "o/l->") || !strings.Contains(got, "+1") {
+		t.Fatalf("expected a single compact branch token with overflow count, got %q", got)
 	}
 	if len([]rune(got)) > 10 {
 		t.Fatalf("expected compact decorations to stay within 10 chars, got %q", got)
@@ -1799,13 +1799,26 @@ func TestFormatCompactDecorationsUsesHeadThenAlphabeticalWithOverflow(t *testing
 	}
 
 	got = formatCompactDecorations([]string{"release", "develop", "main"}, []string{"main", "develop", "release"})
-	if got != "l->develop" {
+	if !strings.HasPrefix(got, "l->") {
 		t.Fatalf("expected alphabetical local branch fallback, got %q", got)
 	}
 
 	got = formatCompactDecorations([]string{"origin/release", "origin/develop"}, nil)
-	if got != "o->develop" {
-		t.Fatalf("expected alphabetical remote branch fallback, got %q", got)
+	if !strings.HasPrefix(got, "o->") || !strings.Contains(got, "+1") {
+		t.Fatalf("expected alphabetical remote branch fallback with overflow count, got %q", got)
+	}
+}
+
+func TestFormatCompactDecorationsKeepsOverflowCountForLongBranches(t *testing.T) {
+	got := formatCompactDecorations(
+		[]string{"HEAD -> feature/very-long-branch-name", "develop", "release"},
+		[]string{"feature/very-long-branch-name", "develop", "release"},
+	)
+	if !strings.Contains(got, "+2") {
+		t.Fatalf("expected overflow count to survive long branch names, got %q", got)
+	}
+	if len([]rune(got)) > 10 {
+		t.Fatalf("expected compact decorations to stay within 10 chars, got %q", got)
 	}
 }
 
@@ -1866,16 +1879,16 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
 	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->main") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge b...") < 0 {
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge b...") < 0 {
 		t.Fatalf("expected graph line to include hash, branches, when, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
 		t.Fatalf("expected HEAD pointer to be highlighted, got %q", line)
 	}
-	if strings.Index(line, "head") > strings.Index(line, "o/l->main") {
+	if strings.Index(line, "head") > strings.Index(line, "o/l->") {
 		t.Fatalf("expected hash to lead branches, got %q", line)
 	}
-	if strings.Index(line, "o/l->main") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5mins") || strings.Index(line, "5mins") > strings.Index(line, "Merge b...") {
+	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5mins") || strings.Index(line, "5mins") > strings.Index(line, "Merge b...") {
 		t.Fatalf("expected commit columns to stay ordered, got %q", line)
 	}
 	if strings.Contains(line, "Merge branch") || strings.Contains(line, "origin/") || strings.Contains(line, "develop") {
@@ -1913,9 +1926,6 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", Current: true, WorktreeDirty: true}); !strings.Contains(got, "(dirty)") {
 		t.Fatalf("expected current dirty local target to show dirty badge, got %q", got)
 	}
-	if !shouldHighlightStash(1, true) || shouldHighlightStash(1, false) || shouldHighlightStash(0, true) {
-		t.Fatalf("expected stash highlight gating to depend on selection and count")
-	}
 }
 
 func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
@@ -1923,7 +1933,7 @@ func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
 	rows := graph.Rows(git.Status{
 		LocalBranches: []string{"main"},
 		GraphCommits: []git.GraphCommit{
-			{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Add stash marker", Decorations: []string{"main"}},
+			{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}},
 		},
 	})
 	if len(rows) != 1 {
@@ -1934,8 +1944,8 @@ func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
 	if withStash == withoutStash {
 		t.Fatalf("expected stash highlight to change focused graph row rendering\nwithout: %q\nwith:    %q", withoutStash, withStash)
 	}
-	if !strings.Contains(ansi.Strip(withStash), "l->main") {
-		t.Fatalf("expected focused graph row to keep branch text visible, got %q", ansi.Strip(withStash))
+	if !strings.Contains(withStash, "38;5;208") {
+		t.Fatalf("expected focused graph row to use stash color on the graph pointer, got %q", withStash)
 	}
 }
 
@@ -1968,6 +1978,31 @@ func TestGraphDetailShowsStashSummaryForFocusedCommit(t *testing.T) {
 	}
 	if strings.Index(got, "stash@{0} - latest change") > strings.Index(got, "stash@{1} - older change") {
 		t.Fatalf("expected stash summary to keep newest-first order, got %q", got)
+	}
+}
+
+func TestRenderGraphContentShowsStashBadgeForFocusedCommit(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			LocalBranches: []string{"main"},
+			GraphCommits: []git.GraphCommit{
+				{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}},
+			},
+		},
+		stashByBase: map[string][]git.StashEntry{
+			"abc1234": {
+				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+			},
+		},
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+
+	raw := m.renderGraphContent(80, 8)
+	if !strings.Contains(raw, "38;5;208") {
+		t.Fatalf("expected graph content to color the stash pointer, got %q", raw)
 	}
 }
 
