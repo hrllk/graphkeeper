@@ -1848,6 +1848,28 @@ func TestFormatCompactDecorationsKeepsOverflowCountForLongBranches(t *testing.T)
 	}
 }
 
+func TestCompactWhenTextUsesShortUnitLabels(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{in: "1 second ago", want: "1s"},
+		{in: "2 minutes ago", want: "2m"},
+		{in: "3 hours ago", want: "3h"},
+		{in: "4 days ago", want: "4d"},
+		{in: "5 weeks ago", want: "5w"},
+		{in: "6 months ago", want: "6m"},
+		{in: "7 years ago", want: "7y"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := compactWhenText(tt.in); got != tt.want {
+				t.Fatalf("compactWhenText(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCanCreateBranchRequiresReadyRepo(t *testing.T) {
 	if canCreateBranch(git.Status{Root: "/repo", WorktreeDirty: true}) {
 		t.Fatal("expected dirty worktree to block branch creation")
@@ -1905,7 +1927,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
 	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
 		t.Fatalf("expected graph line to include hash, branches, date, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
@@ -1914,7 +1936,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Index(line, "head") > strings.Index(line, "o/l->") {
 		t.Fatalf("expected hash to lead branches, got %q", line)
 	}
-	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5mins") || strings.Index(line, "5mins") > strings.Index(line, "Merge branch 'mai...") {
+	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5m") || strings.Index(line, "5m") > strings.Index(line, "Merge branch 'mai...") {
 		t.Fatalf("expected commit columns to stay ordered, got %q", line)
 	}
 	if strings.Contains(line, "Merge branch 'main' into develop") || strings.Contains(line, "origin/") {
@@ -1928,8 +1950,11 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.Contains(focused, pointerMark.Render("*")) {
 		t.Fatalf("expected branch row graph pointer to be highlighted, got %q", focused)
 	}
-	if compactWhenText("5 minutes ago") != "5mins" {
-		t.Fatalf("expected relative time to compact to 5mins")
+	if compactWhenText("5 minutes ago") != "5m" {
+		t.Fatalf("expected relative time to compact to 5m")
+	}
+	if compactWhenText("1 second ago") != "1s" {
+		t.Fatalf("expected second unit to compact to 1s")
 	}
 	if compactTitleText("Merge branch 'main' into develop") != "Merge branch 'mai..." {
 		t.Fatalf("expected title to compact to 20 chars")

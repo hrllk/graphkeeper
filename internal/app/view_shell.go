@@ -23,7 +23,7 @@ var (
 	branchMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
 	pointerMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
 	dirtyMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
-	stashMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("110"))
+	stashMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
 	localColor    = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
 	remoteColor   = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
 	tagColor      = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
