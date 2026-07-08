@@ -190,18 +190,20 @@ func compactWhenText(relative string) string {
 	n := parts[0]
 	unit := parts[1]
 	switch {
+	case strings.HasPrefix(unit, "second"):
+		return n + "s"
 	case strings.HasPrefix(unit, "minute"):
-		return n + "mins"
+		return n + "m"
 	case strings.HasPrefix(unit, "hour"):
-		return n + "hours"
+		return n + "h"
 	case strings.HasPrefix(unit, "day"):
-		return n + "days"
+		return n + "d"
 	case strings.HasPrefix(unit, "month"):
-		return n + "mons"
+		return n + "m"
 	case strings.HasPrefix(unit, "year"):
-		return n + "yrs"
+		return n + "y"
 	case strings.HasPrefix(unit, "week"):
-		return n + "wks"
+		return n + "w"
 	default:
 		return shorten(relative, 7)
 	}
