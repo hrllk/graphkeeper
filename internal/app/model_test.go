@@ -652,6 +652,27 @@ func TestRenderContextContentSplitsInfoAndActions(t *testing.T) {
 	}
 }
 
+func TestRenderContextContentAddsGraphActionsLeftMargin(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{
+				{Hash: "abc1234", Subject: "Commit 1"},
+			},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+		},
+	}
+	m.activeSection = sectionGraph
+
+	got := ansi.Strip(m.renderContextContent(50, 12))
+	if !strings.Contains(got, "│ Graph Actions") {
+		t.Fatalf("expected graph actions column to keep a left margin, got %q", got)
+	}
+}
+
 func TestRenderContextContentKeepsSplitLayoutOnNarrowWidth(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),

@@ -350,6 +350,18 @@ func renderSplitColumns(leftLines, rightLines []string, width, height int) strin
 	return strings.Join(lines, "\n")
 }
 
+func indentLines(lines []string, indent int) []string {
+	if indent <= 0 || len(lines) == 0 {
+		return lines
+	}
+	prefix := strings.Repeat(" ", indent)
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		out[i] = prefix + line
+	}
+	return out
+}
+
 func normalizeColumnLines(lines []string, width, height int) []string {
 	if height <= 0 {
 		return nil
