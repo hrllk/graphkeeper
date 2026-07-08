@@ -213,10 +213,10 @@ func compactTitleText(subject string) string {
 		return "-"
 	}
 	runes := []rune(subject)
-	if len(runes) <= 10 {
+	if len(runes) <= 20 {
 		return subject
 	}
-	return string(runes[:7]) + "..."
+	return string(runes[:17]) + "..."
 }
 
 func padRight(value string, width int) string {

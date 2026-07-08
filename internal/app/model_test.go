@@ -451,6 +451,32 @@ func TestRenderGraphContentFixedHeight(t *testing.T) {
 	}
 }
 
+func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{
+				{
+					Hash:        "c2",
+					Subject:     "Merge branch 'main' into develop with a longer title",
+					Parents:     []string{"c1"},
+					Decorations: []string{"HEAD -> main"},
+					RelativeAge: "5 minutes ago",
+				},
+			},
+		},
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+	got := m.renderGraphContent(80, 6)
+	if !strings.Contains(got, "date") {
+		t.Fatalf("expected graph header to use date label, got %q", got)
+	}
+	if !strings.Contains(got, "Merge branch 'mai...") {
+		t.Fatalf("expected graph title to use 20-character ellipsis form, got %q", got)
+	}
+}
+
 func TestRenderGraphContentStartsAtLeftEdge(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),
@@ -1879,8 +1905,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
 	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge b...") < 0 {
-		t.Fatalf("expected graph line to include hash, branches, when, title and graph, got %q", line)
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5mins") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
+		t.Fatalf("expected graph line to include hash, branches, date, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
 		t.Fatalf("expected HEAD pointer to be highlighted, got %q", line)
@@ -1888,10 +1914,10 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Index(line, "head") > strings.Index(line, "o/l->") {
 		t.Fatalf("expected hash to lead branches, got %q", line)
 	}
-	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5mins") || strings.Index(line, "5mins") > strings.Index(line, "Merge b...") {
+	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5mins") || strings.Index(line, "5mins") > strings.Index(line, "Merge branch 'mai...") {
 		t.Fatalf("expected commit columns to stay ordered, got %q", line)
 	}
-	if strings.Contains(line, "Merge branch") || strings.Contains(line, "origin/") || strings.Contains(line, "develop") {
+	if strings.Contains(line, "Merge branch 'main' into develop") || strings.Contains(line, "origin/") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
 	}
 	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24, 80, false, 0)
@@ -1905,8 +1931,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if compactWhenText("5 minutes ago") != "5mins" {
 		t.Fatalf("expected relative time to compact to 5mins")
 	}
-	if compactTitleText("Merge branch 'main' into develop") != "Merge b..." {
-		t.Fatalf("expected title to compact to 10 chars")
+	if compactTitleText("Merge branch 'main' into develop") != "Merge branch 'mai..." {
+		t.Fatalf("expected title to compact to 20 chars")
 	}
 	if !strings.Contains(formatTargetItem(state.TargetItem{Kind: state.TargetKindRemote, Name: "origin/HEAD", Ref: "origin/HEAD", Default: true}), "origin/HEAD") {
 		t.Fatalf("expected origin/HEAD to stay visible in the remote section")

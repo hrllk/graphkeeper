@@ -20,12 +20,12 @@ func (m model) renderGraphContent(width, height int) string {
 		end = len(rows)
 	}
 	lines := make([]string, 0, height)
-	lines = append(lines, fitVisibleWidth("  "+muted.Render(fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))), width))
+	lines = append(lines, fitVisibleWidth(muted.Render(fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))), width))
 	graphActive := m.activeSection == sectionGraph
 	graphColWidth := max(18, int(float64(width)*0.30))
 	rawGraph := len(rows) > 0 && rows[0].Graph != ""
 	if len(lines) < height {
-		lines = append(lines, fitVisibleWidth("  "+muted.Render(fmt.Sprintf("%-8s %-10s %-*s %-7s %-10s", "commit", "branches", graphColWidth, "graph", "when", "title")), width))
+		lines = append(lines, fitVisibleWidth(muted.Render(fmt.Sprintf("%-8s %-10s %-*s %-7s %-20s", "commit", "branches", graphColWidth, "graph", "date", "title")), width))
 	}
 	for i := start; i < end; i++ {
 		if len(lines) >= height {
