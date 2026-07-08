@@ -9,7 +9,7 @@ import (
 func (m model) renderSectionContent(section graphSection, width, height int) string {
 	items := sectionTargets(m.repoStatus, section)
 	if len(items) == 0 {
-		return fitVisibleWidth(muted.Render("  (empty)"), width)
+		return fitVisibleWidth(muted.Render("(empty)"), width)
 	}
 	cursor := m.sectionCursor[section]
 	var b strings.Builder
@@ -17,9 +17,9 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 		if i >= height {
 			break
 		}
-		prefix := "  "
+		prefix := ""
 		if i == cursor && m.activeSection == section {
-			prefix = "> "
+			prefix = ">"
 		}
 		label := formatTargetItem(item)
 		if label == "" {
@@ -53,9 +53,9 @@ func renderTargets(s state.Status) string {
 	}
 	var b strings.Builder
 	for i, t := range s.Targets {
-		prefix := "  "
+		prefix := ""
 		if i == s.TargetIdx {
-			prefix = "> "
+			prefix = ">"
 		}
 		label := formatTargetItem(t)
 		if label == "" {
