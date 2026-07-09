@@ -820,7 +820,7 @@ func TestRenderContextContentSplitsAllSections(t *testing.T) {
 				Tags: []string{"v1.0.0"},
 			},
 			wantInfo:    "target:",
-			wantActions: "no section actions",
+			wantActions: "enter: jump to graph",
 		},
 	}
 
@@ -906,7 +906,7 @@ func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
 		},
 	}
 	got := m.renderGlobalContent(40, 14)
-	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j: up", "k: down", "f: fetch", "q: quit"} {
+	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j: up", "k: down", "f: fetch", "S: stash list", "q: quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected global hotkeys to include %q, got %q", want, got)
 		}
@@ -2054,6 +2054,37 @@ func TestRenderGraphContentShowsStashBadgeForFocusedCommit(t *testing.T) {
 	raw := m.renderGraphContent(80, 8)
 	if !strings.Contains(raw, "38;5;208") {
 		t.Fatalf("expected graph content to color the stash pointer, got %q", raw)
+	}
+}
+
+func TestRenderStashPopupGroupsByBaseAndKeepsOrder(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{
+		stashEntries: []git.StashEntry{
+			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+			{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
+			{Ref: "stash@{2}", Hash: "stashhash2", BaseHash: "def5678", Subject: "feature WIP"},
+		},
+		stashPopupCursor: 1,
+	}
+
+	got := renderStashPopup(m, 90, 24)
+	if !strings.Contains(got, "Stash list") {
+		t.Fatalf("expected stash popup title, got %q", got)
+	}
+	if !strings.Contains(got, "base: abc1234") || !strings.Contains(got, "base: def5678") {
+		t.Fatalf("expected stash popup to group by base hash, got %q", got)
+	}
+	first := strings.Index(got, "stash@{0} - latest change")
+	second := strings.Index(got, "stash@{1} - older change")
+	if first < 0 || second < 0 {
+		t.Fatalf("expected stash popup to include stash entries, got %q", got)
+	}
+	if first > second {
+		t.Fatalf("expected newest stash to appear before older stash, got %q", got)
+	}
+	if !strings.Contains(got, "up/down: move") {
+		t.Fatalf("expected stash popup help text, got %q", got)
 	}
 }
 

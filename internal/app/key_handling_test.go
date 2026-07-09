@@ -196,6 +196,53 @@ func TestBlockedAlertEscDismissesToBrowse(t *testing.T) {
 	}
 }
 
+func TestStashPopupOpensFromGlobalHotkey(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root: fixture.root,
+	})
+	m.stashEntries = []git.StashEntry{
+		{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+	}
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected stash popup hotkey to stay synchronous, got %v", cmd)
+	}
+	if !got.stashPopupOpen {
+		t.Fatal("expected stash popup to open from global hotkey")
+	}
+	if got.stashPopupCursor != 0 {
+		t.Fatalf("expected stash popup cursor to start at first entry, got %d", got.stashPopupCursor)
+	}
+}
+
+func TestStashPopupEscapeClosesAndKeepsCursor(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root: fixture.root,
+	})
+	m.stashEntries = []git.StashEntry{
+		{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+		{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
+	}
+	m.stashPopupOpen = true
+	m.stashPopupCursor = 1
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected stash popup escape to stay synchronous, got %v", cmd)
+	}
+	if got.stashPopupOpen {
+		t.Fatal("expected stash popup to close on escape")
+	}
+	if got.stashPopupCursor != 1 {
+		t.Fatalf("expected stash popup cursor to stay on selected entry, got %d", got.stashPopupCursor)
+	}
+}
+
 func TestStashShortcutOpensConfirmForDirtyLocalSection(t *testing.T) {
 	fixture := newCommandRepo(t)
 	writeRepoFile(t, fixture.root, "stash.txt", "stash\n")

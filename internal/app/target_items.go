@@ -23,10 +23,11 @@ func branchUpstream(rs git.Status, name string) (string, bool) {
 }
 
 func buildActionTargetItems(rs git.Status) []state.TargetItem {
-	targets := make([]state.TargetItem, 0, len(rs.LocalBranches)+len(rs.RemoteBranches)+len(rs.Tags))
+	tagNames := tagNamesForTargets(rs)
+	targets := make([]state.TargetItem, 0, len(rs.LocalBranches)+len(rs.RemoteBranches)+len(tagNames))
 	targets = appendLocalTargets(targets, rs)
 	targets = appendRemoteTargets(targets, rs.RemoteBranches)
-	targets = appendTagTargets(targets, rs.Tags)
+	targets = appendTagTargets(targets, tagNames)
 	if len(targets) == 0 {
 		targets = appendFallbackBranchTargets(targets, rs.Branches)
 	}
@@ -103,11 +104,40 @@ func buildRemoteSectionTargets(rs git.Status) []state.TargetItem {
 }
 
 func buildTagSectionTargets(rs git.Status) []state.TargetItem {
+	if len(rs.TagEntries) > 0 {
+		items := make([]state.TargetItem, 0, len(rs.TagEntries))
+		for _, tag := range rs.TagEntries {
+			items = append(items, state.TargetItem{
+				Kind:        state.TargetKindTag,
+				Name:        tag.Name,
+				Ref:         tag.Name,
+				CommitHash:  tag.CommitHash,
+				Subject:     tag.Subject,
+				RelativeAge: tag.RelativeAge,
+			})
+		}
+		return items
+	}
 	items := make([]state.TargetItem, 0, len(rs.Tags))
 	for _, name := range rs.Tags {
-		items = append(items, state.TargetItem{Kind: state.TargetKindTag, Name: name, Ref: name})
+		items = append(items, state.TargetItem{
+			Kind: state.TargetKindTag,
+			Name: name,
+			Ref:  name,
+		})
 	}
 	return items
+}
+
+func tagNamesForTargets(rs git.Status) []string {
+	if len(rs.TagEntries) > 0 {
+		names := make([]string, 0, len(rs.TagEntries))
+		for _, tag := range rs.TagEntries {
+			names = append(names, tag.Name)
+		}
+		return names
+	}
+	return append([]string(nil), rs.Tags...)
 }
 
 func appendLocalTargets(targets []state.TargetItem, rs git.Status) []state.TargetItem {

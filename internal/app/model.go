@@ -13,6 +13,12 @@ type model struct {
 	repoStatus        git.Status
 	stashEntries      []git.StashEntry
 	stashByBase       map[string][]git.StashEntry
+	stashPopupOpen    bool
+	stashPopupCursor  int
+	tagPopupOpen      bool
+	tagPopupDraft     string
+	tagPopupError     string
+	tagPopupTarget    string
 	activeSection     graphSection
 	sectionCursor     map[graphSection]int
 	graphLaneCursor   int

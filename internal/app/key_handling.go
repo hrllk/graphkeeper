@@ -7,6 +7,12 @@ import (
 )
 
 func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.tagPopupOpen {
+		return m.handleTagPopupKey(msg)
+	}
+	if m.stashPopupOpen {
+		return m.handleStashPopupKey(msg)
+	}
 	if m.branchOpen {
 		return m.handleBranchOpenKey(msg)
 	}

@@ -169,6 +169,10 @@ func graphLocalBranchNames(decorations []string, localBranches []string) []strin
 }
 
 func focusGraphHead(m *model, rs git.Status) {
+	focusGraphCommit(m, rs, rs.Head)
+}
+
+func focusGraphCommit(m *model, rs git.Status, hash string) {
 	m.activeSection = sectionGraph
 	rows := graph.Rows(rs)
 	if len(rows) == 0 {
@@ -178,7 +182,7 @@ func focusGraphHead(m *model, rs git.Status) {
 		return
 	}
 
-	row := graph.FindRowByHash(rows, rs.Head)
+	row := graph.FindRowByHash(rows, hash)
 	if row < 0 {
 		row = graph.NearestSelectableGraphRow(rows, 0, 1)
 	}

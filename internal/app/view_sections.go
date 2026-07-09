@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"hrllk/graphkeeper/internal/state"
@@ -116,6 +117,14 @@ func formatTargetItem(t state.TargetItem) string {
 		}
 		return label
 	case state.TargetKindTag:
+		if t.CommitHash != "" {
+			return fmt.Sprintf("%-24s  %s  %-28s  %s",
+				t.Name,
+				shorten(t.CommitHash, 7),
+				compactTitleText(t.Subject),
+				compactWhenText(t.RelativeAge),
+			)
+		}
 		return "tag    " + t.Name
 	default:
 		return t.Name
@@ -153,6 +162,7 @@ func renderActionHelpLines(m model) []string {
 			lines = append(lines, "• s: reset         • ctrl+u/d: scroll")
 			lines = append(lines, "• gg: top         • G: bottom")
 			lines = append(lines, "• H: jump to HEAD")
+			lines = append(lines, "• t: tag commit")
 			deleteLabel := "• d: delete branch"
 			if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 				lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(local lane only)"))
@@ -226,7 +236,8 @@ func renderActionHelpLines(m model) []string {
 				}
 			}
 		case sectionTags:
-			lines = append(lines, "• no section actions")
+			lines = append(lines, "• enter: jump to graph")
+			lines = append(lines, "• j/k: move tag rows")
 		default:
 			lines = append(lines, "• no section actions")
 		}

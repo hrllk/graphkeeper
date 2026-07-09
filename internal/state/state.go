@@ -79,6 +79,9 @@ type TargetItem struct {
 	Kind            TargetKind
 	Name            string
 	Ref             string
+	CommitHash      string
+	Subject         string
+	RelativeAge     string
 	Current         bool
 	WorktreeDirty   bool
 	Default         bool

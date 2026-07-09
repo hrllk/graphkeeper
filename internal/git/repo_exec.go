@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +33,19 @@ func (r *Repo) DeleteBranch(ctx context.Context, branch string) (string, error) 
 
 func (r *Repo) DeleteRemoteBranch(ctx context.Context, remote, branch string) (string, error) {
 	return r.Run("push", remote, "--delete", branch)
+}
+
+func (r *Repo) CreateTag(ctx context.Context, name, target string) error {
+	name = strings.TrimSpace(name)
+	target = strings.TrimSpace(target)
+	if name == "" {
+		return fmt.Errorf("tag name is empty")
+	}
+	if target == "" {
+		return fmt.Errorf("tag target is empty")
+	}
+	_, err := r.git(ctx, "tag", name, target)
+	return err
 }
 
 func (r *Repo) StashAll(ctx context.Context, message string) error {
@@ -84,6 +99,53 @@ func (r *Repo) Stashes(ctx context.Context) ([]StashEntry, error) {
 			Subject:  strings.TrimSpace(parts[3]),
 		})
 	}
+	return entries, nil
+}
+
+func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
+	names, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/tags")
+	if err != nil {
+		return nil, err
+	}
+	if len(names) == 0 {
+		return nil, nil
+	}
+	entries := make([]TagEntry, 0, len(names))
+	for _, name := range names {
+		target, err := r.git(ctx, "rev-parse", "--verify", name+"^{commit}")
+		if err != nil {
+			continue
+		}
+		subject, err := r.git(ctx, "show", "-s", "--format=%s", target)
+		if err != nil {
+			continue
+		}
+		relativeAge, err := r.git(ctx, "show", "-s", "--format=%cr", target)
+		if err != nil {
+			continue
+		}
+		commitUnixText, err := r.git(ctx, "show", "-s", "--format=%ct", target)
+		if err != nil {
+			continue
+		}
+		commitUnix, err := strconv.ParseInt(strings.TrimSpace(commitUnixText), 10, 64)
+		if err != nil {
+			continue
+		}
+		entries = append(entries, TagEntry{
+			Name:        strings.TrimSpace(name),
+			CommitHash:  strings.TrimSpace(target),
+			Subject:     strings.TrimSpace(subject),
+			RelativeAge: strings.TrimSpace(relativeAge),
+			CommitUnix:  commitUnix,
+		})
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if entries[i].CommitUnix != entries[j].CommitUnix {
+			return entries[i].CommitUnix > entries[j].CommitUnix
+		}
+		return entries[i].Name < entries[j].Name
+	})
 	return entries, nil
 }
 

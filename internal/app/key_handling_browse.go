@@ -79,6 +79,15 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		}
 		m.status = loadingToast("Fetching for push...")
 		return true, m, executeFetchForPush(m.repo, m.commitLimit)
+	case "S":
+		m.stashPopupOpen = true
+		if m.stashPopupCursor < 0 {
+			m.stashPopupCursor = 0
+		}
+		if maxCursor := len(m.stashEntries) - 1; maxCursor >= 0 && m.stashPopupCursor > maxCursor {
+			m.stashPopupCursor = maxCursor
+		}
+		return true, m, nil
 	case "tab":
 		m.activeSection = nextGraphSection(m.activeSection)
 		return true, m, nil
@@ -178,6 +187,16 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, nil
+	case "t":
+		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
+			return m, nil
+		}
+		m.tagPopupOpen = true
+		m.tagPopupDraft = ""
+		m.tagPopupError = ""
+		m.tagPopupTarget = focus.Hash
+		return m, nil
 	case "m":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Merge unavailable.", "Select a local branch.")
@@ -266,6 +285,27 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "enter":
+		if m.activeSection != sectionTags {
+			return m, nil
+		}
+		item, ok := activeSectionTargetItem(m)
+		if !ok || item.CommitHash == "" {
+			m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No tag selected.", "Move to a tag row.")
+			return m, nil
+		}
+		rows := graph.Rows(m.repoStatus)
+		row := graph.FindRowByHash(rows, item.CommitHash)
+		if row < 0 {
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Tag target is missing.", "Refresh the repo and try again.")
+			return m, nil
+		}
+		m.activeSection = sectionGraph
+		m.sectionCursor[sectionGraph] = row
+		m.graphLaneCursor = graph.PointerLane(rows[row])
+		m.graphScroll = clampScroll(row, len(rows), graphPageSizeForRows(&m, rows, row, graphContentHeightForModel(&m)))
+		m.awaitingGoTop = false
+		return m, nil
 	case "space", " ":
 		if m.activeSection == sectionCurrent || m.activeSection == sectionRemote {
 			if target := activeSectionTarget(m); target != "" {

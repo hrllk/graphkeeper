@@ -114,6 +114,12 @@ func renderAppView(m model) string {
 	if m.branchOpen {
 		centeredBody = overlayPopup(centeredBody, renderBranchInputPopup(m, bodyWidth))
 	}
+	if m.stashPopupOpen {
+		centeredBody = overlayPopup(centeredBody, renderStashPopup(m, bodyWidth, bodyHeight))
+	}
+	if m.tagPopupOpen {
+		centeredBody = overlayPopup(centeredBody, renderTagPopup(m, bodyWidth, bodyHeight))
+	}
 	if m.graphSearchOpen {
 		centeredBody = overlayPopup(centeredBody, renderGraphSearchPopup(m, bodyWidth))
 	}
