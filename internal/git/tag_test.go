@@ -106,6 +106,42 @@ func TestCreateTagRejectsEmptyInputs(t *testing.T) {
 	}
 }
 
+func TestStatusMarksOriginTags(t *testing.T) {
+	base := t.TempDir()
+	origin := filepath.Join(base, "origin.git")
+	work := filepath.Join(base, "work")
+
+	runGitGit(t, base, "init", "--bare", origin)
+	runGitGit(t, base, "init", "-b", "main", "work")
+	configGitUser(t, work)
+	writeGitFile(t, work, "file.txt", "one\n")
+	runGitGit(t, work, "add", "file.txt")
+	runGitGitEnv(t, work, map[string]string{
+		"GIT_AUTHOR_DATE":    "2026-07-08T12:00:00+09:00",
+		"GIT_COMMITTER_DATE": "2026-07-08T12:00:00+09:00",
+	}, "commit", "-m", "first")
+	head := runGitGit(t, work, "rev-parse", "HEAD")
+	runGitGit(t, work, "remote", "add", "origin", origin)
+	runGitGit(t, work, "push", "-u", "origin", "main")
+	runGitGit(t, work, "tag", "v1.0.0", head)
+	runGitGit(t, work, "push", "origin", "v1.0.0")
+
+	repo, err := Open(work)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	status, err := repo.Status(context.Background(), 20)
+	if err != nil {
+		t.Fatalf("Status failed: %v", err)
+	}
+	if len(status.TagEntries) != 1 {
+		t.Fatalf("expected one tag entry, got %+v", status.TagEntries)
+	}
+	if !status.TagEntries[0].OnOrigin {
+		t.Fatalf("expected tag to be marked as present on origin, got %+v", status.TagEntries[0])
+	}
+}
+
 func runGitGitEnv(t *testing.T, dir string, env map[string]string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)

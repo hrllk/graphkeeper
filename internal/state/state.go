@@ -82,6 +82,7 @@ type TargetItem struct {
 	CommitHash      string
 	Subject         string
 	RelativeAge     string
+	OnOrigin        bool
 	Current         bool
 	WorktreeDirty   bool
 	Default         bool

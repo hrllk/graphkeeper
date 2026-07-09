@@ -114,6 +114,7 @@ func buildTagSectionTargets(rs git.Status) []state.TargetItem {
 				CommitHash:  tag.CommitHash,
 				Subject:     tag.Subject,
 				RelativeAge: tag.RelativeAge,
+				OnOrigin:    tag.OnOrigin,
 			})
 		}
 		return items

@@ -33,6 +33,9 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		} else if searchQuery == "" && pointerFocused && refInfo.HasBranch {
 			refs = branchMark.Render(refs)
 		}
+		if tagBadge := compactTagBadge(row.Commit.Tags); tagBadge != "" {
+			refs = strings.TrimSpace(refs + " " + tagBadge)
+		}
 		if searchQuery == "" && graphActive && selected {
 			hash = pointerMark.Render(hash)
 		}
@@ -99,6 +102,9 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 			refs = headMark.Render(refs)
 		} else if searchQuery == "" && pointerFocused && refInfo.HasBranch {
 			refs = branchMark.Render(refs)
+		}
+		if tagBadge := compactTagBadge(row.Commit.Tags); tagBadge != "" {
+			refs = strings.TrimSpace(refs + " " + tagBadge)
 		}
 	}
 	var graphCell string
@@ -193,6 +199,17 @@ func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int
 		b.WriteRune(r)
 	}
 	return padRight(b.String(), graphColWidth)
+}
+
+func compactTagBadge(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	label := tags[0]
+	if len(tags) > 1 {
+		label = fmt.Sprintf("%s+%d", label, len(tags)-1)
+	}
+	return tagColor.Render(label)
 }
 
 func highlightRawGraphPrefix(graph string, lane int, focused bool, hasHead bool, stashFocused bool) string {

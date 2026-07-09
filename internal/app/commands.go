@@ -71,6 +71,16 @@ func fetchRepoState(repo *git.Repo, limit int) tea.Cmd {
 	}
 }
 
+func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
+	return func() tea.Msg {
+		if err := repo.FetchTags(context.Background()); err != nil {
+			return fetchedMsg{err: err}
+		}
+		status, err := repo.Status(context.Background(), limit)
+		return fetchedMsg{status: status, err: err}
+	}
+}
+
 func prepareAction(repo *git.Repo, action state.Action, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if err := repo.Fetch(context.Background()); err != nil {

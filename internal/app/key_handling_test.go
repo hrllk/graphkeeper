@@ -218,6 +218,22 @@ func TestStashPopupOpensFromGlobalHotkey(t *testing.T) {
 	}
 }
 
+func TestFetchTagsKeyTriggersTagRefresh(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root: fixture.root,
+	})
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected F to trigger background tag refresh")
+	}
+	if got.status.Message != "Fetching tags..." {
+		t.Fatalf("expected fetch tags message, got %q", got.status.Message)
+	}
+}
+
 func TestStashPopupEscapeClosesAndKeepsCursor(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{

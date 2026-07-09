@@ -48,6 +48,11 @@ func (r *Repo) CreateTag(ctx context.Context, name, target string) error {
 	return err
 }
 
+func (r *Repo) FetchTags(ctx context.Context) error {
+	_, err := r.git(ctx, "fetch", "origin", "--tags", "--prune")
+	return err
+}
+
 func (r *Repo) StashAll(ctx context.Context, message string) error {
 	_, err := r.git(ctx, "stash", "push", "--include-untracked", "-m", message)
 	return err
@@ -110,6 +115,7 @@ func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
 	if len(names) == 0 {
 		return nil, nil
 	}
+	originTags, _ := r.originTagSet(ctx)
 	entries := make([]TagEntry, 0, len(names))
 	for _, name := range names {
 		target, err := r.git(ctx, "rev-parse", "--verify", name+"^{commit}")
@@ -138,6 +144,7 @@ func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
 			Subject:     strings.TrimSpace(subject),
 			RelativeAge: strings.TrimSpace(relativeAge),
 			CommitUnix:  commitUnix,
+			OnOrigin:    originTags[name],
 		})
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -147,6 +154,30 @@ func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
 		return entries[i].Name < entries[j].Name
 	})
 	return entries, nil
+}
+
+func (r *Repo) originTagSet(ctx context.Context) (map[string]bool, error) {
+	lines, err := r.gitLines(ctx, "ls-remote", "--tags", "origin")
+	if err != nil {
+		return nil, err
+	}
+	if len(lines) == 0 {
+		return nil, nil
+	}
+	tags := make(map[string]bool, len(lines))
+	for _, line := range lines {
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+		ref := strings.TrimPrefix(parts[1], "refs/tags/")
+		ref = strings.TrimSuffix(ref, "^{}")
+		if ref == "" {
+			continue
+		}
+		tags[ref] = true
+	}
+	return tags, nil
 }
 
 func (r *Repo) Divergence(ctx context.Context, left, right string) (leftOnly int, rightOnly int, err error) {

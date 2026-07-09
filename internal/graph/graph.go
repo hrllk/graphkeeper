@@ -14,6 +14,7 @@ type Node struct {
 	Author      string
 	Decorations []string
 	Subject     string
+	Tags        []string
 }
 
 type LaneSide string
@@ -51,6 +52,7 @@ func Nodes(rs git.Status) []Node {
 			Author:      commit.Author,
 			Decorations: append([]string(nil), commit.Decorations...),
 			Subject:     commit.Subject,
+			Tags:        append([]string(nil), commit.Tags...),
 		})
 	}
 	return items
@@ -144,7 +146,7 @@ func rowsFromGitGraph(rs git.Status) []Row {
 		}
 		childRefs := append([]string(nil), children[commit.Hash]...)
 		row := Row{
-			Commit:       Node{Hash: commit.Hash, Parents: append([]string(nil), commit.Parents...), RelativeAge: commit.RelativeAge, Author: commit.Author, Decorations: append([]string(nil), commit.Decorations...), Subject: commit.Subject},
+			Commit:       Node{Hash: commit.Hash, Parents: append([]string(nil), commit.Parents...), RelativeAge: commit.RelativeAge, Author: commit.Author, Decorations: append([]string(nil), commit.Decorations...), Subject: commit.Subject, Tags: append([]string(nil), commit.Tags...)},
 			Graph:        commit.Graph,
 			Children:     childRefs,
 			DisplayWidth: max(max(len([]rune(commit.Graph)), len(childRefs)), 1),

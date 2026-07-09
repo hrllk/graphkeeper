@@ -906,7 +906,7 @@ func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
 		},
 	}
 	got := m.renderGlobalContent(40, 14)
-	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j: up", "k: down", "f: fetch", "S: stash list", "q: quit"} {
+	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j: up", "k: down", "f: fetch", "F: fetch tags", "S: stash list", "q: quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected global hotkeys to include %q, got %q", want, got)
 		}
@@ -2054,6 +2054,26 @@ func TestRenderGraphContentShowsStashBadgeForFocusedCommit(t *testing.T) {
 	raw := m.renderGraphContent(80, 8)
 	if !strings.Contains(raw, "38;5;208") {
 		t.Fatalf("expected graph content to color the stash pointer, got %q", raw)
+	}
+}
+
+func TestRenderGraphContentShowsTagBadgeForTaggedCommit(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			LocalBranches: []string{"main"},
+			GraphCommits: []git.GraphCommit{
+				{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0"}},
+			},
+		},
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+
+	raw := m.renderGraphContent(80, 8)
+	if !strings.Contains(raw, "v1.0.0") {
+		t.Fatalf("expected graph content to surface tag badge, got %q", raw)
 	}
 }
 

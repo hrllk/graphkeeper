@@ -118,11 +118,16 @@ func formatTargetItem(t state.TargetItem) string {
 		return label
 	case state.TargetKindTag:
 		if t.CommitHash != "" {
-			return fmt.Sprintf("%-24s  %s  %-28s  %s",
+			source := "local"
+			if t.OnOrigin {
+				source = "local+origin"
+			}
+			return fmt.Sprintf("%-24s  %s  %-28s  %-10s  %s",
 				t.Name,
 				shorten(t.CommitHash, 7),
 				compactTitleText(t.Subject),
 				compactWhenText(t.RelativeAge),
+				tagColor.Render(source),
 			)
 		}
 		return "tag    " + t.Name
@@ -237,7 +242,6 @@ func renderActionHelpLines(m model) []string {
 			}
 		case sectionTags:
 			lines = append(lines, "• enter: jump to graph")
-			lines = append(lines, "• j/k: move tag rows")
 		default:
 			lines = append(lines, "• no section actions")
 		}

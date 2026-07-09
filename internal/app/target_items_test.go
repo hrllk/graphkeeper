@@ -141,3 +141,17 @@ func TestBuildTagSectionTargets(t *testing.T) {
 		t.Fatalf("tags = %#v", got)
 	}
 }
+
+func TestBuildTagSectionTargetsUsesOriginMarker(t *testing.T) {
+	got := buildTagSectionTargets(git.Status{
+		TagEntries: []git.TagEntry{
+			{Name: "v1.0.0", CommitHash: "abc1234", Subject: "initial", RelativeAge: "2 days ago", OnOrigin: true},
+		},
+	})
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if !got[0].OnOrigin {
+		t.Fatalf("expected origin marker to propagate to target items, got %#v", got[0])
+	}
+}

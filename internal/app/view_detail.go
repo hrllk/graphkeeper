@@ -25,6 +25,8 @@ func (m model) renderGlobalContent(width, height int) string {
 	lines = append(lines, "• j: up")
 	lines = append(lines, "• k: down")
 	lines = append(lines, "• f: fetch")
+	lines = append(lines, "• F: fetch tags")
+	lines = append(lines, "• S: stash list")
 	lines = append(lines, "• q: quit")
 	lines = fitBlockWidth(lines, width)
 	return fitBlockLines(lines, height)

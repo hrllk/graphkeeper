@@ -59,6 +59,7 @@ type GraphCommit struct {
 	Author      string
 	Decorations []string
 	Subject     string
+	Tags        []string
 }
 
 type TagEntry struct {
@@ -67,6 +68,7 @@ type TagEntry struct {
 	Subject     string
 	RelativeAge string
 	CommitUnix  int64
+	OnOrigin    bool
 }
 
 type StashEntry struct {
