@@ -2145,23 +2145,65 @@ func TestRenderStashPopupListsEntriesFlatAndKeepsOrder(t *testing.T) {
 	}
 
 	got := renderStashPopup(m, 90, 24)
+	plain := ansi.Strip(got)
 	if !strings.Contains(got, "Stash list") {
 		t.Fatalf("expected stash popup title, got %q", got)
 	}
-	first := strings.Index(got, "base: abc1234 - stash@{0} - latest change")
-	second := strings.Index(got, "base: abc1234 - stash@{1} - older change")
-	third := strings.Index(got, "base: def5678 - stash@{2} - feature WIP")
+	first := strings.Index(plain, "abc1234  stash@{0}  latest change")
+	second := strings.Index(plain, "abc1234  stash@{1}  older change")
+	third := strings.Index(plain, "def5678  stash@{2}  feature WIP")
 	if first < 0 || second < 0 || third < 0 {
-		t.Fatalf("expected stash popup to include stash entries, got %q", got)
+		t.Fatalf("expected stash popup to include stash entries, got %q", plain)
 	}
 	if first > second {
-		t.Fatalf("expected newest stash to appear before older stash, got %q", got)
+		t.Fatalf("expected newest stash to appear before older stash, got %q", plain)
 	}
 	if !strings.Contains(got, "enter: jump") || !strings.Contains(got, "esc: dismiss") {
 		t.Fatalf("expected stash popup help text, got %q", got)
 	}
 	if strings.Contains(got, "up/down: move") {
 		t.Fatalf("expected stash popup to omit up/down help, got %q", got)
+	}
+}
+
+func TestRenderStashPopupTruncatesLongSubject(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{
+		stashEntries: []git.StashEntry{
+			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "this subject is definitely longer than twenty chars"},
+		},
+	}
+
+	got := ansi.Strip(renderStashPopup(m, 90, 24))
+	if !strings.Contains(got, "abc1234  stash@{0}  this subject is de") {
+		t.Fatalf("expected long subject to truncate near 20 chars, got %q", got)
+	}
+	if strings.Contains(got, "definitely longer than twenty chars") {
+		t.Fatalf("expected long subject to be truncated, got %q", got)
+	}
+}
+
+func TestRenderStashPopupCentersDescriptionLine(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{
+		stashEntries: []git.StashEntry{
+			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+		},
+	}
+
+	lines := strings.Split(ansi.Strip(renderStashPopup(m, 90, 24)), "\n")
+	found := false
+	for _, line := range lines {
+		if strings.Contains(line, "Browse stash entries.") {
+			found = true
+			if idx := strings.Index(line, "Browse stash entries."); idx <= 1 {
+				t.Fatalf("expected description line to have centered padding, got %q", line)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected description line to be present")
 	}
 }
 

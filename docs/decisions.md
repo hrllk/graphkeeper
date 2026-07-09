@@ -79,6 +79,27 @@
 - Keep Graph stash behavior separate from the session stash list UI, pop execution, and branch continuation docs.
 - The detailed Graph stash flow lives in `docs/graph-stash-interaction.md` so the system design stays separate from the feature contract.
 
+## 2026-07-08: Stash list opens from Global hotkey into an overlay popup
+
+- Keep `Graph` limited to stash presence and focus summaries.
+- Open the stash list from a Global hotkey so the entry point is always available.
+- Render the stash list as an overlay popup in the same shell instead of a full screen swap.
+- Keep `0003` as the overlay list UI contract and `0004` as the pop execution contract.
+
+## 2026-07-09: Stash popup uses a flat list with 7-char hash tokens
+
+- Render stash list rows as flat entries instead of grouping by `BaseHash`.
+- Show only the first 7 characters of the stash base hash in the popup row text.
+- Omit the `base:` prefix from the visible label so the hash, ref, and subject scan faster.
+- Keep `BaseHash` internally for Graph jump behavior, but do not expose it in the popup label.
+
+## 2026-07-09: Graph tag work splits read/list and create flows
+
+- Keep tag inspection and tag creation in separate plans.
+- Treat `Tags` as a read-first inspector for grouped tag data.
+- Keep `Graph` tag creation as a focused CUD flow with popup input and repo refresh.
+- Do not mix tag list rendering concerns into the create flow contract.
+
 ## 2026-07-06: Diverged merge/rebase review uses a dedicated status inspection modal
 
 - Keep the final confirm dialog unchanged for merge and rebase execution.

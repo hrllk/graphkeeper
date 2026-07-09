@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -54,10 +53,10 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 		BorderForeground(lipgloss.Color("205")).
 		Padding(1, 2).
 		Width(popupWidth).
-		Align(lipgloss.Center)
+		Align(lipgloss.Left)
 
 	lines := []string{
-		descStyle.Render("Browse stash entries."),
+		centerReviewLineInWidth(descStyle.Render("Browse stash entries."), popupWidth-4),
 		"",
 	}
 	rows := buildStashPopupRows(m.stashEntries)
@@ -65,7 +64,10 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 		lines = append(lines, descStyle.Render("(no stash entries)"))
 		lines = append(lines, "")
 		lines = append(lines, helpStyle.Render("esc: dismiss"))
-		return renderFloatingTitlePopup(popupBox, "Stash list", strings.Join(lines, "\n"), popupWidth)
+		body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
+		titleLine := renderTitleStrip(popupBox, "Stash list", popupWidth)
+		bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
+		return titleLine + "\n" + bodyBlock
 	}
 
 	visibleListHeight := bodyHeight - 8
@@ -106,7 +108,10 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	}
 	lines = append(lines, "")
 	lines = append(lines, helpStyle.Render("enter: jump  •  esc: dismiss"))
-	return renderFloatingTitlePopup(popupBox, "Stash list", strings.Join(lines, "\n"), popupWidth)
+	body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
+	titleLine := renderTitleStrip(popupBox, "Stash list", popupWidth)
+	bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
+	return titleLine + "\n" + bodyBlock
 }
 
 func renderStashPopupEntry(entry git.StashEntry, selected bool, width int) string {
@@ -117,10 +122,14 @@ func renderStashPopupEntry(entry git.StashEntry, selected bool, width int) strin
 	if base == "" {
 		base = "-"
 	}
-	label := fmt.Sprintf("base: %s - %s", shorten(base, 8), entry.Ref)
-	if entry.Subject != "" {
-		label += " - " + entry.Subject
+	parts := []string{
+		stashMark.Render(shorten(base, 7)),
+		muted.Render(entry.Ref),
 	}
+	if entry.Subject != "" {
+		parts = append(parts, shorten(entry.Subject, 20))
+	}
+	label := strings.Join(parts, "  ")
 	label = fitVisibleWidth(label, width-2)
 	line := "  " + label
 	if selected {
