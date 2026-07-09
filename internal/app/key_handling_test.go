@@ -229,6 +229,9 @@ func TestFetchTagsKeyTriggersTagRefresh(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected F to trigger background tag refresh")
 	}
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected tag fetch to enter loading mode, got %s", got.status.Mode)
+	}
 	if got.status.Message != "Fetching tags..." {
 		t.Fatalf("expected fetch tags message, got %q", got.status.Message)
 	}

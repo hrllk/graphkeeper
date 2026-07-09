@@ -70,12 +70,10 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		m = switchBrowseSection(m, sectionTags)
 		return true, m, nil
 	case "f":
-		m.status.Message = "Fetching..."
-		m.status.Detail = "Refreshing refs and tracking."
+		m.status = loadingToast("Fetching sources...")
 		return true, m, fetchRepoState(m.repo, m.commitLimit)
 	case "F":
-		m.status.Message = "Fetching tags..."
-		m.status.Detail = "Refreshing tag refs."
+		m.status = loadingToast("Fetching tags...")
 		return true, m, fetchTagsRepoState(m.repo, m.commitLimit)
 	case "P":
 		if m.repoStatus.Root == "" || m.repoStatus.Detached || m.repoStatus.EmptyRepo {

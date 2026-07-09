@@ -77,8 +77,24 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 			return fetchedMsg{err: err}
 		}
 		status, err := repo.Status(context.Background(), limit)
+		if err == nil {
+			status = attachTagEntries(repo, status)
+		}
 		return fetchedMsg{status: status, err: err}
 	}
+}
+
+func attachTagEntries(repo *git.Repo, status git.Status) git.Status {
+	tagEntries, err := repo.TagEntries(context.Background())
+	if err != nil {
+		return status
+	}
+	status.TagEntries = tagEntries
+	status.Tags = make([]string, 0, len(tagEntries))
+	for _, entry := range tagEntries {
+		status.Tags = append(status.Tags, entry.Name)
+	}
+	return status
 }
 
 func prepareAction(repo *git.Repo, action state.Action, limit int) tea.Cmd {

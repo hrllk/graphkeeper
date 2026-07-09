@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestStatusIncludesTagEntries(t *testing.T) {
+func TestStatusDoesNotAutoLoadTagEntries(t *testing.T) {
 	base := t.TempDir()
 	work := filepath.Join(base, "work")
 
@@ -42,17 +42,24 @@ func TestStatusIncludesTagEntries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status failed: %v", err)
 	}
-	if len(status.TagEntries) != 2 {
-		t.Fatalf("expected 2 tag entries, got %+v", status.TagEntries)
+	if len(status.TagEntries) != 0 {
+		t.Fatalf("expected status to skip tag auto-load, got %+v", status.TagEntries)
 	}
-	if status.TagEntries[0].Name != "v1.1.0" || status.TagEntries[0].CommitHash != second {
-		t.Fatalf("expected newest tag first, got %+v", status.TagEntries[0])
+	if len(status.Tags) != 0 {
+		t.Fatalf("expected status tag names to stay empty without manual fetch, got %+v", status.Tags)
 	}
-	if status.TagEntries[1].Name != "v1.0.0" || status.TagEntries[1].CommitHash != first {
-		t.Fatalf("expected annotated tag to peel to first commit, got %+v", status.TagEntries[1])
+	entries, err := repo.TagEntries(context.Background())
+	if err != nil {
+		t.Fatalf("TagEntries failed: %v", err)
 	}
-	if len(status.Tags) != 2 || status.Tags[0] != "v1.1.0" || status.Tags[1] != "v1.0.0" {
-		t.Fatalf("expected tag name list to mirror entries, got %+v", status.Tags)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 tag entries, got %+v", entries)
+	}
+	if entries[0].Name != "v1.1.0" || entries[0].CommitHash != second {
+		t.Fatalf("expected newest tag first, got %+v", entries[0])
+	}
+	if entries[1].Name != "v1.0.0" || entries[1].CommitHash != first {
+		t.Fatalf("expected annotated tag to peel to first commit, got %+v", entries[1])
 	}
 }
 
@@ -81,8 +88,15 @@ func TestCreateTagCreatesAndRejectsDuplicates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status failed after CreateTag: %v", err)
 	}
-	if len(status.TagEntries) != 1 || status.TagEntries[0].Name != "v1.0.0" || status.TagEntries[0].CommitHash != head {
-		t.Fatalf("expected created tag in status, got %+v", status.TagEntries)
+	if len(status.TagEntries) != 0 {
+		t.Fatalf("expected status to skip tag auto-load after create, got %+v", status.TagEntries)
+	}
+	entries, err := repo.TagEntries(context.Background())
+	if err != nil {
+		t.Fatalf("TagEntries failed after create: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name != "v1.0.0" || entries[0].CommitHash != head {
+		t.Fatalf("expected created tag via manual load, got %+v", entries)
 	}
 	if err := repo.CreateTag(context.Background(), "v1.0.0", head); err == nil {
 		t.Fatal("expected duplicate CreateTag to fail")
@@ -134,11 +148,18 @@ func TestStatusMarksOriginTags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status failed: %v", err)
 	}
-	if len(status.TagEntries) != 1 {
-		t.Fatalf("expected one tag entry, got %+v", status.TagEntries)
+	if len(status.TagEntries) != 0 {
+		t.Fatalf("expected status to skip tag auto-load, got %+v", status.TagEntries)
 	}
-	if !status.TagEntries[0].OnOrigin {
-		t.Fatalf("expected tag to be marked as present on origin, got %+v", status.TagEntries[0])
+	entries, err := repo.TagEntries(context.Background())
+	if err != nil {
+		t.Fatalf("TagEntries failed: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected one tag entry, got %+v", entries)
+	}
+	if !entries[0].OnOrigin {
+		t.Fatalf("expected tag to be marked as present on origin, got %+v", entries[0])
 	}
 }
 

@@ -72,10 +72,13 @@ func (m model) handleTagPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func executeCreateTag(repo *git.Repo, name, target string, limit int) tea.Cmd {
 	return func() tea.Msg {
-		if err := repo.CreateTag(context.Background(), name, target); err != nil {
+	if err := repo.CreateTag(context.Background(), name, target); err != nil {
 			return tagCreatedMsg{Name: name, Target: target, Err: err}
 		}
 		status, err := repo.Status(context.Background(), limit)
+		if err == nil {
+			status = attachTagEntries(repo, status)
+		}
 		return tagCreatedMsg{Name: name, Target: target, Status: status, Err: err}
 	}
 }

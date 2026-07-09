@@ -103,11 +103,6 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	localBranches := branches
 	remoteBranches, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/remotes")
 	defaultBranch := r.defaultRemoteBranch(ctx)
-	tagEntries, _ := r.TagEntries(ctx)
-	tags := make([]string, 0, len(tagEntries))
-	for _, entry := range tagEntries {
-		tags = append(tags, entry.Name)
-	}
 	graphCommits, graphErr := r.graphCommits(ctx, localBranches, branchUpstreams, limit)
 	if graphErr != nil && !isNoCommits(graphErr) {
 		return Status{ErrorMessage: graphErr.Error()}, graphErr
@@ -178,8 +173,8 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		BranchUpstreams:       branchUpstreams,
 		Tracking:              tracking,
 		RemoteBranches:        remoteBranches,
-		Tags:                  tags,
-		TagEntries:            tagEntries,
+		Tags:                  nil,
+		TagEntries:            nil,
 		Remotes:               remotes,
 		EmptyRepo:             emptyRepo,
 		NoUpstream:            noUpstream,

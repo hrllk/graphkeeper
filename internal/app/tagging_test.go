@@ -193,8 +193,9 @@ func TestCreateTagFlowRefreshesAndFocusesSameCommit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("refreshed status failed: %v", err)
 	}
+	refreshed = attachTagEntries(fixture.repo, refreshed)
 	if len(refreshed.TagEntries) != 1 {
-		t.Fatalf("expected one created tag, got %+v", refreshed.TagEntries)
+		t.Fatalf("expected one created tag after manual load, got %+v", refreshed.TagEntries)
 	}
 	if refreshed.TagEntries[0].Name != "v1.0.0" || refreshed.TagEntries[0].CommitHash != fixture.initialHash {
 		t.Fatalf("unexpected refreshed tag entry: %+v", refreshed.TagEntries[0])

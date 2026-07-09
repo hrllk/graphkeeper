@@ -96,6 +96,13 @@ func TestWindowResizeDoesNotIncreaseInitialGraphLoadLimit(t *testing.T) {
 	}
 }
 
+func TestModelInitLoadsInitialState(t *testing.T) {
+	m := model{status: state.New().WithBrowse()}
+	if cmd := m.Init(); cmd == nil {
+		t.Fatal("expected init to load the initial repo state")
+	}
+}
+
 func TestSplitPaneWidthsUseThreeSevenRatio(t *testing.T) {
 	left, right := splitPaneWidths(100)
 	if left+right != 100 {
@@ -1402,10 +1409,10 @@ func TestFetchKeyDoesNotForceLoadingMode(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected fetch key to trigger background refresh")
 	}
-	if got.status.Mode != state.ModeBrowse {
-		t.Fatalf("expected fetch to keep browse mode, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected fetch to enter loading mode, got %s", got.status.Mode)
 	}
-	if got.status.Message != "Fetching..." {
+	if got.status.Message != "Fetching sources..." {
 		t.Fatalf("expected fetch message to be visible, got %q", got.status.Message)
 	}
 }
@@ -1421,11 +1428,30 @@ func TestFetchKeyWorksFromAnyBrowseSection(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected fetch key to trigger refresh outside graph section")
 	}
-	if got.status.Mode != state.ModeBrowse {
-		t.Fatalf("expected fetch to keep browse mode, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected fetch to enter loading mode, got %s", got.status.Mode)
 	}
-	if got.status.Message != "Fetching..." {
+	if got.status.Message != "Fetching sources..." {
 		t.Fatalf("expected fetch message to be visible, got %q", got.status.Message)
+	}
+}
+
+func TestFetchTagsKeyEntersLoadingMode(t *testing.T) {
+	m := model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+		commitLimit:   0,
+	}
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected fetch tags key to trigger background refresh")
+	}
+	if got.status.Mode != state.ModeLoading {
+		t.Fatalf("expected fetch tags to enter loading mode, got %s", got.status.Mode)
+	}
+	if got.status.Message != "Fetching tags..." {
+		t.Fatalf("expected fetch tags message to be visible, got %q", got.status.Message)
 	}
 }
 
@@ -2095,15 +2121,15 @@ func TestRenderStashPopupGroupsByBaseAndKeepsOrder(t *testing.T) {
 	if !strings.Contains(got, "base: abc1234") || !strings.Contains(got, "base: def5678") {
 		t.Fatalf("expected stash popup to group by base hash, got %q", got)
 	}
-	first := strings.Index(got, "stash@{0} - latest change")
-	second := strings.Index(got, "stash@{1} - older change")
+	first := strings.Index(got, "base: abc1234 - stash@{0} - latest change")
+	second := strings.Index(got, "base: abc1234 - stash@{1} - older change")
 	if first < 0 || second < 0 {
 		t.Fatalf("expected stash popup to include stash entries, got %q", got)
 	}
 	if first > second {
 		t.Fatalf("expected newest stash to appear before older stash, got %q", got)
 	}
-	if !strings.Contains(got, "up/down: move") {
+	if !strings.Contains(got, "up/down: move") || !strings.Contains(got, "enter: jump") || !strings.Contains(got, "esc: dismiss") {
 		t.Fatalf("expected stash popup help text, got %q", got)
 	}
 }

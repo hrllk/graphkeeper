@@ -20,7 +20,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.repoStatus = msg.status
 		syncBrowseState(&m, msg.status)
-		if m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError {
+		if m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError || m.status.Mode == state.ModeLoading {
 			m.status = deriveStatus(msg.status)
 		}
 		telemetry.Log("app", "fetch_repo", map[string]string{
