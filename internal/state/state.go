@@ -28,6 +28,7 @@ const (
 	ActionReset            Action = "reset"
 	ActionCreateBranch     Action = "create-branch"
 	ActionDeleteBranch     Action = "delete-branch"
+	ActionDeleteTag        Action = "delete-tag"
 	ActionStash            Action = "stash"
 	ActionCleanWorkingTree Action = "clean-working-tree"
 	ActionPush             Action = "push"

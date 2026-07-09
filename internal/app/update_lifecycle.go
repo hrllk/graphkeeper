@@ -22,7 +22,9 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.Log("app", "load_error", map[string]string{"error": msg.err.Error()})
 			return m, nil
 		}
+		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		m.status = deriveStatus(msg.status)
 		telemetry.Log("app", "load_repo", map[string]string{
@@ -37,7 +39,9 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, nil
 		}
+		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		if !m.branchOpen && (m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError) {
 			m.status = deriveStatus(msg.status)

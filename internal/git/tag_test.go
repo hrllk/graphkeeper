@@ -120,6 +120,44 @@ func TestCreateTagRejectsEmptyInputs(t *testing.T) {
 	}
 }
 
+func TestDeleteTagRemovesLocalRef(t *testing.T) {
+	base := t.TempDir()
+	work := filepath.Join(base, "work")
+
+	runGitGit(t, base, "init", "-b", "main", "work")
+	configGitUser(t, work)
+	writeGitFile(t, work, "file.txt", "one\n")
+	runGitGit(t, work, "add", "file.txt")
+	runGitGitEnv(t, work, map[string]string{
+		"GIT_AUTHOR_DATE":    "2026-07-08T12:00:00+09:00",
+		"GIT_COMMITTER_DATE": "2026-07-08T12:00:00+09:00",
+	}, "commit", "-m", "first")
+	head := runGitGit(t, work, "rev-parse", "HEAD")
+	runGitGit(t, work, "tag", "v1.0.0", head)
+
+	repo, err := Open(work)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	if _, err := repo.DeleteTag(context.Background(), "v1.0.0"); err != nil {
+		t.Fatalf("DeleteTag failed: %v", err)
+	}
+	status, err := repo.Status(context.Background(), 20)
+	if err != nil {
+		t.Fatalf("Status failed after DeleteTag: %v", err)
+	}
+	if len(status.TagEntries) != 0 {
+		t.Fatalf("expected deleted tag to stay out of cached status, got %+v", status.TagEntries)
+	}
+	entries, err := repo.TagEntries(context.Background())
+	if err != nil {
+		t.Fatalf("TagEntries failed after DeleteTag: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected tag list to be empty after delete, got %+v", entries)
+	}
+}
+
 func TestStatusMarksOriginTags(t *testing.T) {
 	base := t.TempDir()
 	origin := filepath.Join(base, "origin.git")

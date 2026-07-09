@@ -24,7 +24,6 @@ var (
 	pointerMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
 	dirtyMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
 	stashMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
-	localColor    = lipgloss.NewStyle().Foreground(lipgloss.Color("70"))
 	remoteColor   = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
 	tagColor      = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
 	highlight     = lipgloss.NewStyle().Reverse(true).Bold(true)
@@ -173,6 +172,8 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 		helpText = "enter: fast-forward  •  esc: dismiss"
 	} else if m.status.Action == state.ActionDeleteBranch {
 		helpText = "y: delete  •  n: cancel"
+	} else if m.status.Action == state.ActionDeleteTag {
+		helpText = "y: delete  •  n: cancel"
 	} else if m.status.Action == state.ActionStash {
 		helpText = "y: stash  •  n: cancel"
 	} else if m.status.Action == state.ActionCleanWorkingTree {
@@ -181,10 +182,10 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 	return renderFloatingTitlePopup(
 		popupBox,
 		popupTitle,
-		strings.Join([]string{
+		centerReviewFooterLine(strings.Join([]string{
 			descStyle.Render(m.status.Detail),
 			helpStyle.Render(helpText),
-		}, "\n\n"),
+		}, "\n\n"), width-4),
 		width,
 	)
 }

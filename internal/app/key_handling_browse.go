@@ -395,6 +395,17 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.graphSearchError = ""
 		return m, nil
 	case "d":
+		if m.activeSection == sectionTags {
+			selection := deleteTagSelection(m)
+			if !selection.ok {
+				m.status = selection.blocked
+				return m, nil
+			}
+			m.status = state.New().WithConfirm(state.ActionDeleteTag, selection.title, selection.detail)
+			m.status.Title = selection.title
+			m.status.Selected = selection.target
+			return m, nil
+		}
 		if m.activeSection == sectionGraph || m.activeSection == sectionCurrent || m.activeSection == sectionRemote {
 			selection := deleteBranchSelection(m)
 			if !selection.ok {

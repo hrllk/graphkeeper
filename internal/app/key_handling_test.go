@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/git"
+	"hrllk/graphkeeper/internal/graph"
 	"hrllk/graphkeeper/internal/state"
 )
 
@@ -218,6 +219,38 @@ func TestStashPopupOpensFromGlobalHotkey(t *testing.T) {
 	}
 }
 
+func TestStashPopupEnterJumpsToBaseCommit(t *testing.T) {
+	fixture := newCommandRepo(t)
+	status := git.Status{
+		Root: fixture.root,
+		GraphCommits: []git.GraphCommit{
+			{Hash: "base1234", Subject: "base"},
+			{Hash: "head1234", Parents: []string{"base1234"}, Subject: "head"},
+		},
+	}
+	m := testKeyHandlingModel(fixture.repo, status)
+	m.stashEntries = []git.StashEntry{
+		{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "base1234", Subject: "latest change"},
+	}
+	m.stashPopupOpen = true
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected stash popup enter to stay synchronous, got %v", cmd)
+	}
+	if got.stashPopupOpen {
+		t.Fatal("expected stash popup to close on enter")
+	}
+	if got.activeSection != sectionGraph {
+		t.Fatalf("expected enter to jump to graph section, got %v", got.activeSection)
+	}
+	wantRow := findGraphRowByHash(graph.Rows(status), "base1234")
+	if got.sectionCursor[sectionGraph] != wantRow {
+		t.Fatalf("expected graph cursor to jump to stash base row %d, got %d", wantRow, got.sectionCursor[sectionGraph])
+	}
+}
+
 func TestFetchTagsKeyTriggersTagRefresh(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{
@@ -259,6 +292,36 @@ func TestStashPopupEscapeClosesAndKeepsCursor(t *testing.T) {
 	}
 	if got.stashPopupCursor != 1 {
 		t.Fatalf("expected stash popup cursor to stay on selected entry, got %d", got.stashPopupCursor)
+	}
+}
+
+func TestStashPopupArrowKeysMoveSelection(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root: fixture.root,
+	})
+	m.stashEntries = []git.StashEntry{
+		{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+		{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "def5678", Subject: "older change"},
+	}
+	m.stashPopupOpen = true
+	m.stashPopupCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected stash popup move to stay synchronous, got %v", cmd)
+	}
+	if got.stashPopupCursor != 1 {
+		t.Fatalf("expected stash popup cursor to move down, got %d", got.stashPopupCursor)
+	}
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected stash popup move to stay synchronous, got %v", cmd)
+	}
+	if got.stashPopupCursor != 0 {
+		t.Fatalf("expected stash popup cursor to move back up, got %d", got.stashPopupCursor)
 	}
 }
 
@@ -620,6 +683,49 @@ func TestDeleteBranchShortcutOpensConfirmForOriginBranch(t *testing.T) {
 	}
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Deleting origin branch..." {
 		t.Fatalf("expected remote delete loading state, got %+v", got.status)
+	}
+}
+
+func TestDeleteTagShortcutOpensConfirm(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root: "repo",
+		TagEntries: []git.TagEntry{
+			{Name: "v1.0.0", CommitHash: fixture.initialHash, Subject: "initial", RelativeAge: "2 days ago"},
+		},
+		Tags: []string{"v1.0.0"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: fixture.initialHash, Subject: "initial"},
+		},
+	})
+	m.activeSection = sectionTags
+	m.sectionCursor[sectionTags] = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected tag delete shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionDeleteTag {
+		t.Fatalf("expected delete-tag action, got %s", got.status.Action)
+	}
+	if got.status.Title != "Delete tag?" {
+		t.Fatalf("expected tag delete confirm title, got %q", got.status.Title)
+	}
+	if got.status.Selected != "v1.0.0" {
+		t.Fatalf("expected tag target to be stored, got %q", got.status.Selected)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected tag delete confirm acceptance to execute")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Deleting tag..." {
+		t.Fatalf("expected tag delete loading state, got %+v", got.status)
 	}
 }
 

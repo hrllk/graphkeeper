@@ -109,7 +109,9 @@ func (m model) handleTagCreatedMsg(msg tagCreatedMsg) (model, tea.Cmd) {
 		return m, nil
 	}
 
+	msg.Status = m.withCachedTagEntries(msg.Status)
 	m.repoStatus = msg.Status
+	m.storeTagEntries(msg.Status)
 	syncBrowseState(&m, msg.Status)
 	rows := graph.Rows(msg.Status)
 	row := graph.FindRowByHash(rows, msg.Target)

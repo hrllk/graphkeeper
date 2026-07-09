@@ -22,6 +22,7 @@ func TestExecutionDetail(t *testing.T) {
 		{name: "reset", action: state.ActionReset, target: "feature", want: "Hard reset complete. HEAD now points at feature."},
 		{name: "delete local", action: state.ActionDeleteBranch, target: "feature", want: "Branch deleted: feature."},
 		{name: "delete origin", action: state.ActionDeleteBranch, target: "origin/feature", want: "Origin branch deleted: origin/feature."},
+		{name: "delete tag", action: state.ActionDeleteTag, target: "v1.0.0", want: "Tag deleted: v1.0.0."},
 		{name: "default", action: state.ActionNone, want: "Action complete."},
 	}
 

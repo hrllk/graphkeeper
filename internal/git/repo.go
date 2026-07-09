@@ -33,6 +33,7 @@ type Status struct {
 	RemoteBranches        []string
 	Tags                  []string
 	TagEntries            []TagEntry
+	TagEntriesLoaded      bool
 	Remotes               []string
 	EmptyRepo             bool
 	NoUpstream            bool

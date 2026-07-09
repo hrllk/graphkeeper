@@ -90,6 +90,7 @@ func attachTagEntries(repo *git.Repo, status git.Status) git.Status {
 		return status
 	}
 	status.TagEntries = tagEntries
+	status.TagEntriesLoaded = true
 	status.Tags = make([]string, 0, len(tagEntries))
 	for _, entry := range tagEntries {
 		status.Tags = append(status.Tags, entry.Name)
@@ -257,6 +258,21 @@ func executeDeleteBranch(repo *git.Repo, target string, remote bool, limit int) 
 			return executedMsg{action: state.ActionDeleteBranch, target: target, err: refreshErr}
 		}
 		return executedMsg{action: state.ActionDeleteBranch, target: target, status: refreshed, err: err}
+	}
+}
+
+func executeDeleteTag(repo *git.Repo, target string, limit int) tea.Cmd {
+	return func() tea.Msg {
+		if target == "" {
+			return executedMsg{action: state.ActionDeleteTag, err: fmt.Errorf("target is empty")}
+		}
+		_, err := repo.DeleteTag(context.Background(), target)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionDeleteTag, target: target, err: statusErr}
+		}
+		status = attachTagEntries(repo, status)
+		return executedMsg{action: state.ActionDeleteTag, target: target, status: status, err: err}
 	}
 }
 

@@ -22,6 +22,8 @@ func executionDetail(action state.Action, target string, rs git.Status) string {
 			return "Origin branch deleted: " + target + "."
 		}
 		return "Branch deleted: " + target + "."
+	case state.ActionDeleteTag:
+		return "Tag deleted: " + target + "."
 	default:
 		return "Action complete."
 	}

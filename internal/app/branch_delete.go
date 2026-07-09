@@ -107,3 +107,40 @@ func deleteBranchLoadingMessage(remote bool) string {
 	}
 	return "Deleting branch..."
 }
+
+type tagDeleteSelection struct {
+	target  string
+	title   string
+	detail  string
+	blocked state.Status
+	ok      bool
+}
+
+func deleteTagSelection(m model) tagDeleteSelection {
+	item, ok := activeSectionTargetItem(m)
+	if !ok {
+		return tagDeleteSelection{
+			blocked: state.New().WithBlocked(state.BlockTargetEmpty, "No tag selected.", "Choose a tag row."),
+		}
+	}
+	if item.Kind != state.TargetKindTag {
+		return tagDeleteSelection{
+			blocked: state.New().WithBlocked(state.BlockUnknown, "Delete unavailable.", "Choose a tag row."),
+		}
+	}
+	if item.Ref == "" {
+		return tagDeleteSelection{
+			blocked: state.New().WithBlocked(state.BlockTargetEmpty, "Tag target is missing.", "Refresh the tag list and try again."),
+		}
+	}
+	return tagDeleteSelection{
+		target: item.Ref,
+		title:  "Delete tag?",
+		detail: "Tag: " + item.Ref,
+		ok:     true,
+	}
+}
+
+func deleteTagLoadingMessage() string {
+	return "Deleting tag..."
+}

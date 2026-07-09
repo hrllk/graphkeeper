@@ -1724,6 +1724,30 @@ func TestFetchedMsgKeepsPassiveBrowseState(t *testing.T) {
 	}
 }
 
+func TestRefreshedMsgPreservesCachedTagEntries(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		tagEntries: []git.TagEntry{
+			{Name: "v1.0.0", CommitHash: "abc1234", Subject: "initial", RelativeAge: "2 days ago", OnOrigin: true},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+
+	gotModel, _ := m.Update(refreshedMsg{status: git.Status{Root: "/repo", Branch: "main", Head: "def5678"}})
+	got := gotModel.(model)
+	if len(got.repoStatus.TagEntries) != 1 {
+		t.Fatalf("expected cached tag entries to survive refresh, got %+v", got.repoStatus.TagEntries)
+	}
+	if got.repoStatus.TagEntries[0].Name != "v1.0.0" || !got.repoStatus.TagEntries[0].OnOrigin {
+		t.Fatalf("unexpected cached tag entry after refresh: %+v", got.repoStatus.TagEntries[0])
+	}
+}
+
 func TestCheckoutFocusesGraphHeadRow(t *testing.T) {
 	m := model{
 		commitLimit:     0,
@@ -2003,6 +2027,12 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", Current: true, WorktreeDirty: true}); !strings.Contains(got, "(dirty)") {
 		t.Fatalf("expected current dirty local target to show dirty badge, got %q", got)
 	}
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}); !strings.Contains(got, "(no-up)") || strings.Contains(got, "abc1234") {
+		t.Fatalf("expected local-only tags to use no-up and omit hash, got %q", got)
+	}
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.1.0", Ref: "v1.1.0", CommitHash: "def5678", Subject: "second release", RelativeAge: "1 day ago", OnOrigin: true}); !strings.Contains(got, "(origin)") || strings.Contains(got, "def5678") {
+		t.Fatalf("expected origin-synced tags to show origin marker and omit hash, got %q", got)
+	}
 }
 
 func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
@@ -2103,7 +2133,7 @@ func TestRenderGraphContentShowsTagBadgeForTaggedCommit(t *testing.T) {
 	}
 }
 
-func TestRenderStashPopupGroupsByBaseAndKeepsOrder(t *testing.T) {
+func TestRenderStashPopupListsEntriesFlatAndKeepsOrder(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
 		stashEntries: []git.StashEntry{
@@ -2118,19 +2148,33 @@ func TestRenderStashPopupGroupsByBaseAndKeepsOrder(t *testing.T) {
 	if !strings.Contains(got, "Stash list") {
 		t.Fatalf("expected stash popup title, got %q", got)
 	}
-	if !strings.Contains(got, "base: abc1234") || !strings.Contains(got, "base: def5678") {
-		t.Fatalf("expected stash popup to group by base hash, got %q", got)
-	}
 	first := strings.Index(got, "base: abc1234 - stash@{0} - latest change")
 	second := strings.Index(got, "base: abc1234 - stash@{1} - older change")
-	if first < 0 || second < 0 {
+	third := strings.Index(got, "base: def5678 - stash@{2} - feature WIP")
+	if first < 0 || second < 0 || third < 0 {
 		t.Fatalf("expected stash popup to include stash entries, got %q", got)
 	}
 	if first > second {
 		t.Fatalf("expected newest stash to appear before older stash, got %q", got)
 	}
-	if !strings.Contains(got, "up/down: move") || !strings.Contains(got, "enter: jump") || !strings.Contains(got, "esc: dismiss") {
+	if !strings.Contains(got, "enter: jump") || !strings.Contains(got, "esc: dismiss") {
 		t.Fatalf("expected stash popup help text, got %q", got)
+	}
+	if strings.Contains(got, "up/down: move") {
+		t.Fatalf("expected stash popup to omit up/down help, got %q", got)
+	}
+}
+
+func TestRenderConfirmPopupCentersHotkeys(t *testing.T) {
+	m := model{
+		status: state.New().WithConfirm(state.ActionStash, "Stash changes?", "Continue?"),
+	}
+	got := renderConfirmPopup(m, 60)
+	if !strings.Contains(got, "y: stash  •  n: cancel") {
+		t.Fatalf("expected stash confirm help, got %q", got)
+	}
+	if strings.Contains(got, "\ny: stash  •  n: cancel") {
+		t.Fatalf("expected hotkeys line to be centered, got %q", got)
 	}
 }
 

@@ -43,7 +43,9 @@ func handleBranchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.branchOpen = false
 		m.branchError = ""
+		msg2.status = m.withCachedTagEntries(msg2.status)
 		m.repoStatus = msg2.status
+		m.storeTagEntries(msg2.status)
 		syncBrowseState(&m, msg2.status)
 		focusGraphHead(&m, msg2.status)
 		m.status = loadingToast("Branch created.")

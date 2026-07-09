@@ -18,7 +18,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch failed.", msg.err.Error())
 			return m, nil
 		}
+		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		if m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError || m.status.Mode == state.ModeLoading {
 			m.status = deriveStatus(msg.status)
@@ -34,7 +36,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.Log("app", "prepare_failed", map[string]string{"action": string(msg.action), "error": msg.err.Error()})
 			return m, nil
 		}
+		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		switch msg.action {
 		case state.ActionMerge, state.ActionRebase, state.ActionReset:
@@ -53,7 +57,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.Log("app", "pull_check_failed", map[string]string{"error": msg.err.Error()})
 			return m, nil
 		}
+		msg.repo = m.withCachedTagEntries(msg.repo)
 		m.repoStatus = msg.repo
+		m.storeTagEntries(msg.repo)
 		syncBrowseState(&m, msg.repo)
 		m.status = msg.status
 		telemetry.Log("app", "pull_check", map[string]string{
@@ -67,7 +73,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.Log("app", "preview_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
 			return m, nil
 		}
+		msg.repo = m.withCachedTagEntries(msg.repo)
 		m.repoStatus = msg.repo
+		m.storeTagEntries(msg.repo)
 		syncBrowseState(&m, msg.repo)
 		m.status = msg.status
 		m.status.Selected = msg.target
@@ -83,7 +91,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.Log("app", "graph_action_check_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
 			return m, nil
 		}
+		msg.repo = m.withCachedTagEntries(msg.repo)
 		m.repoStatus = msg.repo
+		m.storeTagEntries(msg.repo)
 		syncBrowseState(&m, msg.repo)
 		switch {
 		case msg.currentOnly == 0 && msg.targetOnly == 0:
@@ -111,7 +121,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch before push failed.", msg.err.Error())
 			return m, nil
 		}
+		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		if msg.status.NoUpstream {
 			branchName := msg.status.Branch
@@ -128,7 +140,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch before pull failed.", msg.err.Error())
 			return m, nil
 		}
+		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		track := m.repoStatus.Tracking[m.repoStatus.Branch]
 		if track.Behind == 0 {

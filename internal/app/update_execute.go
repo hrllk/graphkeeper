@@ -23,7 +23,9 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg2.action == state.ActionStash || msg2.action == state.ActionCleanWorkingTree {
 			if msg2.status.Root != "" {
+				msg2.status = m.withCachedTagEntries(msg2.status)
 				m.repoStatus = msg2.status
+				m.storeTagEntries(msg2.status)
 				syncBrowseState(&m, msg2.status)
 			}
 			reason := state.BlockUnknown
@@ -41,7 +43,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg2.action == state.ActionPush && !isAuthError && (strings.Contains(msg2.err.Error(), "[rejected]") || strings.Contains(msg2.err.Error(), "non-fast-forward")) {
 			status := m.repoStatus
 			if msg2.status.Root != "" {
-				status = msg2.status
+				status = m.withCachedTagEntries(msg2.status)
 			}
 			m.repoStatus = status
 			m.handshakeCommits = make(map[string]bool)
@@ -64,8 +66,15 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 			return m, nil
 		}
+		if msg2.action == state.ActionDeleteTag && strings.Contains(strings.ToLower(msg2.err.Error()), "not found") {
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Tag not found.", "Refresh the tag list and try again.")
+			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
+			return m, nil
+		}
 		if (msg2.action == state.ActionPull || msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase) && (msg2.status.MergeInProgress || msg2.status.RebaseInProgress) {
+			msg2.status = m.withCachedTagEntries(msg2.status)
 			m.repoStatus = msg2.status
+			m.storeTagEntries(msg2.status)
 			syncBrowseState(&m, msg2.status)
 			m.status = state.New().WithBrowse()
 			m.status.Message = "Pull conflicted."
@@ -77,7 +86,9 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg2.action == state.ActionMerge && msg2.status.MergeInProgress {
+			msg2.status = m.withCachedTagEntries(msg2.status)
 			m.repoStatus = msg2.status
+			m.storeTagEntries(msg2.status)
 			syncBrowseState(&m, msg2.status)
 			m.status = state.New().WithBrowse()
 			m.status.Message = "Merge conflicted."
@@ -89,7 +100,9 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg2.action == state.ActionRebase && msg2.status.RebaseInProgress {
+			msg2.status = m.withCachedTagEntries(msg2.status)
 			m.repoStatus = msg2.status
+			m.storeTagEntries(msg2.status)
 			syncBrowseState(&m, msg2.status)
 			m.status = state.New().WithBrowse()
 			m.status.Message = "Rebase conflicted."
@@ -126,7 +139,11 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 		return m, nil
 	}
+	if msg2.action != state.ActionDeleteTag {
+		msg2.status = m.withCachedTagEntries(msg2.status)
+	}
 	m.repoStatus = msg2.status
+	m.storeTagEntries(msg2.status)
 	if msg2.action == state.ActionStash {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
@@ -170,6 +187,18 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status.Message = "Branch deleted."
 		}
+		telemetry.Log("app", "execute_action", map[string]string{
+			"action": string(msg2.action),
+			"target": msg2.target,
+			"head":   msg2.status.Head,
+		})
+		return m, nil
+	}
+	if msg2.action == state.ActionDeleteTag {
+		syncBrowseState(&m, msg2.status)
+		m.replaceTagEntries(msg2.status)
+		m.status = deriveStatus(msg2.status)
+		m.status.Message = "Tag deleted."
 		telemetry.Log("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,

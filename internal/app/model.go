@@ -11,6 +11,7 @@ type model struct {
 	repo              *git.Repo
 	status            state.Status
 	repoStatus        git.Status
+	tagEntries        []git.TagEntry
 	stashEntries      []git.StashEntry
 	stashByBase       map[string][]git.StashEntry
 	stashPopupOpen    bool

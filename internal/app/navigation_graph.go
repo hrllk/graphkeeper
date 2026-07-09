@@ -169,27 +169,28 @@ func graphLocalBranchNames(decorations []string, localBranches []string) []strin
 }
 
 func focusGraphHead(m *model, rs git.Status) {
-	focusGraphCommit(m, rs, rs.Head)
+	_ = focusGraphCommit(m, rs, rs.Head)
 }
 
-func focusGraphCommit(m *model, rs git.Status, hash string) {
+func focusGraphCommit(m *model, rs git.Status, hash string) bool {
 	m.activeSection = sectionGraph
 	rows := graph.Rows(rs)
 	if len(rows) == 0 {
 		m.sectionCursor[sectionGraph] = 0
 		m.graphScroll = 0
 		m.graphLaneCursor = 0
-		return
+		return hash == ""
 	}
 
 	row := graph.FindRowByHash(rows, hash)
 	if row < 0 {
-		row = graph.NearestSelectableGraphRow(rows, 0, 1)
+		return false
 	}
 	m.sectionCursor[sectionGraph] = row
 	page := graphPageSizeForRows(m, rows, row, graphContentHeightForModel(m))
 	m.graphScroll = clampScroll(row, len(rows), page)
 	m.graphLaneCursor = graph.PointerLane(rows[row])
+	return true
 }
 
 func moveGraphBrowseCursor(m model, delta int) model {

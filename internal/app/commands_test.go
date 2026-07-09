@@ -558,6 +558,47 @@ func TestExecuteDeleteBranchVariants(t *testing.T) {
 	})
 }
 
+func TestExecuteDeleteTagVariants(t *testing.T) {
+	t.Run("tag delete", func(t *testing.T) {
+		fixture := newCommandRepo(t)
+		if err := fixture.repo.CreateTag(context.Background(), "v1.0.0", fixture.initialHash); err != nil {
+			t.Fatalf("CreateTag failed: %v", err)
+		}
+
+		got, ok := cmdResult(t, executeDeleteTag(fixture.repo, "v1.0.0", 40)).(executedMsg)
+		if !ok {
+			t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeDeleteTag(fixture.repo, "v1.0.0", 40)))
+		}
+		if got.action != state.ActionDeleteTag {
+			t.Fatalf("action = %s, want delete-tag", got.action)
+		}
+		if got.err != nil {
+			t.Fatalf("tag delete err = %v", got.err)
+		}
+		if got.target != "v1.0.0" {
+			t.Fatalf("expected delete target v1.0.0, got %q", got.target)
+		}
+		entries := got.status.TagEntries
+		if len(entries) != 0 {
+			t.Fatalf("expected deleted tag to disappear from refreshed status, got %+v", entries)
+		}
+	})
+
+	t.Run("tag delete missing", func(t *testing.T) {
+		fixture := newCommandRepo(t)
+		got, ok := cmdResult(t, executeDeleteTag(fixture.repo, "v9.9.9", 40)).(executedMsg)
+		if !ok {
+			t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeDeleteTag(fixture.repo, "v9.9.9", 40)))
+		}
+		if got.action != state.ActionDeleteTag {
+			t.Fatalf("action = %s, want delete-tag", got.action)
+		}
+		if got.err == nil {
+			t.Fatal("expected missing tag delete to fail")
+		}
+	})
+}
+
 func TestExecuteCheckoutKeepsRemoteFallback(t *testing.T) {
 	fixture := newCommandRepo(t)
 	advanceRemoteBranch(t, fixture.remote, "feature", "feature.txt", "feature\n", "feature branch")
