@@ -166,7 +166,6 @@ func renderActionHelpLines(m model) []string {
 			lines = append(lines, "• s: reset         • ctrl+u/d: scroll")
 			lines = append(lines, "• gg: top         • G: bottom")
 			lines = append(lines, "• H: jump to HEAD")
-			lines = append(lines, "• t: tag commit")
 			deleteLabel := "• d: delete branch"
 			if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 				lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(local lane only)"))
@@ -187,12 +186,15 @@ func renderActionHelpLines(m model) []string {
 			}
 			popEntries := graphStashPopEntriesForFocus(m)
 			if len(popEntries) > 0 {
-				lines = append(lines, "• o: pop stash")
+				lines = append(lines, "• t: tag commit   • o: pop stash")
 			} else if graphFocusIsHead(m) {
-				lines = append(lines, disabled.Render("• o: pop stash")+" "+muted.Render("(no stash)"))
+				line := "• t: tag commit   " + disabled.Render("• o: pop stash") + " " + muted.Render("(no stash)")
+				lines = append(lines, line)
 			} else {
-				lines = append(lines, disabled.Render("• o: pop stash")+" "+muted.Render("(HEAD only)"))
+				line := "• t: tag commit   " + disabled.Render("• o: pop stash") + " " + muted.Render("(HEAD only)")
+				lines = append(lines, line)
 			}
+			return lines
 		case sectionCurrent, sectionRemote:
 			if m.activeSection == sectionCurrent {
 				if m.repoStatus.WorktreeDirty {

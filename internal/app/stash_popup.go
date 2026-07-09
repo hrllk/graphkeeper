@@ -14,6 +14,49 @@ type stashPopupRow struct {
 	ItemIndex int
 }
 
+func (m model) handleStashMessageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.stashMessageOpen = false
+		m.stashMessageDraft = ""
+		m.stashMessageError = ""
+		m.status = deriveStatus(m.repoStatus)
+		return m, nil
+	case "enter":
+		message := strings.TrimSpace(m.stashMessageDraft)
+		if message == "" {
+			m.stashMessageError = "Stash message is empty."
+			return m, nil
+		}
+		m.stashMessageOpen = false
+		m.stashMessageDraft = ""
+		m.stashMessageError = ""
+		m.status = loadingToast("Stashing changes...")
+		return m, executeStashAll(m.repo, m.commitLimit, message)
+	case "backspace":
+		if len(m.stashMessageDraft) > 0 {
+			runes := []rune(m.stashMessageDraft)
+			m.stashMessageDraft = string(runes[:len(runes)-1])
+			m.stashMessageError = ""
+		}
+		return m, nil
+	case "delete":
+		if len(m.stashMessageDraft) > 0 {
+			runes := []rune(m.stashMessageDraft)
+			m.stashMessageDraft = string(runes[:len(runes)-1])
+			m.stashMessageError = ""
+		}
+		return m, nil
+	default:
+		if len(msg.Runes) > 0 {
+			m.stashMessageDraft += string(msg.Runes)
+			m.stashMessageError = ""
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
 func (m model) handleGraphStashPopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
@@ -172,6 +215,35 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	titleLine := renderTitleStrip(popupBox, "Stash list", popupWidth)
 	bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
 	return titleLine + "\n" + bodyBlock
+}
+
+func renderStashMessagePopup(m model, bodyWidth int) string {
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	popupWidth := popupWidthForBody(bodyWidth, 40, 60)
+	popupBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Padding(1, 2).
+		Width(popupWidth).
+		Align(lipgloss.Center)
+	draft := m.stashMessageDraft
+	if draft == "" {
+		draft = " "
+	}
+	lines := []string{
+		descStyle.Render("Enter a message for this stash."),
+		"",
+		descStyle.Render("message: " + draft),
+	}
+	if m.stashMessageError != "" {
+		lines = append(lines, "")
+		lines = append(lines, errStyle.Render(m.stashMessageError))
+	}
+	lines = append(lines, "")
+	lines = append(lines, helpStyle.Render("enter: stash  •  esc: cancel"))
+	return renderFloatingTitlePopup(popupBox, "Stash changes", strings.Join(lines, "\n"), popupWidth)
 }
 
 func renderGraphStashPopPopup(m model, bodyWidth, bodyHeight int) string {

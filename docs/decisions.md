@@ -100,6 +100,14 @@
 - Keep `Graph` tag creation as a focused CUD flow with popup input and repo refresh.
 - Do not mix tag list rendering concerns into the create flow contract.
 
+## 2026-07-09: Tag provenance is an app-managed snapshot over local refs
+
+- Read local tags from local refs on startup so the Tag section can render immediately without waiting for remote provenance.
+- Keep remote provenance in `.git/graphkeeper/tag-provenance.json` as app-owned metadata instead of trying to extend Git refs.
+- Use `F` as the explicit refresh path for `git fetch --tags` plus `git ls-remote --tags origin`, then persist the resulting provenance snapshot.
+- Treat `never synced` and `stale` as the only user-facing sync summary states.
+- Do not use `(no-up)` when provenance has not been loaded yet; unknown provenance must remain visually distinct from missing remote provenance.
+
 ## 2026-07-09: Graph stash pop is HEAD-gated and uses a two-step overlay
 
 - Keep Graph stash pop available only when the focused `Graph` row is `HEAD` and that commit has at least one stash.

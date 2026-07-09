@@ -14,6 +14,9 @@ type model struct {
 	tagEntries           []git.TagEntry
 	stashEntries         []git.StashEntry
 	stashByBase          map[string][]git.StashEntry
+	stashMessageOpen     bool
+	stashMessageDraft    string
+	stashMessageError    string
 	stashPopupOpen       bool
 	stashPopupCursor     int
 	graphStashPopOpen    bool

@@ -1293,10 +1293,10 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	if !containsLine(graph, "• gg: top         • G: bottom") {
 		t.Fatalf("expected graph actions to use gg shortcut, got %v", graph)
 	}
-	if !strings.Contains(strings.Join(graph, " "), "d: delete branch") {
+	if !strings.Contains(graphJoined, "d: delete branch") {
 		t.Fatalf("expected graph actions to include delete branch, got %v", graph)
 	}
-	if !strings.Contains(strings.Join(graph, " "), "o: pop stash") {
+	if !strings.Contains(graphJoined, "o: pop stash") {
 		t.Fatalf("expected graph actions to include stash pop, got %v", graph)
 	}
 	current := renderActionHelpLines(model{
@@ -2263,6 +2263,22 @@ func TestRenderConfirmPopupCentersHotkeys(t *testing.T) {
 	}
 	if strings.Contains(got, "\ny: stash  •  n: cancel") {
 		t.Fatalf("expected hotkeys line to be centered, got %q", got)
+	}
+}
+
+func TestRenderStashMessagePopupShowsInputAndHelp(t *testing.T) {
+	m := model{
+		stashMessageDraft: "wip: local cleanup",
+	}
+	got := renderStashMessagePopup(m, 72)
+	if !strings.Contains(got, "Enter a message for this stash.") {
+		t.Fatalf("expected stash message prompt, got %q", got)
+	}
+	if !strings.Contains(got, "message: wip: local cleanup") {
+		t.Fatalf("expected stash message draft, got %q", got)
+	}
+	if !strings.Contains(got, "enter: stash  •  esc: cancel") {
+		t.Fatalf("expected stash message help, got %q", got)
 	}
 }
 

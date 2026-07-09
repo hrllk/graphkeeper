@@ -10,6 +10,9 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.graphStashPopOpen {
 		return m.handleGraphStashPopKey(msg)
 	}
+	if m.stashMessageOpen {
+		return m.handleStashMessageKey(msg)
+	}
 	if m.tagPopupOpen {
 		return m.handleTagPopupKey(msg)
 	}

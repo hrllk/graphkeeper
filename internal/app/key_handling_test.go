@@ -446,7 +446,7 @@ func TestGraphStashPopConfirmExecutesOnEnter(t *testing.T) {
 	}
 }
 
-func TestStashShortcutOpensConfirmForDirtyLocalSection(t *testing.T) {
+func TestStashShortcutOpensMessagePopupForDirtyLocalSection(t *testing.T) {
 	fixture := newCommandRepo(t)
 	writeRepoFile(t, fixture.root, "stash.txt", "stash\n")
 	m := testKeyHandlingModel(fixture.repo, git.Status{
@@ -463,14 +463,46 @@ func TestStashShortcutOpensConfirmForDirtyLocalSection(t *testing.T) {
 	if cmd != nil {
 		t.Fatalf("expected stash shortcut to stay synchronous, got %v", cmd)
 	}
-	if got.status.Mode != state.ModeConfirm {
-		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	if !got.stashMessageOpen {
+		t.Fatal("expected stash message popup to open")
 	}
-	if got.status.Action != state.ActionStash {
-		t.Fatalf("expected stash action, got %s", got.status.Action)
+	if got.status.Mode != state.ModeBrowse {
+		t.Fatalf("expected browse mode while message popup is open, got %s", got.status.Mode)
 	}
-	if got.status.Title != "Stash changes?" {
-		t.Fatalf("expected stash confirm title, got %q", got.status.Title)
+	if got.stashMessageDraft != "" {
+		t.Fatalf("expected empty draft, got %q", got.stashMessageDraft)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("stash message")})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected message typing to stay synchronous, got %v", cmd)
+	}
+	if got.stashMessageDraft != "stash message" {
+		t.Fatalf("expected typed message to accumulate, got %q", got.stashMessageDraft)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected stash message submission to execute")
+	}
+	if got.stashMessageOpen {
+		t.Fatal("expected stash message popup to close on submit")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Stashing changes..." {
+		t.Fatalf("expected stash loading state, got %+v", got.status)
+	}
+	msg := cmd()
+	executed, ok := msg.(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", msg)
+	}
+	if executed.action != state.ActionStash {
+		t.Fatalf("expected stash executed action, got %s", executed.action)
+	}
+	if executed.err != nil {
+		t.Fatalf("expected stash execution to succeed, got %v", executed.err)
 	}
 }
 
@@ -559,11 +591,19 @@ func TestStashShortcutRefreshesStashState(t *testing.T) {
 	if cmd != nil {
 		t.Fatalf("expected stash shortcut to stay synchronous, got %v", cmd)
 	}
+	if !got.stashMessageOpen {
+		t.Fatal("expected stash message popup to open")
+	}
 
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("local cleanup")})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected message typing to stay synchronous, got %v", cmd)
+	}
 	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got = gotModel.(model)
 	if cmd == nil {
-		t.Fatal("expected stash acceptance to execute")
+		t.Fatal("expected stash message submission to execute")
 	}
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Stashing changes..." {
 		t.Fatalf("expected stash loading state, got %+v", got.status)

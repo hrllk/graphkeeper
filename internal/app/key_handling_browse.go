@@ -344,7 +344,10 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = state.New().WithBlocked(state.BlockDirtyTree, "Working tree is clean.", "Nothing to stash.")
 				return m, nil
 			}
-			m.status = confirmStashChanges()
+			m.stashMessageOpen = true
+			m.stashMessageDraft = ""
+			m.stashMessageError = ""
+			m.status = deriveStatus(m.repoStatus)
 			return m, nil
 		}
 		return m, nil
@@ -433,16 +436,6 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
-}
-
-func confirmStashChanges() state.Status {
-	status := state.New().WithConfirm(
-		state.ActionStash,
-		"Stash changes?",
-		"This will save staged, unstaged, and untracked files.",
-	)
-	status.Title = "Stash changes?"
-	return status
 }
 
 func confirmCleanWorkingTree() state.Status {
