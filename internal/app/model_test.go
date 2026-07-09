@@ -1728,6 +1728,29 @@ func TestRenderSectionContentStartsAtLeftEdge(t *testing.T) {
 	}
 }
 
+func TestRenderSectionContentKeepsActiveCursorVisible(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			LocalBranches: []string{"main", "feature", "tmp1", "tmp2", "tmp2-2", "tmp2-3"},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 5,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+		activeSection: sectionCurrent,
+	}
+	got := ansi.Strip(m.renderSectionContent(sectionCurrent, 30, 4))
+	if !strings.Contains(got, "tmp2-3") {
+		t.Fatalf("expected active cursor item to remain visible, got %q", got)
+	}
+	if strings.Contains(got, "main\n") && strings.Contains(got, "tmp2-3") {
+		t.Fatalf("expected section view to window toward the cursor, got %q", got)
+	}
+}
+
 func containsLine(lines []string, want string) bool {
 	for _, line := range lines {
 		if line == want {
@@ -2073,11 +2096,14 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", Current: true, WorktreeDirty: true}); !strings.Contains(got, "(dirty)") {
 		t.Fatalf("expected current dirty local target to show dirty badge, got %q", got)
 	}
-	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}); !strings.Contains(got, "(no-up)") || strings.Contains(got, "abc1234") {
-		t.Fatalf("expected local-only tags to use no-up and omit hash, got %q", got)
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}); !strings.Contains(got, "(unknown)") || strings.Contains(got, "abc1234") {
+		t.Fatalf("expected tags without provenance to use unknown and omit hash, got %q", got)
 	}
-	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.1.0", Ref: "v1.1.0", CommitHash: "def5678", Subject: "second release", RelativeAge: "1 day ago", OnOrigin: true}); !strings.Contains(got, "(origin)") || strings.Contains(got, "def5678") {
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.1.0", Ref: "v1.1.0", CommitHash: "def5678", Subject: "second release", RelativeAge: "1 day ago", OriginKnown: true, OnOrigin: true}); !strings.Contains(got, "(origin)") || strings.Contains(got, "def5678") {
 		t.Fatalf("expected origin-synced tags to show origin marker and omit hash, got %q", got)
+	}
+	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.2.0", Ref: "v1.2.0", CommitHash: "fedcba9", Subject: "third release", RelativeAge: "just now", OriginKnown: true}); !strings.Contains(got, "(no-up)") {
+		t.Fatalf("expected known but missing remote tags to show no-up, got %q", got)
 	}
 }
 
@@ -2552,22 +2578,86 @@ func TestRenderGraphContentClipsHeadersBeforeRows(t *testing.T) {
 func TestRenderRightRailRendersStackedCards(t *testing.T) {
 	m := model{
 		repoStatus: git.Status{
-			LocalBranches:  []string{"main"},
-			RemoteBranches: []string{"origin/main"},
-			Tags:           []string{"v1.0.0"},
+			LocalBranches:  []string{"feature/super-long-local-branch-name"},
+			RemoteBranches: []string{"origin/super-long-remote-branch-name"},
+			TagEntries: []git.TagEntry{
+				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true},
+			},
 		},
 	}
-	got := m.renderRightRail(40, 12)
+	got := m.renderRightRail(40, 18)
 	if got == "" {
 		t.Fatal("expected right rail to render")
 	}
 	lines := strings.Split(got, "\n")
-	if len(lines) != 12 {
+	if len(lines) < 18 {
 		t.Fatalf("expected right rail to keep stacked card height, got %d lines: %q", len(lines), got)
 	}
 	for _, want := range []string{"Local", "Remote", "Tags"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected right rail to contain %q, got %q", want, got)
+		}
+	}
+	for i, line := range lines {
+		if width := lipgloss.Width(ansi.Strip(line)); width > 42 {
+			t.Fatalf("expected right rail line %d to fit helper width, got width=%d line=%q", i, width, line)
+		}
+	}
+	if !strings.Contains(ansi.Strip(got), "feature/super-long") {
+		t.Fatalf("expected local section to remain readable, got %q", got)
+	}
+	if !strings.Contains(ansi.Strip(got), "super-long-remote") {
+		t.Fatalf("expected remote section to remain readable, got %q", got)
+	}
+	if !strings.Contains(ansi.Strip(got), "v1.0.0") {
+		t.Fatalf("expected tag section to show the tag name, got %q", got)
+	}
+}
+
+func TestRenderTagsEmptyStateStopsPromptAfterProvenanceLoad(t *testing.T) {
+	m := model{
+		repoStatus: git.Status{
+			TagProvenanceLoaded: true,
+			TagSyncSummary:      string(tagSyncStale),
+		},
+		tagSyncAttempted: true,
+	}
+	got := m.renderSectionContent(sectionTags, 40, 4)
+	if strings.Contains(got, "Press F to sync tag provenance.") {
+		t.Fatalf("expected provenanced empty tags state to stop prompting for F, got %q", got)
+	}
+	if !strings.Contains(got, "No local tags found.") {
+		t.Fatalf("expected empty tags state to explain no tags were found, got %q", got)
+	}
+}
+
+func TestRenderAppViewFitsViewportWidth(t *testing.T) {
+	m := model{
+		width:  140,
+		height: 60,
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch:         "feature/super-long-local-branch-name",
+			Head:           "abcdef1234567890",
+			Remote:         "origin",
+			LocalBranches:  []string{"feature/super-long-local-branch-name"},
+			RemoteBranches: []string{"origin/super-long-remote-branch-name"},
+			TagEntries: []git.TagEntry{
+				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true},
+			},
+		},
+		sectionCursor: map[graphSection]int{
+			sectionGraph:   0,
+			sectionCurrent: 0,
+			sectionRemote:  0,
+			sectionTags:    0,
+		},
+	}
+	got := renderAppView(m)
+	lines := strings.Split(got, "\n")
+	for i, line := range lines {
+		if width := lipgloss.Width(ansi.Strip(line)); width > 140 {
+			t.Fatalf("expected renderAppView line %d to fit viewport width, got width=%d line=%q", i, width, line)
 		}
 	}
 }

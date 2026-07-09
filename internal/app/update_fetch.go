@@ -20,6 +20,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		if msg.status.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		if m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError || m.status.Mode == state.ModeLoading {
@@ -38,6 +41,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		if msg.status.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		switch msg.action {
@@ -59,6 +65,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.repo = m.withCachedTagEntries(msg.repo)
 		m.repoStatus = msg.repo
+		if msg.repo.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.repo)
 		syncBrowseState(&m, msg.repo)
 		m.status = msg.status
@@ -75,6 +84,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.repo = m.withCachedTagEntries(msg.repo)
 		m.repoStatus = msg.repo
+		if msg.repo.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.repo)
 		syncBrowseState(&m, msg.repo)
 		m.status = msg.status
@@ -93,6 +105,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.repo = m.withCachedTagEntries(msg.repo)
 		m.repoStatus = msg.repo
+		if msg.repo.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.repo)
 		syncBrowseState(&m, msg.repo)
 		switch {
@@ -123,6 +138,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		if msg.status.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		if msg.status.NoUpstream {
@@ -142,6 +160,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		if msg.status.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		track := m.repoStatus.Tracking[m.repoStatus.Branch]

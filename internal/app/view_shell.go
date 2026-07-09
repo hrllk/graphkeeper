@@ -56,7 +56,11 @@ func renderAppView(m model) string {
 	headerHeight := layoutHeaderHeight(bodyHeight)
 	graphRailHeight := layoutGraphRailHeight(bodyHeight)
 
-	globalWidth, contextWidth := splitPaneWidths(bodyWidth)
+	headerPaneWidth := bodyWidth - 4
+	if headerPaneWidth < 0 {
+		headerPaneWidth = 0
+	}
+	globalWidth, contextWidth := splitPaneWidths(headerPaneWidth)
 	globalBox := renderFloatingTitleFrame(
 		baseBox.Width(globalWidth).Height(headerHeight),
 		"Global",
@@ -73,17 +77,21 @@ func renderAppView(m model) string {
 	)
 	headerRow := lipgloss.JoinHorizontal(lipgloss.Top, globalBox, contextBox)
 
-	graphWidth := int(float64(bodyWidth) * 0.72)
+	graphBudget := bodyWidth - 4
+	if graphBudget < 0 {
+		graphBudget = 0
+	}
+	graphWidth := int(float64(graphBudget) * 0.72)
 	if graphWidth < 56 {
 		graphWidth = 56
 	}
-	if graphWidth > bodyWidth-18 {
-		graphWidth = bodyWidth - 18
+	if graphWidth > graphBudget-18 {
+		graphWidth = graphBudget - 18
 	}
 	if graphWidth < 0 {
 		graphWidth = 0
 	}
-	rightWidth := bodyWidth - graphWidth
+	rightWidth := graphBudget - graphWidth
 	graphContentHeight := graphContentHeightForModel(&m)
 	graphBox := renderFloatingTitleFrame(
 		m.getBoxStyle(sectionGraph).Width(graphWidth).Height(graphRailHeight),
@@ -392,30 +400,34 @@ func (m model) renderRightRail(width, height int) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
-	sectionHeight := height - 6
+	cardWidth := width
+	if cardWidth < 1 {
+		cardWidth = 1
+	}
+	sectionHeight := height - 3
 	if sectionHeight < 1 {
 		sectionHeight = 1
 	}
 	localHeight, remoteHeight, tagsHeight := splitThreeHeights(sectionHeight)
 	localBox := renderFloatingTitleFrame(
-		m.getBoxStyle(sectionCurrent).Width(width).Height(localHeight),
+		m.getBoxStyle(sectionCurrent).Width(cardWidth).Height(localHeight),
 		"[2] Local",
-		m.renderSectionContent(sectionCurrent, max(width-4, 0), max(localHeight-2, 0)),
-		width,
+		m.renderSectionContent(sectionCurrent, max(cardWidth-4, 0), localHeight),
+		cardWidth,
 		localHeight,
 	)
 	remoteBox := renderFloatingTitleFrame(
-		m.getBoxStyle(sectionRemote).Width(width).Height(remoteHeight),
+		m.getBoxStyle(sectionRemote).Width(cardWidth).Height(remoteHeight),
 		"[3] Remote",
-		m.renderSectionContent(sectionRemote, max(width-4, 0), max(remoteHeight-2, 0)),
-		width,
+		m.renderSectionContent(sectionRemote, max(cardWidth-4, 0), remoteHeight),
+		cardWidth,
 		remoteHeight,
 	)
 	tagsBox := renderFloatingTitleFrame(
-		m.getBoxStyle(sectionTags).Width(width).Height(tagsHeight),
+		m.getBoxStyle(sectionTags).Width(cardWidth).Height(tagsHeight),
 		"[4] Tags",
-		m.renderSectionContent(sectionTags, max(width-4, 0), max(tagsHeight-2, 0)),
-		width,
+		m.renderSectionContent(sectionTags, max(cardWidth-4, 0), tagsHeight),
+		cardWidth,
 		tagsHeight,
 	)
 	return lipgloss.JoinVertical(lipgloss.Left, localBox, remoteBox, tagsBox)

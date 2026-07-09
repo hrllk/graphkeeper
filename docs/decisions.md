@@ -108,6 +108,13 @@
 - Treat `never synced` and `stale` as the only user-facing sync summary states.
 - Do not use `(no-up)` when provenance has not been loaded yet; unknown provenance must remain visually distinct from missing remote provenance.
 
+## 2026-07-09: Tag push is explicit and tag fetch does not overwrite conflicts
+
+- Use `t` for local tag creation only.
+- Use `P` in the Tags section for explicit tag push.
+- Keep `F` focused on provenance sync and remote tag refresh.
+- If `F` hits a tag-name or tag-content conflict, fail without overwriting the existing local tag ref.
+
 ## 2026-07-09: Graph stash pop is HEAD-gated and uses a two-step overlay
 
 - Keep Graph stash pop available only when the focused `Graph` row is `HEAD` and that commit has at least one stash.

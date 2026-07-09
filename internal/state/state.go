@@ -33,6 +33,7 @@ const (
 	ActionStashPop         Action = "stash-pop"
 	ActionCleanWorkingTree Action = "clean-working-tree"
 	ActionPush             Action = "push"
+	ActionPushTag          Action = "push-tag"
 	ActionForcePush        Action = "force-push"
 	ActionSetUpstream      Action = "set-upstream"
 	ActionPullMerge        Action = "pull-merge"
@@ -84,6 +85,7 @@ type TargetItem struct {
 	CommitHash      string
 	Subject         string
 	RelativeAge     string
+	OriginKnown     bool
 	OnOrigin        bool
 	Current         bool
 	WorktreeDirty   bool

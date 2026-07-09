@@ -22,5 +22,7 @@ func (m model) withCachedTagEntries(status git.Status) git.Status {
 	for _, entry := range m.tagEntries {
 		status.Tags = append(status.Tags, entry.Name)
 	}
+	status.TagProvenanceLoaded = m.repoStatus.TagProvenanceLoaded
+	status.TagSyncSummary = m.repoStatus.TagSyncSummary
 	return status
 }

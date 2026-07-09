@@ -62,8 +62,20 @@ func (m model) renderContextInfoLines(width int) []string {
 		}
 	case sectionCurrent, sectionRemote, sectionTags:
 		items := sectionTargets(m.repoStatus, m.activeSection)
+		if m.activeSection == sectionTags {
+			if m.repoStatus.TagProvenanceLoaded {
+				lines = append(lines, fmt.Sprintf("sync: %s", tagSyncSummaryLabel(m.repoStatus.TagSyncSummary)))
+				lines = append(lines, tagSyncSummaryHelp(m.repoStatus.TagSyncSummary))
+			} else if !m.tagSyncAttempted {
+				lines = append(lines, muted.Render("sync: Press F to sync tag provenance."))
+			}
+		}
 		if len(items) == 0 {
-			lines = append(lines, muted.Render("  (empty)"))
+			if m.activeSection == sectionTags && !m.tagSyncAttempted {
+				lines = append(lines, muted.Render("  (provenance unknown)"))
+			} else {
+				lines = append(lines, muted.Render("  (empty)"))
+			}
 			return lines
 		}
 		cursor := m.sectionCursor[m.activeSection]

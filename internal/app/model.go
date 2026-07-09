@@ -12,6 +12,7 @@ type model struct {
 	status               state.Status
 	repoStatus           git.Status
 	tagEntries           []git.TagEntry
+	tagSyncAttempted     bool
 	stashEntries         []git.StashEntry
 	stashByBase          map[string][]git.StashEntry
 	stashMessageOpen     bool

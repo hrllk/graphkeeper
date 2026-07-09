@@ -63,6 +63,70 @@ func TestStatusDoesNotAutoLoadTagEntries(t *testing.T) {
 	}
 }
 
+func TestLocalTagEntriesReadsLocalRefsWithoutOriginFlags(t *testing.T) {
+	base := t.TempDir()
+	work := filepath.Join(base, "work")
+
+	runGitGit(t, base, "init", "-b", "main", "work")
+	configGitUser(t, work)
+	writeGitFile(t, work, "file.txt", "one\n")
+	runGitGit(t, work, "add", "file.txt")
+	runGitGitEnv(t, work, map[string]string{
+		"GIT_AUTHOR_DATE":    "2026-07-08T10:00:00+09:00",
+		"GIT_COMMITTER_DATE": "2026-07-08T10:00:00+09:00",
+	}, "commit", "-m", "first")
+	head := runGitGit(t, work, "rev-parse", "HEAD")
+	runGitGit(t, work, "tag", "v1.0.0", head)
+
+	repo, err := Open(work)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	entries, err := repo.LocalTagEntries(context.Background())
+	if err != nil {
+		t.Fatalf("LocalTagEntries failed: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected one local tag entry, got %+v", entries)
+	}
+	if entries[0].OriginKnown {
+		t.Fatalf("expected local tag read to keep origin unknown, got %+v", entries[0])
+	}
+}
+
+func TestOriginTagSetReadsRemoteTags(t *testing.T) {
+	base := t.TempDir()
+	origin := filepath.Join(base, "origin.git")
+	work := filepath.Join(base, "work")
+
+	runGitGit(t, base, "init", "--bare", origin)
+	runGitGit(t, base, "init", "-b", "main", "work")
+	configGitUser(t, work)
+	writeGitFile(t, work, "file.txt", "one\n")
+	runGitGit(t, work, "add", "file.txt")
+	runGitGitEnv(t, work, map[string]string{
+		"GIT_AUTHOR_DATE":    "2026-07-08T12:00:00+09:00",
+		"GIT_COMMITTER_DATE": "2026-07-08T12:00:00+09:00",
+	}, "commit", "-m", "first")
+	head := runGitGit(t, work, "rev-parse", "HEAD")
+	runGitGit(t, work, "remote", "add", "origin", origin)
+	runGitGit(t, work, "push", "-u", "origin", "main")
+	runGitGit(t, work, "tag", "v1.0.0", head)
+	runGitGit(t, work, "push", "origin", "v1.0.0")
+
+	repo, err := Open(work)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	tags, err := repo.OriginTagSet(context.Background())
+	if err != nil {
+		t.Fatalf("OriginTagSet failed: %v", err)
+	}
+	if !tags["v1.0.0"] {
+		t.Fatalf("expected remote tag set to include v1.0.0, got %+v", tags)
+	}
+}
+
 func TestCreateTagCreatesAndRejectsDuplicates(t *testing.T) {
 	base := t.TempDir()
 	work := filepath.Join(base, "work")

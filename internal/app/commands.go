@@ -15,6 +15,28 @@ import (
 func loadRepoState(repo *git.Repo, limit int) tea.Cmd {
 	return func() tea.Msg {
 		status, err := repo.Status(context.Background(), limit)
+		if err != nil {
+			return loadedMsg{status: status, err: err}
+		}
+		tags, tagErr := repo.LocalTagEntries(context.Background())
+		if tagErr == nil {
+			status.TagEntries = tags
+			status.TagEntriesLoaded = true
+			status.Tags = make([]string, 0, len(tags))
+			for _, entry := range tags {
+				status.Tags = append(status.Tags, entry.Name)
+			}
+		}
+		snapshot, snapErr := loadTagSnapshot(status.Root)
+		if snapErr == nil {
+			status = applyTagSnapshot(status, snapshot)
+			status.TagProvenanceLoaded = true
+		} else if len(status.TagEntries) > 0 {
+			status = markTagOriginUnknown(status)
+		} else {
+			status.TagProvenanceLoaded = false
+			status.TagSyncSummary = string(tagSyncNeverSynced)
+		}
 		return loadedMsg{status: status, err: err}
 	}
 }
@@ -77,9 +99,29 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 			return fetchedMsg{err: err}
 		}
 		status, err := repo.Status(context.Background(), limit)
-		if err == nil {
-			status = attachTagEntries(repo, status)
+		if err != nil {
+			return fetchedMsg{status: status, err: err}
 		}
+		tags, tagErr := repo.LocalTagEntries(context.Background())
+		if tagErr != nil {
+			return fetchedMsg{status: status, err: tagErr}
+		}
+		remoteTags, remoteErr := repo.OriginTagSet(context.Background())
+		if remoteErr != nil {
+			return fetchedMsg{status: status, err: remoteErr}
+		}
+		status.TagEntries = tags
+		status.TagEntriesLoaded = true
+		status.Tags = make([]string, 0, len(tags))
+		for _, entry := range tags {
+			status.Tags = append(status.Tags, entry.Name)
+		}
+		snapshot := buildTagSnapshot(tags, remoteTags, tagSyncStale)
+		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
+			return fetchedMsg{status: status, err: err}
+		}
+		status = applyTagSnapshot(status, snapshot)
+		status.TagProvenanceLoaded = true
 		return fetchedMsg{status: status, err: err}
 	}
 }
@@ -91,6 +133,8 @@ func attachTagEntries(repo *git.Repo, status git.Status) git.Status {
 	}
 	status.TagEntries = tagEntries
 	status.TagEntriesLoaded = true
+	status.TagProvenanceLoaded = true
+	status.TagSyncSummary = string(tagSyncStale)
 	status.Tags = make([]string, 0, len(tagEntries))
 	for _, entry := range tagEntries {
 		status.Tags = append(status.Tags, entry.Name)

@@ -34,6 +34,8 @@ type Status struct {
 	Tags                  []string
 	TagEntries            []TagEntry
 	TagEntriesLoaded      bool
+	TagProvenanceLoaded   bool
+	TagSyncSummary        string
 	Remotes               []string
 	EmptyRepo             bool
 	NoUpstream            bool
@@ -69,6 +71,7 @@ type TagEntry struct {
 	Subject     string
 	RelativeAge string
 	CommitUnix  int64
+	OriginKnown bool
 	OnOrigin    bool
 }
 

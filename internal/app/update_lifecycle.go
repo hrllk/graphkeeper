@@ -24,6 +24,9 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		if msg.status.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		m.status = deriveStatus(msg.status)
@@ -41,6 +44,9 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		if msg.status.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
 		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
 		if !m.branchOpen && (m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError) {

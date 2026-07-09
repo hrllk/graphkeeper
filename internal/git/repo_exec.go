@@ -27,6 +27,14 @@ func (r *Repo) Push(ctx context.Context, branch string, force bool, setUpstream 
 	return r.Run(args...)
 }
 
+func (r *Repo) PushTag(ctx context.Context, tag string) (string, error) {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return "", fmt.Errorf("tag is empty")
+	}
+	return r.Run("push", "origin", tag)
+}
+
 func (r *Repo) DeleteBranch(ctx context.Context, branch string) (string, error) {
 	return r.Run("branch", "-D", branch)
 }
@@ -121,6 +129,22 @@ func (r *Repo) Stashes(ctx context.Context) ([]StashEntry, error) {
 }
 
 func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
+	entries, err := r.LocalTagEntries(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) == 0 {
+		return nil, nil
+	}
+	originTags, _ := r.OriginTagSet(ctx)
+	for i := range entries {
+		entries[i].OriginKnown = true
+		entries[i].OnOrigin = originTags[entries[i].Name]
+	}
+	return entries, nil
+}
+
+func (r *Repo) LocalTagEntries(ctx context.Context) ([]TagEntry, error) {
 	names, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/tags")
 	if err != nil {
 		return nil, err
@@ -128,7 +152,6 @@ func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
 	if len(names) == 0 {
 		return nil, nil
 	}
-	originTags, _ := r.originTagSet(ctx)
 	entries := make([]TagEntry, 0, len(names))
 	for _, name := range names {
 		target, err := r.git(ctx, "rev-parse", "--verify", name+"^{commit}")
@@ -157,7 +180,6 @@ func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
 			Subject:     strings.TrimSpace(subject),
 			RelativeAge: strings.TrimSpace(relativeAge),
 			CommitUnix:  commitUnix,
-			OnOrigin:    originTags[name],
 		})
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -169,7 +191,7 @@ func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
 	return entries, nil
 }
 
-func (r *Repo) originTagSet(ctx context.Context) (map[string]bool, error) {
+func (r *Repo) OriginTagSet(ctx context.Context) (map[string]bool, error) {
 	lines, err := r.gitLines(ctx, "ls-remote", "--tags", "origin")
 	if err != nil {
 		return nil, err

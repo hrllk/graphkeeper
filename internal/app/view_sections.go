@@ -4,30 +4,52 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"hrllk/graphkeeper/internal/state"
 )
 
 func (m model) renderSectionContent(section graphSection, width, height int) string {
 	items := sectionTargets(m.repoStatus, section)
 	if len(items) == 0 {
+		if section == sectionTags {
+			lines := []string{fitVisibleWidth(muted.Render("No local tags found."), width)}
+			if !m.tagSyncAttempted {
+				lines = append(lines, fitVisibleWidth(muted.Render("Press F to sync tag provenance."), width))
+			}
+			return fitBlockLines(lines, height)
+		}
 		return fitVisibleWidth(muted.Render("(empty)"), width)
 	}
 	cursor := m.sectionCursor[section]
+	start := 0
+	if m.activeSection == section && height > 0 && len(items) > height {
+		start = cursor - height + 1
+		if start < 0 {
+			start = 0
+		}
+		if start > len(items)-height {
+			start = len(items) - height
+		}
+	}
 	var b strings.Builder
-	for i, item := range items {
-		if i >= height {
+	rendered := 0
+	for i := start; i < len(items); i++ {
+		if rendered >= height {
 			break
 		}
+		item := items[i]
 		prefix := ""
 		if i == cursor && m.activeSection == section {
 			prefix = ">"
 		}
-		label := formatTargetItem(item)
+		label := formatSectionTargetItem(item, width)
 		if label == "" {
 			continue
 		}
 		b.WriteString(fitVisibleWidth(prefix+label, width))
 		b.WriteString("\n")
+		rendered++
 	}
 	return b.String()
 }
@@ -118,9 +140,11 @@ func formatTargetItem(t state.TargetItem) string {
 		return label
 	case state.TargetKindTag:
 		if t.CommitHash != "" {
-			source := warn.Render("(no-up)")
-			if t.OnOrigin {
+			source := muted.Render("(unknown)")
+			if t.OriginKnown && t.OnOrigin {
 				source = remoteColor.Render("(origin)")
+			} else if t.OriginKnown {
+				source = warn.Render("(no-up)")
 			}
 			return fmt.Sprintf("%-24s  %-28s  %-10s  %s",
 				t.Name,
@@ -135,10 +159,83 @@ func formatTargetItem(t state.TargetItem) string {
 	}
 }
 
+func formatSectionTargetItem(t state.TargetItem, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	switch t.Kind {
+	case state.TargetKindLocal:
+		return formatSectionBranchTarget("l->", t.Name, width, t.Current, t.WorktreeDirty, t.NeedsPull, t.NeedsPush, t.NoUpstream, t.MergeConflicted)
+	case state.TargetKindRemote:
+		name := t.Name
+		if !strings.Contains(name, "/") {
+			return ""
+		}
+		if !strings.HasSuffix(name, "/HEAD") && strings.HasPrefix(name, "origin/") {
+			name = strings.TrimPrefix(name, "origin/")
+		}
+		label := formatSectionBranchTarget("o->", name, width, false, false, false, false, false, false)
+		if t.Default {
+			label += " " + muted.Render("(default)")
+		}
+		return fitVisibleWidth(label, width)
+	case state.TargetKindTag:
+		if t.CommitHash == "" {
+			return fitVisibleWidth(tagColor.Render(t.Name), width)
+		}
+		parts := []string{
+			tagColor.Render(shorten(t.Name, max(width-18, 4))),
+		}
+		if t.Subject != "" {
+			parts = append(parts, compactTitleText(t.Subject))
+		}
+		if t.RelativeAge != "" {
+			parts = append(parts, compactWhenText(t.RelativeAge))
+		}
+		source := muted.Render("(unknown)")
+		if t.OriginKnown && t.OnOrigin {
+			source = remoteColor.Render("(origin)")
+		} else if t.OriginKnown {
+			source = warn.Render("(no-up)")
+		}
+		parts = append(parts, source)
+		return fitVisibleWidth(strings.Join(parts, "  "), width)
+	default:
+		return fitVisibleWidth(t.Name, width)
+	}
+}
+
+func formatSectionBranchTarget(prefix, name string, width int, current, dirty, needsPull, needsPush, noUpstream, conflicted bool) string {
+	base := prefix + shorten(name, max(width-lipgloss.Width(prefix), 4))
+	var label string
+	if current {
+		label = headMark.Render(base)
+	} else {
+		label = base
+	}
+	parts := []string{label}
+	if dirty {
+		parts = append(parts, dirtyMark.Render("(dirty)"))
+	}
+	if needsPull {
+		parts = append(parts, warn.Render("⬇"))
+	}
+	if needsPush {
+		parts = append(parts, warn.Render("⬆"))
+	}
+	if noUpstream {
+		parts = append(parts, warn.Render("(no-up)"))
+	}
+	if conflicted {
+		parts = append(parts, conflictMark.Render("(conflict)"))
+	}
+	return fitVisibleWidth(strings.Join(parts, " "), width)
+}
+
 func renderActionHelpLines(m model) []string {
 	switch m.status.Mode {
 	case state.ModeBrowse:
-		lines := make([]string, 0, 5)
+		lines := make([]string, 0, 8)
 		switch m.activeSection {
 		case sectionGraph:
 			isLocal := isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor)
@@ -218,7 +315,8 @@ func renderActionHelpLines(m model) []string {
 			}
 			if m.activeSection == sectionCurrent {
 				if pullReady(m.repoStatus) {
-					lines = append(lines, "• p: pull           • P: push")
+					lines = append(lines, "• p: pull")
+					lines = append(lines, "• P: push")
 				} else {
 					label := "• p: pull"
 					switch {
@@ -231,9 +329,11 @@ func renderActionHelpLines(m model) []string {
 					}
 					pushLabel := "• P: push"
 					if m.repoStatus.Detached || m.repoStatus.EmptyRepo {
-						lines = append(lines, disabled.Render(label)+"   "+disabled.Render(pushLabel))
+						lines = append(lines, disabled.Render(label))
+						lines = append(lines, disabled.Render(pushLabel))
 					} else {
-						lines = append(lines, disabled.Render(label)+"   "+pushLabel)
+						lines = append(lines, disabled.Render(label))
+						lines = append(lines, pushLabel)
 					}
 				}
 				if m.repoStatus.MergeInProgress {
