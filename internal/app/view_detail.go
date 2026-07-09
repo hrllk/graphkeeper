@@ -39,9 +39,7 @@ func (m model) renderContextContent(width, height int) string {
 	sectionTitle := sectionName(m.activeSection)
 	leftLines := append([]string{title.Render(sectionTitle + " Details")}, m.renderContextInfoLines(width)...)
 	rightLines := append([]string{title.Render(sectionTitle + " Actions")}, renderActionHelpLines(m)...)
-	if m.activeSection == sectionGraph {
-		rightLines = indentLines(rightLines, 1)
-	}
+	rightLines = indentLines(rightLines, 1)
 	return renderSplitColumns(leftLines, rightLines, width, height)
 }
 
@@ -148,7 +146,7 @@ func (m model) renderDetailContent(width, height int) string {
 	}
 	lines = append(lines, "")
 	lines = append(lines, title.Render("Actions"))
-	lines = append(lines, renderActionHelpLines(m)...)
+	lines = append(lines, indentLines(renderActionHelpLines(m), 1)...)
 	lines = fitBlockWidth(lines, width)
 	return fitBlockLines(lines, height)
 }
