@@ -26,6 +26,7 @@ func testKeyHandlingModel(repo *git.Repo, status git.Status) model {
 			sectionTags:    0,
 		},
 		handshakeCommits: make(map[string]bool),
+		stashByBase:      make(map[string][]git.StashEntry),
 	}
 }
 
@@ -322,6 +323,126 @@ func TestStashPopupArrowKeysMoveSelection(t *testing.T) {
 	}
 	if got.stashPopupCursor != 0 {
 		t.Fatalf("expected stash popup cursor to move back up, got %d", got.stashPopupCursor)
+	}
+}
+
+func TestGraphStashPopHotkeyOpensConfirmForSingleEntry(t *testing.T) {
+	fixture := newCommandRepo(t)
+	headHash := fixture.initialHash
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root: fixture.root,
+		Head: headHash,
+		GraphCommits: []git.GraphCommit{
+			{Hash: headHash, Decorations: []string{"HEAD -> main", "main"}},
+		},
+	})
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = 0
+	m.stashByBase[headHash] = []git.StashEntry{
+		{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: headHash, Subject: "latest change"},
+	}
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected graph stash pop hotkey to stay synchronous, got %v", cmd)
+	}
+	if !got.graphStashPopOpen {
+		t.Fatal("expected graph stash pop popup to open")
+	}
+	if got.graphStashPopMode != graphStashPopModeConfirm {
+		t.Fatalf("expected single stash to open confirm, got %v", got.graphStashPopMode)
+	}
+	if len(got.graphStashPopEntries) != 1 {
+		t.Fatalf("expected one stash entry, got %d", len(got.graphStashPopEntries))
+	}
+}
+
+func TestGraphStashPopHotkeyUsesPickerForMultipleEntries(t *testing.T) {
+	fixture := newCommandRepo(t)
+	headHash := fixture.initialHash
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root: fixture.root,
+		Head: headHash,
+		GraphCommits: []git.GraphCommit{
+			{Hash: headHash, Decorations: []string{"HEAD -> main", "main"}},
+		},
+	})
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = 0
+	m.stashByBase[headHash] = []git.StashEntry{
+		{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: headHash, Subject: "latest change"},
+		{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: headHash, Subject: "older change"},
+	}
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected graph stash pop hotkey to stay synchronous, got %v", cmd)
+	}
+	if !got.graphStashPopOpen {
+		t.Fatal("expected graph stash pop popup to open")
+	}
+	if got.graphStashPopMode != graphStashPopModePicker {
+		t.Fatalf("expected multiple stashes to open picker, got %v", got.graphStashPopMode)
+	}
+	if got.graphStashPopCursor != 0 {
+		t.Fatalf("expected picker cursor to start at first entry, got %d", got.graphStashPopCursor)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected picker navigation to stay synchronous, got %v", cmd)
+	}
+	if got.graphStashPopCursor != 1 {
+		t.Fatalf("expected picker cursor to move down, got %d", got.graphStashPopCursor)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected picker enter to stay synchronous, got %v", cmd)
+	}
+	if got.graphStashPopMode != graphStashPopModeConfirm {
+		t.Fatalf("expected picker enter to switch to confirm, got %v", got.graphStashPopMode)
+	}
+	if !got.graphStashPopOpen {
+		t.Fatal("expected popup to remain open for confirm")
+	}
+}
+
+func TestGraphStashPopConfirmExecutesOnEnter(t *testing.T) {
+	fixture := newCommandRepo(t)
+	headHash := fixture.initialHash
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root: fixture.root,
+		Head: headHash,
+		GraphCommits: []git.GraphCommit{
+			{Hash: headHash, Decorations: []string{"HEAD -> main", "main"}},
+		},
+	})
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = 0
+	m.stashByBase[headHash] = []git.StashEntry{
+		{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: headHash, Subject: "latest change"},
+		{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: headHash, Subject: "older change"},
+	}
+	m.graphStashPopOpen = true
+	m.graphStashPopMode = graphStashPopModeConfirm
+	m.graphStashPopCursor = 1
+	m.graphStashPopEntries = m.stashesForCommit(headHash)
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected confirm enter to execute stash pop")
+	}
+	if got.graphStashPopOpen {
+		t.Fatal("expected graph stash popup to close on execute")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Popping stash..." {
+		t.Fatalf("expected pop loading state, got %+v", got.status)
 	}
 }
 

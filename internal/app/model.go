@@ -8,42 +8,53 @@ import (
 )
 
 type model struct {
-	repo              *git.Repo
-	status            state.Status
-	repoStatus        git.Status
-	tagEntries        []git.TagEntry
-	stashEntries      []git.StashEntry
-	stashByBase       map[string][]git.StashEntry
-	stashPopupOpen    bool
-	stashPopupCursor  int
-	tagPopupOpen      bool
-	tagPopupDraft     string
-	tagPopupError     string
-	tagPopupTarget    string
-	activeSection     graphSection
-	sectionCursor     map[graphSection]int
-	graphLaneCursor   int
-	graphScroll       int
-	graphSearchOpen   bool
-	graphSearchDraft  string
-	graphSearchQuery  string
-	graphSearchIndex  []graphSearchEntry
-	graphSearchCursor int
-	graphSearchError  string
-	awaitingGoTop     bool
-	branchOpen        bool
-	branchDraft       string
-	branchBase        string
-	branchError       string
-	width             int
-	height            int
-	commitLimit       int
-	err               error
-	handshakeCommits  map[string]bool
-	pullIsFastForward bool
+	repo                 *git.Repo
+	status               state.Status
+	repoStatus           git.Status
+	tagEntries           []git.TagEntry
+	stashEntries         []git.StashEntry
+	stashByBase          map[string][]git.StashEntry
+	stashPopupOpen       bool
+	stashPopupCursor     int
+	graphStashPopOpen    bool
+	graphStashPopMode    graphStashPopMode
+	graphStashPopCursor  int
+	graphStashPopEntries []git.StashEntry
+	tagPopupOpen         bool
+	tagPopupDraft        string
+	tagPopupError        string
+	tagPopupTarget       string
+	activeSection        graphSection
+	sectionCursor        map[graphSection]int
+	graphLaneCursor      int
+	graphScroll          int
+	graphSearchOpen      bool
+	graphSearchDraft     string
+	graphSearchQuery     string
+	graphSearchIndex     []graphSearchEntry
+	graphSearchCursor    int
+	graphSearchError     string
+	awaitingGoTop        bool
+	branchOpen           bool
+	branchDraft          string
+	branchBase           string
+	branchError          string
+	width                int
+	height               int
+	commitLimit          int
+	err                  error
+	handshakeCommits     map[string]bool
+	pullIsFastForward    bool
 }
 
 type graphSection int
+
+type graphStashPopMode int
+
+const (
+	graphStashPopModePicker graphStashPopMode = iota
+	graphStashPopModeConfirm
+)
 
 const (
 	sectionGraph graphSection = iota
@@ -63,10 +74,11 @@ func New(repo *git.Repo) (tea.Model, error) {
 			sectionRemote:  0,
 			sectionTags:    0,
 		},
-		graphLaneCursor:  0,
-		commitLimit:      0,
-		handshakeCommits: make(map[string]bool),
-		stashByBase:      make(map[string][]git.StashEntry),
+		graphLaneCursor:   0,
+		commitLimit:       0,
+		handshakeCommits:  make(map[string]bool),
+		stashByBase:       make(map[string][]git.StashEntry),
+		graphStashPopMode: graphStashPopModePicker,
 	}
 	return m, nil
 }

@@ -37,6 +37,8 @@ This document stops at the Graph visual layer.
 
 The session-wide stash list UI lives in `docs/20260706-0003-stash-session-list-ui-plan.md`.
 The selected-stash pop flow lives in `docs/20260706-0004-stash-pop-execution-plan.md`.
+The `Graph`-specific stash pop entry flow lives in `docs/20260709-0005-graph-stash-pop-plan.md`.
+The `Graph` stash pop implementation plan lives in `docs/20260709-0006-graph-stash-pop-implementation-plan.md`.
 The branch continuation flow lives in `docs/20260706-0005-stash-continue-from-branch-plan.md`.
 
 ## Out of Scope

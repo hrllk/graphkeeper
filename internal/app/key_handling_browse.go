@@ -199,6 +199,18 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.tagPopupError = ""
 		m.tagPopupTarget = focus.Hash
 		return m, nil
+	case "o":
+		entries := graphStashPopEntriesForFocus(m)
+		if len(entries) == 0 {
+			if !graphFocusIsHead(m) {
+				m.status = state.New().WithBlocked(state.BlockUnknown, "Stash pop unavailable.", "Focus HEAD before popping stash.")
+			} else {
+				m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No stash available.", "Add a stash at HEAD first.")
+			}
+			return m, nil
+		}
+		m = openGraphStashPop(m)
+		return m, nil
 	case "m":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Merge unavailable.", "Select a local branch.")

@@ -62,6 +62,15 @@ func (r *Repo) StashAll(ctx context.Context, message string) error {
 	return err
 }
 
+func (r *Repo) StashPop(ctx context.Context, ref string) error {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return fmt.Errorf("stash ref is empty")
+	}
+	_, err := r.git(ctx, "stash", "pop", ref)
+	return err
+}
+
 func (r *Repo) CleanWorkingTree(ctx context.Context, includeIgnored bool) error {
 	if _, err := r.git(ctx, "reset", "--hard"); err != nil {
 		return err

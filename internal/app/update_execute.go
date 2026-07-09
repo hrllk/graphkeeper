@@ -71,6 +71,21 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 			return m, nil
 		}
+		if msg2.action == state.ActionStashPop {
+			if msg2.status.Root != "" {
+				msg2.status = m.withCachedTagEntries(msg2.status)
+				m.repoStatus = msg2.status
+				m.storeTagEntries(msg2.status)
+				syncBrowseState(&m, msg2.status)
+			}
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Stash pop failed.", msg2.err.Error())
+			telemetry.Log("app", "execute_failed", map[string]string{
+				"action": string(msg2.action),
+				"target": msg2.target,
+				"error":  msg2.err.Error(),
+			})
+			return m, loadStashState(m.repo)
+		}
 		if (msg2.action == state.ActionPull || msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase) && (msg2.status.MergeInProgress || msg2.status.RebaseInProgress) {
 			msg2.status = m.withCachedTagEntries(msg2.status)
 			m.repoStatus = msg2.status
@@ -205,6 +220,17 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			"head":   msg2.status.Head,
 		})
 		return m, nil
+	}
+	if msg2.action == state.ActionStashPop {
+		syncBrowseState(&m, msg2.status)
+		m.status = deriveStatus(msg2.status)
+		m.status.Message = "Stash popped."
+		telemetry.Log("app", "execute_action", map[string]string{
+			"action": string(msg2.action),
+			"target": msg2.target,
+			"head":   msg2.status.Head,
+		})
+		return m, loadStashState(m.repo)
 	}
 	if msg2.action == state.ActionCheckout {
 		m.commitLimit = 0

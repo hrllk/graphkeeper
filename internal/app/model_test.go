@@ -1296,6 +1296,9 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	if !strings.Contains(strings.Join(graph, " "), "d: delete branch") {
 		t.Fatalf("expected graph actions to include delete branch, got %v", graph)
 	}
+	if !strings.Contains(strings.Join(graph, " "), "o: pop stash") {
+		t.Fatalf("expected graph actions to include stash pop, got %v", graph)
+	}
 	current := renderActionHelpLines(model{
 		status:        state.New().WithBrowse(),
 		activeSection: sectionCurrent,
@@ -1363,6 +1366,49 @@ func TestRenderActionHelpLinesShowsCleanupActionsOnlyForDirtyCurrentSection(t *t
 	cleanJoined := strings.Join(clean, " ")
 	if !strings.Contains(cleanJoined, "dirty only") {
 		t.Fatalf("expected clean local actions to show dirty-only gating, got %v", clean)
+	}
+}
+
+func TestRenderGraphStashPopPopupShowsPickerAndConfirmStates(t *testing.T) {
+	forceTrueColorProfile(t)
+	picker := model{
+		graphStashPopOpen: true,
+		graphStashPopMode: graphStashPopModePicker,
+		graphStashPopEntries: []git.StashEntry{
+			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+			{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
+		},
+	}
+	gotPicker := ansi.Strip(renderGraphStashPopPopup(picker, 90, 24))
+	if !strings.Contains(gotPicker, "Pop stash") {
+		t.Fatalf("expected pop stash title, got %q", gotPicker)
+	}
+	if !strings.Contains(gotPicker, "Choose a stash to pop.") {
+		t.Fatalf("expected picker description, got %q", gotPicker)
+	}
+	if !strings.Contains(gotPicker, "stash@{0}") || !strings.Contains(gotPicker, "stash@{1}") {
+		t.Fatalf("expected picker rows, got %q", gotPicker)
+	}
+	if !strings.Contains(gotPicker, "enter: choose") {
+		t.Fatalf("expected picker footer, got %q", gotPicker)
+	}
+
+	confirm := model{
+		graphStashPopOpen: true,
+		graphStashPopMode: graphStashPopModeConfirm,
+		graphStashPopEntries: []git.StashEntry{
+			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+		},
+	}
+	gotConfirm := ansi.Strip(renderGraphStashPopPopup(confirm, 90, 24))
+	if !strings.Contains(gotConfirm, "Confirm stash pop.") {
+		t.Fatalf("expected confirm description, got %q", gotConfirm)
+	}
+	if !strings.Contains(gotConfirm, "enter: pop") {
+		t.Fatalf("expected confirm footer, got %q", gotConfirm)
+	}
+	if !strings.Contains(gotConfirm, "This will remove the stash") {
+		t.Fatalf("expected confirm warning, got %q", gotConfirm)
 	}
 }
 

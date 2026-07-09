@@ -276,6 +276,20 @@ func executeDeleteTag(repo *git.Repo, target string, limit int) tea.Cmd {
 	}
 }
 
+func executeStashPop(repo *git.Repo, limit int, entry git.StashEntry) tea.Cmd {
+	return func() tea.Msg {
+		if entry.Ref == "" {
+			return executedMsg{action: state.ActionStashPop, err: fmt.Errorf("stash ref is empty")}
+		}
+		err := repo.StashPop(context.Background(), entry.Ref)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionStashPop, target: entry.Ref, err: statusErr}
+		}
+		return executedMsg{action: state.ActionStashPop, target: entry.Ref, status: status, err: err}
+	}
+}
+
 func previewSelection(repo *git.Repo, rs git.Status, action state.Action, target string) tea.Cmd {
 	return func() tea.Msg {
 		if target == "" {

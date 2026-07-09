@@ -194,6 +194,43 @@ func TestLoadStashState(t *testing.T) {
 	}
 }
 
+func TestExecuteStashPopRefreshesStashList(t *testing.T) {
+	fixture := newCommandRepo(t)
+	writeRepoFile(t, fixture.root, "stash.txt", "stash\n")
+	runGit(t, fixture.root, "add", "stash.txt")
+	runGit(t, fixture.root, "stash", "push", "-m", "wip stash")
+
+	stashes, err := fixture.repo.Stashes(context.Background())
+	if err != nil {
+		t.Fatalf("repo.Stashes err = %v", err)
+	}
+	if len(stashes) != 1 {
+		t.Fatalf("expected one stash entry, got %+v", stashes)
+	}
+
+	got, ok := cmdResult(t, executeStashPop(fixture.repo, 40, stashes[0])).(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeStashPop(fixture.repo, 40, stashes[0])))
+	}
+	if got.action != state.ActionStashPop {
+		t.Fatalf("expected stash pop action, got %s", got.action)
+	}
+	if got.err != nil {
+		t.Fatalf("executeStashPop err = %v", got.err)
+	}
+	if got.status.Root == "" {
+		t.Fatalf("expected refreshed status after stash pop, got %+v", got.status)
+	}
+
+	remaining, err := fixture.repo.Stashes(context.Background())
+	if err != nil {
+		t.Fatalf("repo.Stashes after pop err = %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("expected stash list to be empty after pop, got %+v", remaining)
+	}
+}
+
 func TestExecuteStashAllIncludesUntracked(t *testing.T) {
 	fixture := newCommandRepo(t)
 	writeRepoFile(t, fixture.root, "tracked.txt", "tracked\n")

@@ -100,6 +100,14 @@
 - Keep `Graph` tag creation as a focused CUD flow with popup input and repo refresh.
 - Do not mix tag list rendering concerns into the create flow contract.
 
+## 2026-07-09: Graph stash pop is HEAD-gated and uses a two-step overlay
+
+- Keep Graph stash pop available only when the focused `Graph` row is `HEAD` and that commit has at least one stash.
+- Use `o` as the Graph pop hotkey because the existing Graph section already uses `p` and `P`.
+- When multiple stashes exist, open a picker first and then a confirm overlay for the selected stash.
+- When only one stash exists, skip the picker and open the confirm overlay directly.
+- Keep the Graph pop overlay separate from the global stash list popup so read/browse and execution remain distinct.
+
 ## 2026-07-06: Diverged merge/rebase review uses a dedicated status inspection modal
 
 - Keep the final confirm dialog unchanged for merge and rebase execution.

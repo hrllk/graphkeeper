@@ -10,8 +10,54 @@ import (
 )
 
 type stashPopupRow struct {
-	Entry       git.StashEntry
-	ItemIndex   int
+	Entry     git.StashEntry
+	ItemIndex int
+}
+
+func (m model) handleGraphStashPopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.graphStashPopOpen = false
+		m.graphStashPopEntries = nil
+		m.graphStashPopCursor = 0
+		m.graphStashPopMode = graphStashPopModePicker
+		m.status = deriveStatus(m.repoStatus)
+		return m, nil
+	case "up", "k":
+		if m.graphStashPopMode == graphStashPopModePicker && len(m.graphStashPopEntries) > 0 {
+			m.graphStashPopCursor = moveCircularCursor(m.graphStashPopCursor, -1, len(m.graphStashPopEntries))
+		}
+		return m, nil
+	case "down", "j":
+		if m.graphStashPopMode == graphStashPopModePicker && len(m.graphStashPopEntries) > 0 {
+			m.graphStashPopCursor = moveCircularCursor(m.graphStashPopCursor, 1, len(m.graphStashPopEntries))
+		}
+		return m, nil
+	case "enter":
+		if len(m.graphStashPopEntries) == 0 {
+			m.graphStashPopOpen = false
+			m.graphStashPopMode = graphStashPopModePicker
+			m.status = deriveStatus(m.repoStatus)
+			return m, nil
+		}
+		if m.graphStashPopMode == graphStashPopModePicker {
+			m.graphStashPopMode = graphStashPopModeConfirm
+			return m, nil
+		}
+		entry, ok := graphStashPopSelected(m)
+		if !ok {
+			m.graphStashPopOpen = false
+			m.graphStashPopMode = graphStashPopModePicker
+			m.status = deriveStatus(m.repoStatus)
+			return m, nil
+		}
+		m.graphStashPopOpen = false
+		m.graphStashPopMode = graphStashPopModePicker
+		m.status = loadingToast("Popping stash...")
+		return m, executeStashPop(m.repo, m.commitLimit, entry)
+	default:
+		return m, nil
+	}
 }
 
 func (m model) handleStashPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -42,6 +88,20 @@ func (m model) handleStashPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+func moveCircularCursor(cursor, delta, count int) int {
+	if count <= 0 {
+		return 0
+	}
+	if cursor < 0 || cursor >= count {
+		cursor = 0
+	}
+	cursor = (cursor + delta) % count
+	if cursor < 0 {
+		cursor += count
+	}
+	return cursor
 }
 
 func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
@@ -110,6 +170,86 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	lines = append(lines, helpStyle.Render("enter: jump  •  esc: dismiss"))
 	body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
 	titleLine := renderTitleStrip(popupBox, "Stash list", popupWidth)
+	bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
+	return titleLine + "\n" + bodyBlock
+}
+
+func renderGraphStashPopPopup(m model, bodyWidth, bodyHeight int) string {
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	popupWidth := popupWidthForBody(bodyWidth, 44, 76)
+	popupBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("205")).
+		Padding(1, 2).
+		Width(popupWidth).
+		Align(lipgloss.Left)
+
+	lines := []string{
+		centerReviewLineInWidth(descStyle.Render("Pop stash from HEAD."), popupWidth-4),
+		"",
+	}
+
+	if len(m.graphStashPopEntries) == 0 {
+		lines = append(lines, descStyle.Render("(no stash entries)"))
+		lines = append(lines, "")
+		lines = append(lines, helpStyle.Render("esc: dismiss"))
+		body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
+		titleLine := renderTitleStrip(popupBox, "Pop stash", popupWidth)
+		bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
+		return titleLine + "\n" + bodyBlock
+	}
+
+	if m.graphStashPopMode == graphStashPopModePicker {
+		lines = append(lines, descStyle.Render("Choose a stash to pop."))
+		lines = append(lines, "")
+		visibleListHeight := bodyHeight - 10
+		if visibleListHeight < 1 {
+			visibleListHeight = 1
+		}
+		start := m.graphStashPopCursor - visibleListHeight/2
+		if start < 0 {
+			start = 0
+		}
+		end := start + visibleListHeight
+		if end > len(m.graphStashPopEntries) {
+			end = len(m.graphStashPopEntries)
+			start = end - visibleListHeight
+			if start < 0 {
+				start = 0
+			}
+		}
+		if start > 0 {
+			lines = append(lines, muted.Render("..."))
+		}
+		for i := start; i < end; i++ {
+			lines = append(lines, renderStashPopupEntry(m.graphStashPopEntries[i], i == m.graphStashPopCursor, popupWidth-4))
+		}
+		if end < len(m.graphStashPopEntries) {
+			lines = append(lines, muted.Render("..."))
+		}
+		lines = append(lines, "")
+		lines = append(lines, helpStyle.Render("enter: choose  •  esc: dismiss"))
+	} else {
+		entry, ok := graphStashPopSelected(m)
+		if !ok {
+			lines = append(lines, descStyle.Render("(no selection)"))
+			lines = append(lines, "")
+			lines = append(lines, helpStyle.Render("esc: dismiss"))
+		} else {
+			lines = append(lines, descStyle.Render("Confirm stash pop."))
+			lines = append(lines, "")
+			lines = append(lines, renderStashPopupEntry(entry, true, popupWidth-4))
+			lines = append(lines, "")
+			lines = append(lines, warnStyle.Render("This will remove the stash if the pop succeeds."))
+			lines = append(lines, "")
+			lines = append(lines, helpStyle.Render("enter: pop  •  esc: dismiss"))
+		}
+	}
+
+	body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
+	titleLine := renderTitleStrip(popupBox, "Pop stash", popupWidth)
 	bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
 	return titleLine + "\n" + bodyBlock
 }

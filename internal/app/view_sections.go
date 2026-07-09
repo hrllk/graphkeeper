@@ -185,6 +185,14 @@ func renderActionHelpLines(m model) []string {
 			} else {
 				lines = append(lines, "• / ?: search        "+disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
 			}
+			popEntries := graphStashPopEntriesForFocus(m)
+			if len(popEntries) > 0 {
+				lines = append(lines, "• o: pop stash")
+			} else if graphFocusIsHead(m) {
+				lines = append(lines, disabled.Render("• o: pop stash")+" "+muted.Render("(no stash)"))
+			} else {
+				lines = append(lines, disabled.Render("• o: pop stash")+" "+muted.Render("(HEAD only)"))
+			}
 		case sectionCurrent, sectionRemote:
 			if m.activeSection == sectionCurrent {
 				if m.repoStatus.WorktreeDirty {

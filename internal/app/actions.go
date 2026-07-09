@@ -178,3 +178,44 @@ func selectedTarget(s state.Status) string {
 	}
 	return ""
 }
+
+func graphFocusIsHead(m model) bool {
+	if m.activeSection != sectionGraph {
+		return false
+	}
+	focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+	return focus.Hash != "" && focus.Hash == m.repoStatus.Head
+}
+
+func graphStashPopEntriesForFocus(m model) []git.StashEntry {
+	if !graphFocusIsHead(m) {
+		return nil
+	}
+	return m.stashesForCommit(m.repoStatus.Head)
+}
+
+func openGraphStashPop(m model) model {
+	entries := graphStashPopEntriesForFocus(m)
+	if len(entries) == 0 {
+		return m
+	}
+	m.graphStashPopEntries = append([]git.StashEntry(nil), entries...)
+	m.graphStashPopCursor = 0
+	m.graphStashPopMode = graphStashPopModePicker
+	m.graphStashPopOpen = true
+	if len(entries) == 1 {
+		m.graphStashPopMode = graphStashPopModeConfirm
+	}
+	return m
+}
+
+func graphStashPopSelected(m model) (git.StashEntry, bool) {
+	if len(m.graphStashPopEntries) == 0 {
+		return git.StashEntry{}, false
+	}
+	cursor := m.graphStashPopCursor
+	if cursor < 0 || cursor >= len(m.graphStashPopEntries) {
+		cursor = 0
+	}
+	return m.graphStashPopEntries[cursor], true
+}
