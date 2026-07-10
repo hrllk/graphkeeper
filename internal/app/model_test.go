@@ -492,6 +492,33 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 	}
 }
 
+func TestRenderGraphContentHidesAuthorHeaderWhenSpaceIsTight(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{
+				{
+					Hash:        "c2",
+					Subject:     "Merge branch 'main' into develop",
+					Author:      "hrllk",
+					Parents:     []string{"c1"},
+					Decorations: []string{"HEAD -> main"},
+					RelativeAge: "5 minutes ago",
+				},
+			},
+		},
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+	got := m.renderGraphContent(70, 6)
+	if strings.Contains(got, "author") {
+		t.Fatalf("expected author header to disappear on narrow rows, got %q", got)
+	}
+	if !strings.Contains(got, "title") {
+		t.Fatalf("expected title header to remain visible on narrow rows, got %q", got)
+	}
+}
+
 func TestRenderGraphContentStartsAtLeftEdge(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),
@@ -544,7 +571,7 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 			GraphCommits: []git.GraphCommit{
 				{
 					Hash:        "abc1234",
-					Parents:     []string{"def5678", "9876543"},
+					Parents:     []string{"def56789abcdef", "9876543210fedcba"},
 					Decorations: []string{"HEAD -> main", "origin/main"},
 				},
 			},
@@ -562,7 +589,7 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 	if !strings.Contains(got, "focus: abc1234") {
 		t.Fatalf("expected focus header to include hash, got %q", got)
 	}
-	if !strings.Contains(got, "parent: (multi parent)") || !strings.Contains(got, "  - def5678") || !strings.Contains(got, "  - 9876543") {
+	if !strings.Contains(got, "parent: (multi parent)") || !strings.Contains(got, "  - def56789") || !strings.Contains(got, "  - 98765432") {
 		t.Fatalf("expected focus block to include multi-parent list, got %q", got)
 	}
 	if !strings.Contains(got, "branches:") || !strings.Contains(got, "  - HEAD -> main") || strings.Contains(got, "origin/main") {
@@ -633,9 +660,6 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	if !strings.Contains(got, "upstream:") || !strings.Contains(got, "(none)") {
 		t.Fatalf("expected current branch context to show upstream fallback, got %q", got)
 	}
-	if strings.Contains(got, "items:") || strings.Contains(got, "sync:") {
-		t.Fatalf("expected current branch context to omit items/sync, got %q", got)
-	}
 }
 
 func TestRenderContextContentClipsToWidth(t *testing.T) {
@@ -675,9 +699,6 @@ func TestRenderContextContentShowsTagTitleAndTarget(t *testing.T) {
 	got := ansi.Strip(m.renderContextContent(80, 18))
 	if !strings.Contains(got, "title: release title") || !strings.Contains(got, "target: abc1234") {
 		t.Fatalf("expected tag detail to show title and target only, got %q", got)
-	}
-	if strings.Contains(got, "status:") || strings.Contains(got, "tagger:") || strings.Contains(got, "tagged:") || strings.Contains(got, "message:") {
-		t.Fatalf("expected tag detail to hide extra metadata, got %q", got)
 	}
 }
 

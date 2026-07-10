@@ -295,12 +295,11 @@ func focusParentLines(node graphNode, width int) []string {
 		return []string{renderContextDetailListItem("parent", "-")}
 	}
 	if len(node.Parents) == 1 {
-		return []string{renderContextDetailListItem("parent", node.Parents[0])}
+		return []string{renderContextDetailListItem("parent", shorten(node.Parents[0], 8))}
 	}
 	lines := []string{renderContextDetailListItem("parent", "(multi parent)")}
-	parentWidth := max(width-4, 0)
 	for _, parent := range node.Parents {
-		lines = append(lines, fmt.Sprintf("  - %s", shorten(parent, parentWidth)))
+		lines = append(lines, fmt.Sprintf("  - %s", shorten(parent, 8)))
 	}
 	return lines
 }
