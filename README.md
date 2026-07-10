@@ -1,70 +1,74 @@
 # graphkeeper
 
+`graphkeeper` is a graph-based Git TUI for people who manage repositories.
+It keeps branch topology, remote state, tags, and stash state visible at the same time so you can make maintenance decisions from the graph instead of guessing from command output.
+
+This README reflects the current `alpha.4` codebase.
+
+## Demo
+
+<img width="400" height="279" alt="Graphkeeper demo screenshot" src="https://github.com/user-attachments/assets/a84d1926-9bcc-46df-b0af-a3d760adce1e" />
+
+## TOC
+
+- [Demo](#demo)
+- [Overview](#overview)
+- [Who It Is For](#who-it-is-for)
+- [What It Helps You Do](#what-it-helps-you-do)
+- [What It Is Not](#what-it-is-not)
+- [Quick Start](#quick-start)
+- [Working Model](#working-model)
+- [Keyboard](#keyboard)
+- [Alpha Note](#alpha-note)
+- [Docs](#docs)
+
 ## Overview
 
-`graphkeeper` is a graph-first Git TUI for people who want to read repo history fast.
-It helps you see branches, upstreams, and commit shape without losing the big picture.
+`graphkeeper` is built for the maintainer view of Git.
+It is for the person who needs to answer questions like:
 
-This is still an MVP.
-The tool is small on purpose, and the structure is still being cleaned up.
+- Where does this branch actually point?
+- Is FF possible, or do I need a merge or rebase?
+- Which commit should be tagged as a release?
+- Is there local work to stash before switching focus?
+- What is the safest next operation on this repository?
 
-### Demo
----
-<img width="400" height="279" alt="Screen Recording 2026-06-24 at 13 36 32" src="https://github.com/user-attachments/assets/a84d1926-9bcc-46df-b0af-a3d760adce1e" />
+The UI is graph-first on purpose.
+The commit graph is the main surface, while Current, Remote, and Tags provide supporting context.
 
-### TOC
----
+## Who It Is For
 
-- [Overview](#overview)
-- [What It Is](#what-it-is)
-- [What It Is Not](#what-it-is-not)
-- [Why It Exists](#why-it-exists)
-- [Quickstart](#quickstart)
-- [Neovim Entry Point](#neovim-entry-point)
-- [Graph Mental Model](#graph-mental-model)
-- [MVP Scope](#mvp-scope)
-- [Keyboard](#keyboard)
-- [Status](#status)
+This tool is for people who manage repositories rather than just contribute to them.
 
-### What It Is
----
+- release managers
+- maintainers
+- engineering leads who review branch state
+- people who teach others how to read Git topology
 
-`graphkeeper` is made for people who need to read Git history as a graph.
+If you need to explain Git history to someone else, this tool is especially useful because it keeps the graph visible while you talk through the decision.
 
-- read the commit graph quickly
-- see where local branches and remotes point
+## What It Helps You Do
+
+- inspect the commit graph quickly
+- see current branch, upstream, remotes, and tags in one place
 - understand ahead, behind, and diverged states
-- choose graph-based actions from the graph itself
-- keep the current branch context visible while working
+- decide whether fast-forward is possible
+- create or switch to a branch from a graph point
+- tag a release point
+- stash or clean local work when needed
+- keep the selected graph context visible while navigating
 
-### What It Is Not
----
+## What It Is Not
 
-`graphkeeper` is not a lazygit replacement.
+`graphkeeper` is not a full Git cockpit.
 
-`lazygit` is a broad Git cockpit.
-It is great for staging, committing, diffs, stashing, file-level work, and daily Git tasks.
+It is not trying to replace tools like `lazygit` for file staging, diff browsing, or everyday commit authoring.
+It is narrower on purpose: graph awareness, repository shape, and maintainer-style decisions.
 
-`graphkeeper` is narrower on purpose.
-It focuses on graph awareness, branch topology, and maintainer-style work.
-Think of it as a map for the repository, not the whole cockpit.
+It also does not handle conflict resolution inside the TUI.
+When an operation conflicts, you finish the resolution in another Git-capable tool.
 
-### Why It Exists
----
-
-Git history is topology.
-If you only read plain command output, it is easy to miss the shape of the repo and make a bad move.
-
-`graphkeeper` exists to answer questions like:
-
-- Where is this branch actually pointing?
-- Which local branch should I operate on?
-- What does the upstream know that my local branch does not?
-- Is this commit safe to reset to?
-- Should I merge, rebase, or leave this branch alone?
-
-### Quickstart
----
+## Quick Start
 
 Build the binary:
 
@@ -72,74 +76,108 @@ Build the binary:
 go build ./cmd/graphkeeper
 ```
 
-This creates a `graphkeeper` binary in the current folder.
-
 Run it:
 
 ```bash
 ./graphkeeper
 ```
 
-### Neovim Entry Point
----
+Or run it directly:
 
-Neovim plugin support will be added later.
+```bash
+go run ./cmd/graphkeeper
+```
 
-### Graph Mental Model
----
+## Working Model
 
-The graph is not just a list of commits.
+The graph is the primary mental model.
 
-- each node is a commit
+- each row is a commit
 - edges show ancestry
 - branch labels show where refs point
-- upstream context shows what is local and what still lives remotely
+- remote labels show what still lives on origin
+- tag labels show release points
+- stash markers show local work that has been parked
 
-The current graph strategy is based on `git log` data.
-`internal/graph` owns lane order, commit order, focus rules, and graph row rules.
+The usual maintainer flow looks like this:
 
-Once you read the repository this way, operations become easier to reason about.
-You stop guessing which ref is safe to move.
+1. Inspect the graph and find the current point of truth.
+2. Check whether the branch is clean, ahead, behind, or diverged.
+3. Decide whether to merge, rebase, reset, tag, or switch branches.
+4. Keep the graph visible while you verify the choice.
 
-# SORRY THIS NOT A MVP :)
+## Keyboard
 
-### ~~MVP Scope~~
----
-~~~~
-~~The current implementation is intentionally limited.~~
-~~~~
-~~- the graph is local-branch focused~~
-~~- remote-only branches do not add extra lanes to the main graph~~
-~~- the UI favors branch topology over file-level Git work~~
-~~- the feature set is small enough to understand quickly~~
+### Global
 
-~~That is the point.~~
-~~This is a maintainer tool, not a full Git shell replacement.~~
-
-### Keyboard
----
-
-- `1` local branches
-- `2` remotes
-- `3` tags
-- `4` graph
+- `1` graph
+- `2` current
+- `3` remote
+- `4` tags
 - `tab` / `shift+tab` switch sections
-- `up` / `down` / `j` / `k` move
+- `j` / `k` or `up` / `down` move
 - `enter` inspect or execute the current action
-- `/` search the graph section
-- `n` / `N` repeat the last graph search
-- `f` fetch
+- `f` fetch repository state
+- `F` fetch tags
+- `?` show hidden hotkeys
 - `q` quit
 
-### Status
----
+### Graph
 
-MVP.
-This README is kept simple on purpose.
-The implementation will keep changing as the graph workflow gets sharper.
+- `space` checkout the selected commit or ref
+- `m` merge
+- `r` rebase
+- `s` reset
+- `d` delete branch
+- `p` pull
+- `P` push
+- `t` tag the selected commit
+- `o` pop stash at HEAD
+- `H` jump to HEAD
 
-### Docs
+### Current
+
+- `space` checkout the selected branch
+- `s` stash changes
+- `c` clean working tree
+- `d` delete branch
+
+### Remote
+
+- `space` checkout the selected remote branch
+- `p` pull
+- `d` delete remote branch
+
+### Tags
+
+- `enter` jump to the selected tag in the graph
+- `P` push the selected tag
+- `d` delete tag
+
+## Alpha Note
+
+This is an alpha.4 snapshot. Read it as a concept and workflow preview, not a finished product.
+
+This README describes the current shape of the product, not a promise of final polish.
+
+The core graph workflow is in place, but the product is still evolving.
+Expect the UI and shortcut map to keep tightening as the maintainer flow gets sharper.
+
+What works now:
+
+- graph navigation
+- current / remote / tag inspection
+- branch, merge, rebase, reset, push, pull, stash, and tag flows
+- maintainer-style graph reading with ref context visible
+
+What is intentionally out of scope:
+
+- conflict resolution inside the app
+- a full file-level Git workflow
+
+## Docs
 
 - `docs/structure.md` - current code map
 - `docs/roadmap.md` - next work order
-- `docs/archive/` - old plans and moved docs
+- `docs/highlighting-color-map.md` - UI color map
+- `docs/archive/` - older plans and moved docs
