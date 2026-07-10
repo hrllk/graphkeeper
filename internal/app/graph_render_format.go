@@ -226,7 +226,14 @@ func compactAuthorText(author string) string {
 	if author == "" {
 		return "-"
 	}
-	return author
+	runes := []rune(author)
+	if len(runes) <= 7 {
+		return author
+	}
+	if len(runes) <= 2 {
+		return string(runes)
+	}
+	return string(runes[:5]) + ".."
 }
 
 func padRight(value string, width int) string {

@@ -25,7 +25,7 @@ func (m model) renderGraphContent(width, height int) string {
 	graphColWidth := max(18, int(float64(width)*0.30))
 	rawGraph := len(rows) > 0 && rows[0].Graph != ""
 	if len(lines) < height {
-		lines = append(lines, fitVisibleWidth(sectionTitle.Render(fmt.Sprintf("%-8s %-10s %-*s %-*s %-*s %-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphAuthorWidthTarget, "author", graphTitleWidthTarget, "title")), width))
+		lines = append(lines, fitVisibleWidth(sectionTitle.Render(fmt.Sprintf("%-8s %-10s %-*s %-*s %-*s%-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphAuthorWidthTarget, "author", graphTitleWidthTarget, "title")), width))
 	}
 	for i := start; i < end; i++ {
 		if len(lines) >= height {

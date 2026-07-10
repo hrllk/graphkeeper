@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	graphAuthorWidthTarget = 12
+	graphAuthorWidthTarget = 7
 	graphTitleWidthTarget  = 20
 	graphDateWidth         = 7
 )
@@ -150,18 +150,12 @@ func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth, g
 		return renderSearchField(subject, searchQuery, available, focused)
 	}
 
-	authorWidth := min(graphAuthorWidthTarget, available-graphTitleWidthTarget-1)
-	if authorWidth < 0 {
-		authorWidth = 0
-	}
-	titleWidth := available - authorWidth - 1
-	if titleWidth > graphTitleWidthTarget {
-		titleWidth = graphTitleWidthTarget
-	}
-	if authorWidth <= 0 {
+	titleWidth := graphTitleWidthTarget
+	if available < graphTitleWidthTarget+graphAuthorWidthTarget {
 		return renderSearchField(subject, searchQuery, titleWidth, focused)
 	}
 
+	authorWidth := graphAuthorWidthTarget
 	renderedAuthor := renderSearchField(author, searchQuery, authorWidth, focused)
 	if renderedAuthor == "" {
 		return renderSearchField(subject, searchQuery, titleWidth, focused)
@@ -170,7 +164,7 @@ func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth, g
 	if renderedTitle == "" {
 		return renderedAuthor
 	}
-	return renderedAuthor + " " + renderedTitle
+	return renderedAuthor + renderedTitle
 }
 
 func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int, graphColWidth int, stashCount int) string {

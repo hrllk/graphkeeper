@@ -467,7 +467,7 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 				{
 					Hash:        "c2",
 					Subject:     "Merge branch 'main' into develop with a longer title",
-					Author:      "hrllk",
+					Author:      "alexander",
 					Parents:     []string{"c1"},
 					Decorations: []string{"HEAD -> main"},
 					RelativeAge: "5 minutes ago",
@@ -477,14 +477,14 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{sectionGraph: 0},
 	}
-	got := m.renderGraphContent(80, 6)
+	got := m.renderGraphContent(84, 6)
 	if !strings.Contains(got, "date") {
 		t.Fatalf("expected graph header to use date label, got %q", got)
 	}
 	if !strings.Contains(got, "author") {
 		t.Fatalf("expected graph header to use author label, got %q", got)
 	}
-	if !strings.Contains(got, "hrllk") {
+	if !strings.Contains(got, "alexa..") {
 		t.Fatalf("expected graph row to include author name, got %q", got)
 	}
 	if !strings.Contains(got, "Merge branch 'mai...") {
@@ -573,13 +573,44 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 	}
 }
 
+func TestRenderDetailContentShowsGraphOptionalMetadata(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			GraphCommits: []git.GraphCommit{
+				{
+					Hash:        "abc1234",
+					Parents:     []string{"def5678"},
+					Decorations: []string{"HEAD -> main", "feature/topic"},
+					Tags:        []string{"v1.0.0", "v1.1.0"},
+					Subject:     "commit subject",
+				},
+			},
+		},
+		stashByBase: map[string][]git.StashEntry{
+			"abc1234": []git.StashEntry{{Ref: "stash@{0}", Subject: "wip", BaseHash: "abc1234"}},
+		},
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+
+	got := ansi.Strip(m.renderContextContent(60, 14))
+	for _, want := range []string{"branches:", "stashes:", "tags:"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected graph details to include %q, got %q", want, got)
+		}
+	}
+	if !strings.Contains(got, "v1.0.0") || !strings.Contains(got, "v1.1.0") {
+		t.Fatalf("expected graph details to include tag list, got %q", got)
+	}
+}
+
 func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),
 		repoStatus: git.Status{
 			Branch:        "main",
 			Head:          "abc1234",
-			Upstream:      "origin/main",
+			Upstream:      "",
 			Remote:        "origin",
 			WorktreeDirty: true,
 			LocalBranches: []string{"main"},
@@ -599,8 +630,11 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	if !strings.Contains(got, "target:") || !strings.Contains(got, "worktree:") {
 		t.Fatalf("expected current branch context to show target and worktree, got %q", got)
 	}
-	if !strings.Contains(got, "worktree:") || !strings.Contains(got, "sync: push required") {
-		t.Fatalf("expected worktree/sync details in context, got %q", got)
+	if !strings.Contains(got, "upstream:") || !strings.Contains(got, "(none)") {
+		t.Fatalf("expected current branch context to show upstream fallback, got %q", got)
+	}
+	if strings.Contains(got, "items:") || strings.Contains(got, "sync:") {
+		t.Fatalf("expected current branch context to omit items/sync, got %q", got)
 	}
 }
 
@@ -626,13 +660,12 @@ func TestRenderContextContentClipsToWidth(t *testing.T) {
 	}
 }
 
-func TestRenderContextContentShowsTagProvenanceStatus(t *testing.T) {
+func TestRenderContextContentShowsTagTitleAndTarget(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),
 		repoStatus: git.Status{
-			TagProvenanceLoaded: true,
 			TagEntries: []git.TagEntry{
-				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: false},
+				{Name: "v1.0.0", CommitHash: "abc1234", Message: "release title", Subject: "release body"},
 			},
 		},
 		activeSection: sectionTags,
@@ -640,8 +673,11 @@ func TestRenderContextContentShowsTagProvenanceStatus(t *testing.T) {
 	}
 
 	got := ansi.Strip(m.renderContextContent(80, 18))
-	if !strings.Contains(got, "status: (local)") {
-		t.Fatalf("expected tag detail to show local provenance status, got %q", got)
+	if !strings.Contains(got, "title: release title") || !strings.Contains(got, "target: abc1234") {
+		t.Fatalf("expected tag detail to show title and target only, got %q", got)
+	}
+	if strings.Contains(got, "status:") || strings.Contains(got, "tagger:") || strings.Contains(got, "tagged:") || strings.Contains(got, "message:") {
+		t.Fatalf("expected tag detail to hide extra metadata, got %q", got)
 	}
 }
 
@@ -851,9 +887,10 @@ func TestRenderContextContentSplitsAllSections(t *testing.T) {
 			name:   "tags",
 			active: sectionTags,
 			repoStatus: git.Status{
-				Tags: []string{"v1.0.0"},
+				TagEntries: []git.TagEntry{{Name: "v1.0.0", CommitHash: "abc1234", Message: "release"}},
+				Tags:       []string{"v1.0.0"},
 			},
-			wantInfo:    "target:",
+			wantInfo:    "title:",
 			wantActions: "enter: jump to graph",
 		},
 	}
@@ -2030,6 +2067,24 @@ func TestCompactWhenTextUsesShortUnitLabels(t *testing.T) {
 	}
 }
 
+func TestCompactAuthorTextUsesSevenCharBudget(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{in: "", want: "-"},
+		{in: "hrllk", want: "hrllk"},
+		{in: "alexander", want: "alexa.."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := compactAuthorText(tt.in); got != tt.want {
+				t.Fatalf("compactAuthorText(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCanCreateBranchRequiresReadyRepo(t *testing.T) {
 	if canCreateBranch(git.Status{Root: "/repo", WorktreeDirty: true}) {
 		t.Fatal("expected dirty worktree to block branch creation")
@@ -2075,9 +2130,9 @@ func TestGraphRowsKeepsSiblingBranchesVisible(t *testing.T) {
 func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	rows := graph.Rows(git.Status{
 		GraphCommits: []git.GraphCommit{
-			{Graph: "*   ", Hash: "head", RelativeAge: "5 minutes ago", Author: "hrllk", Subject: "Merge branch 'main' into develop", Decorations: []string{"HEAD -> main", "origin/main", "origin/HEAD", "develop"}},
+			{Graph: "*   ", Hash: "head", RelativeAge: "5 minutes ago", Author: "alexander", Subject: "Merge branch 'main' into develop", Decorations: []string{"HEAD -> main", "origin/main", "origin/HEAD", "develop"}},
 			{Graph: "|\\", Hash: ""},
-			{Graph: "| * ", Hash: "parent", RelativeAge: "14 minutes ago", Author: "hrllk", Subject: "Add suffix-based zsh completion", Decorations: []string{"origin/HEAD -> origin/main"}},
+			{Graph: "| * ", Hash: "parent", RelativeAge: "14 minutes ago", Author: "alexander", Subject: "Add suffix-based zsh completion", Decorations: []string{"origin/HEAD -> origin/main"}},
 		},
 	})
 	if len(rows) != 3 {
@@ -2086,8 +2141,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.HasPrefix(rows[0].Graph, "*") || rows[1].Commit.Hash != "" || !strings.HasPrefix(rows[2].Graph, "| *") {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
-	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "hrllk") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
+	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 84, false, 0)
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "alexa..") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
 		t.Fatalf("expected graph line to include hash, branches, date, author, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
@@ -2099,14 +2154,14 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5m") || strings.Index(line, "5m") > strings.Index(line, "Merge branch 'mai...") {
 		t.Fatalf("expected commit columns to stay ordered, got %q", line)
 	}
-	if strings.Index(line, "5m") > strings.Index(line, "hrllk") || strings.Index(line, "hrllk") > strings.Index(line, "Merge branch 'mai...") {
+	if strings.Index(line, "5m") > strings.Index(line, "alexa..") || strings.Index(line, "alexa..") > strings.Index(line, "Merge branch 'mai...") {
 		t.Fatalf("expected author to sit between date and title, got %q", line)
 	}
 	if strings.Contains(line, "Merge branch 'main' into develop") || strings.Contains(line, "origin/") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
 	}
 	narrow := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 70, false, 0)
-	if strings.Contains(narrow, "hrllk") {
+	if strings.Contains(narrow, "alexa..") {
 		t.Fatalf("expected author to shrink away before title on narrow rows, got %q", narrow)
 	}
 	if !strings.Contains(narrow, "Merge branch") {
