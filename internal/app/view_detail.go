@@ -21,15 +21,15 @@ func (m model) renderGlobalContent(width, height int) string {
 		lines = append(lines, "Mode: "+renderStatusCompact(m.status))
 	}
 	lines = append(lines, "")
-	lines = append(lines, title.Render("Actions"))
-	lines = append(lines, "• tab: next section")
-	lines = append(lines, "• shift+tab: previous section")
-	lines = append(lines, "• j/k: move")
-	lines = append(lines, "• f: fetch")
-	lines = append(lines, "• F: fetch tags")
-	lines = append(lines, "• S: stash list")
-	lines = append(lines, "• q: quit")
-	lines = append(lines, "• ?: show hidden hotkeys")
+	lines = append(lines, renderSectionTitle("Actions"))
+	lines = append(lines, renderHotkeyLine("tab", "next section"))
+	lines = append(lines, renderHotkeyLine("shift+tab", "previous section"))
+	lines = append(lines, renderHotkeyLine("j/k", "move"))
+	lines = append(lines, renderHotkeyLine("f", "fetch"))
+	lines = append(lines, renderHotkeyLine("F", "fetch tags"))
+	lines = append(lines, renderHotkeyLine("S", "stash list"))
+	lines = append(lines, renderHotkeyLine("q", "quit"))
+	lines = append(lines, renderHotkeyLine("?", "show hidden hotkeys"))
 	lines = fitBlockWidth(lines, width)
 	return fitBlockLines(lines, height)
 }
@@ -39,8 +39,8 @@ func (m model) renderContextContent(width, height int) string {
 		return ""
 	}
 	sectionTitle := sectionName(m.activeSection)
-	leftLines := append([]string{title.Render(sectionTitle + " Details")}, m.renderContextInfoLines(width)...)
-	rightLines := append([]string{title.Render(sectionTitle + " Actions")}, renderActionHelpLines(m)...)
+	leftLines := append([]string{renderSectionTitle(sectionTitle + " Details")}, m.renderContextInfoLines(width)...)
+	rightLines := append([]string{renderSectionTitle(sectionTitle + " Actions")}, renderActionHelpLines(m)...)
 	rightLines = indentLines(rightLines, 1)
 	return renderSplitColumns(leftLines, rightLines, width, height)
 }
@@ -128,6 +128,7 @@ func (m model) renderContextInfoLines(width int) []string {
 		if m.activeSection == sectionTags {
 			if entry, ok := selectedTagEntry(m); ok {
 				lines = append(lines, fmt.Sprintf("selected: %s", entry.Name))
+				lines = append(lines, fmt.Sprintf("status: %s", tagProvenanceStateLabel(m.repoStatus.TagProvenanceLoaded, entry.OriginKnown, entry.OnOrigin)))
 				lines = append(lines, fmt.Sprintf("commit: %s", shorten(entry.CommitHash, 7)))
 				if entry.Annotated {
 					if entry.Tagger != "" {
@@ -250,7 +251,7 @@ func (m model) renderDetailContent(width, height int) string {
 		lines = append(lines, fmt.Sprintf("new br: %s (base: %s)", m.branchDraft, shorten(m.branchBase, 7)))
 	}
 	lines = append(lines, "")
-	lines = append(lines, title.Render("Actions"))
+	lines = append(lines, renderSectionTitle("Actions"))
 	lines = append(lines, indentLines(renderActionHelpLines(m), 1)...)
 	lines = fitBlockWidth(lines, width)
 	return fitBlockLines(lines, height)

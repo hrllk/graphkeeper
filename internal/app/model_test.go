@@ -289,7 +289,7 @@ func TestRenderAppViewKeepsShellPlacementFullWidth(t *testing.T) {
 		height: 60,
 		status: state.New().WithBrowse(),
 	}
-	got := renderAppView(m)
+	got := ansi.Strip(renderAppView(m))
 	for _, want := range []string{"Global", "Browse", "Actions", "tab: next section", "f: fetch"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected render to contain %q, got %q", want, got)
@@ -619,6 +619,25 @@ func TestRenderContextContentClipsToWidth(t *testing.T) {
 	}
 }
 
+func TestRenderContextContentShowsTagProvenanceStatus(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			TagProvenanceLoaded: true,
+			TagEntries: []git.TagEntry{
+				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: false},
+			},
+		},
+		activeSection: sectionTags,
+		sectionCursor: map[graphSection]int{sectionTags: 0},
+	}
+
+	got := ansi.Strip(m.renderContextContent(80, 18))
+	if !strings.Contains(got, "status: (local)") {
+		t.Fatalf("expected tag detail to show local provenance status, got %q", got)
+	}
+}
+
 func TestRenderDetailContentClipsToWidth(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),
@@ -667,7 +686,7 @@ func TestRenderContextContentSplitsInfoAndActions(t *testing.T) {
 	m.activeSection = sectionCurrent
 	m.status.WorktreeState = state.WorktreeStateDirty
 
-	got := m.renderContextContent(40, 12)
+	got := ansi.Strip(m.renderContextContent(40, 12))
 	lines := strings.Split(got, "\n")
 	if len(lines) != 12 {
 		t.Fatalf("expected split context to preserve fixed height, got %d lines: %q", len(lines), got)
@@ -727,7 +746,7 @@ func TestRenderContextContentKeepsSplitLayoutOnNarrowWidth(t *testing.T) {
 	}
 	m.activeSection = sectionGraph
 
-	got := m.renderContextContent(22, 8)
+	got := ansi.Strip(m.renderContextContent(22, 8))
 	lines := strings.Split(got, "\n")
 	if len(lines) != 8 {
 		t.Fatalf("expected narrow split context to preserve height, got %d lines: %q", len(lines), got)
@@ -770,7 +789,7 @@ func TestRenderContextContentUsesSectionNameInHeaders(t *testing.T) {
 			}
 			m.activeSection = tt.active
 
-			got := m.renderContextContent(60, 12)
+			got := ansi.Strip(m.renderContextContent(60, 12))
 			if !strings.Contains(got, tt.wantPrefix+" Details") || !strings.Contains(got, tt.wantPrefix+" Actions") {
 				t.Fatalf("expected headers to use %q prefix, got %q", tt.wantPrefix, got)
 			}
@@ -845,7 +864,7 @@ func TestRenderContextContentSplitsAllSections(t *testing.T) {
 				},
 			}
 			m.activeSection = tt.active
-			got := m.renderContextContent(48, 10)
+			got := ansi.Strip(m.renderContextContent(48, 10))
 			if !strings.Contains(got, "│") {
 				t.Fatalf("expected split layout separator in %q", got)
 			}
@@ -913,7 +932,7 @@ func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
 			Remote: "origin",
 		},
 	}
-	got := m.renderGlobalContent(40, 14)
+	got := ansi.Strip(m.renderGlobalContent(40, 14))
 	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j/k: move", "f: fetch", "F: fetch tags", "S: stash list", "q: quit", "?: show hidden hotkeys"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected global hotkeys to include %q, got %q", want, got)
@@ -1280,7 +1299,7 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 			sectionGraph: 0,
 		},
 	})
-	graphJoined := strings.Join(graph, " ")
+	graphJoined := ansi.Strip(strings.Join(graph, " "))
 	if len(graph) != 4 {
 		t.Fatalf("expected graph actions to stay at four visible lines, got %v", graph)
 	}
@@ -1305,7 +1324,7 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 			sectionCurrent: 0,
 		},
 	})
-	currentJoined := strings.Join(current, " ")
+	currentJoined := ansi.Strip(strings.Join(current, " "))
 	if !strings.Contains(currentJoined, "d: delete branch") {
 		t.Fatalf("expected current actions to include delete branch, got %v", current)
 	}
@@ -1317,10 +1336,10 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 		status:        state.New().WithBrowse(),
 		activeSection: sectionRemote,
 	})
-	if !containsLine(remote, "• space: checkout") {
+	if !containsLine(strings.Split(ansi.Strip(strings.Join(remote, "\n")), "\n"), "• space: checkout") {
 		t.Fatalf("expected remote actions to include checkout, got %v", remote)
 	}
-	remoteJoined := strings.Join(remote, " ")
+	remoteJoined := ansi.Strip(strings.Join(remote, " "))
 	if strings.Contains(remoteJoined, "m: merge") || strings.Contains(remoteJoined, "s: reset") {
 		t.Fatalf("expected remote actions to exclude graph-only actions, got %v", remote)
 	}
@@ -1359,7 +1378,7 @@ func TestRenderActionHelpLinesShowsCleanupActionsOnlyForDirtyCurrentSection(t *t
 			sectionCurrent: 0,
 		},
 	})
-	dirtyJoined := strings.Join(dirty, " ")
+	dirtyJoined := ansi.Strip(strings.Join(dirty, " "))
 	if !strings.Contains(dirtyJoined, "s: stash changes") || !strings.Contains(dirtyJoined, "c: clean working tree") {
 		t.Fatalf("expected dirty local actions to include cleanup shortcuts, got %v", dirty)
 	}
@@ -1378,7 +1397,7 @@ func TestRenderActionHelpLinesShowsCleanupActionsOnlyForDirtyCurrentSection(t *t
 			sectionCurrent: 0,
 		},
 	})
-	cleanJoined := strings.Join(clean, " ")
+	cleanJoined := ansi.Strip(strings.Join(clean, " "))
 	if !strings.Contains(cleanJoined, "dirty only") {
 		t.Fatalf("expected clean local actions to show dirty-only gating, got %v", clean)
 	}
@@ -2114,11 +2133,11 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}, 80); !strings.Contains(got, "abc1234") || !strings.Contains(got, "v1.0.0") || !strings.Contains(got, "2d") || !strings.Contains(got, "(unknown)") {
 		t.Fatalf("expected tag rows to use hash, name, age and unknown state, got %q", got)
 	}
-	if got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.1.0", Ref: "v1.1.0", CommitHash: "def5678", Subject: "second release", RelativeAge: "1 day ago", OriginKnown: true, OnOrigin: true}, 80); !strings.Contains(got, "def5678") || !strings.Contains(got, "v1.1.0") || !strings.Contains(got, "(origin)") {
+	if got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.1.0", Ref: "v1.1.0", CommitHash: "def5678", Subject: "second release", RelativeAge: "1 day ago", ProvenanceLoaded: true, OriginKnown: true, OnOrigin: true}, 80); !strings.Contains(got, "def5678") || !strings.Contains(got, "v1.1.0") || !strings.Contains(got, "(origin)") {
 		t.Fatalf("expected origin-synced tag rows to show hash, name and origin marker, got %q", got)
 	}
-	if got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.2.0", Ref: "v1.2.0", CommitHash: "fedcba9", Subject: "third release", RelativeAge: "just now", OriginKnown: true}, 80); !strings.Contains(got, "fedcba9") || !strings.Contains(got, "v1.2.0") || !strings.Contains(got, "(unknown)") {
-		t.Fatalf("expected known but missing remote tags to show name and unknown state, got %q", got)
+	if got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.2.0", Ref: "v1.2.0", CommitHash: "fedcba9", Subject: "third release", RelativeAge: "just now", ProvenanceLoaded: true, OriginKnown: true}, 80); !strings.Contains(got, "fedcba9") || !strings.Contains(got, "v1.2.0") || !strings.Contains(got, "(local)") {
+		t.Fatalf("expected known but missing remote tags to show name and local state, got %q", got)
 	}
 }
 
@@ -2225,6 +2244,19 @@ func TestFormatSectionTargetItemUsesTagHashColor(t *testing.T) {
 	got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}, 80)
 	if !strings.Contains(got, "38;2;157;0;255") {
 		t.Fatalf("expected tag hash to use #9D00FF, got %q", got)
+	}
+}
+
+func TestTagProvenanceStateLabel(t *testing.T) {
+	forceTrueColorProfile(t)
+	if got := ansi.Strip(tagProvenanceStateLabel(false, false, false)); got != "(unknown)" {
+		t.Fatalf("expected unknown provenance label, got %q", got)
+	}
+	if got := tagProvenanceStateLabel(true, true, false); !strings.Contains(got, "38;2;157;0;255") || !strings.Contains(ansi.Strip(got), "(local)") {
+		t.Fatalf("expected local provenance label to use tag color, got %q", got)
+	}
+	if got := tagProvenanceStateLabel(true, true, true); !strings.Contains(got, "38;5;81") || !strings.Contains(ansi.Strip(got), "(origin)") {
+		t.Fatalf("expected origin provenance label to use remote color, got %q", got)
 	}
 }
 
@@ -2680,10 +2712,11 @@ func TestRenderGraphContentClipsHeadersBeforeRows(t *testing.T) {
 func TestRenderRightRailRendersStackedCards(t *testing.T) {
 	m := model{
 		repoStatus: git.Status{
-			LocalBranches:  []string{"feature/super-long-local-branch-name"},
-			RemoteBranches: []string{"origin/super-long-remote-branch-name"},
+			LocalBranches:       []string{"feature/super-long-local-branch-name"},
+			RemoteBranches:      []string{"origin/super-long-remote-branch-name"},
+			TagProvenanceLoaded: true,
 			TagEntries: []git.TagEntry{
-				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true},
+				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
 			},
 		},
 	}
@@ -2739,13 +2772,14 @@ func TestRenderAppViewFitsViewportWidth(t *testing.T) {
 		height: 60,
 		status: state.New().WithBrowse(),
 		repoStatus: git.Status{
-			Branch:         "feature/super-long-local-branch-name",
-			Head:           "abcdef1234567890",
-			Remote:         "origin",
-			LocalBranches:  []string{"feature/super-long-local-branch-name"},
-			RemoteBranches: []string{"origin/super-long-remote-branch-name"},
+			Branch:              "feature/super-long-local-branch-name",
+			Head:                "abcdef1234567890",
+			Remote:              "origin",
+			LocalBranches:       []string{"feature/super-long-local-branch-name"},
+			RemoteBranches:      []string{"origin/super-long-remote-branch-name"},
+			TagProvenanceLoaded: true,
 			TagEntries: []git.TagEntry{
-				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true},
+				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
 			},
 		},
 		sectionCursor: map[graphSection]int{

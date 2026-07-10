@@ -66,29 +66,29 @@ func hiddenVisibleHotkeys(m model) []string {
 	switch m.activeSection {
 	case sectionGraph:
 		return []string{
-			"m: merge",
-			"r: rebase",
-			"space: checkout",
-			"H: jump to HEAD",
+			renderHotkeyLine("m", "merge"),
+			renderHotkeyLine("r", "rebase"),
+			renderHotkeyLine("space", "checkout"),
+			renderHotkeyLine("H", "jump to HEAD"),
 		}
 	case sectionCurrent:
 		return []string{
-			"s: stash changes",
-			"c: clean working tree",
-			"space: checkout",
-			"d: delete branch",
+			renderHotkeyLine("s", "stash changes"),
+			renderHotkeyLine("c", "clean working tree"),
+			renderHotkeyLine("space", "checkout"),
+			renderHotkeyLine("d", "delete branch"),
 		}
 	case sectionRemote:
 		return []string{
-			"space: checkout",
-			"f: fetch",
-			"p: pull",
-			"d: delete branch",
+			renderHotkeyLine("space", "checkout"),
+			renderHotkeyLine("f", "fetch"),
+			renderHotkeyLine("p", "pull"),
+			renderHotkeyLine("d", "delete branch"),
 		}
 	case sectionTags:
 		return []string{
-			"enter: jump to graph",
-			"d: delete tag",
+			renderHotkeyLine("enter", "jump to graph"),
+			renderHotkeyLine("d", "delete tag"),
 		}
 	default:
 		return nil
@@ -128,21 +128,21 @@ func hiddenConditionalHotkeys(m model) []string {
 
 func hiddenMovedOutHotkeys(m model) []string {
 	lines := []string{
-		"tab: next section",
-		"shift+tab: previous section",
-		"j/k: move",
-		"f: fetch",
-		"F: fetch tags",
-		"S: stash list",
-		"q: quit",
+		renderHotkeyLine("tab", "next section"),
+		renderHotkeyLine("shift+tab", "previous section"),
+		renderHotkeyLine("j/k", "move"),
+		renderHotkeyLine("f", "fetch"),
+		renderHotkeyLine("F", "fetch tags"),
+		renderHotkeyLine("S", "stash list"),
+		renderHotkeyLine("q", "quit"),
 	}
 	if m.status.Mode == state.ModeBrowse {
-		lines = append(lines, "?: hidden hotkeys")
+		lines = append(lines, renderHotkeyLine("?", "hidden hotkeys"))
 	}
 	lines = append(lines,
-		"gg: top",
-		"G: bottom",
-		"ctrl+u/d: scroll",
+		renderHotkeyLine("gg", "top"),
+		renderHotkeyLine("G", "bottom"),
+		renderHotkeyLine("ctrl+u/d", "scroll"),
 	)
 	return lines
 }

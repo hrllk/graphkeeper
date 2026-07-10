@@ -140,7 +140,7 @@ func formatTargetItem(t state.TargetItem) string {
 		return label
 	case state.TargetKindTag:
 		if t.CommitHash != "" {
-			source := tagOriginStateLabel(t.OriginKnown, t.OnOrigin)
+			source := tagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin)
 			return fmt.Sprintf("%-24s  %-8s  %-10s  %s",
 				shorten(t.CommitHash, 7),
 				shorten(t.Name, 8),
@@ -154,9 +154,15 @@ func formatTargetItem(t state.TargetItem) string {
 	}
 }
 
-func tagOriginStateLabel(originKnown, onOrigin bool) string {
+func tagProvenanceStateLabel(provenanceLoaded, originKnown, onOrigin bool) string {
+	if !provenanceLoaded {
+		return muted.Render("(unknown)")
+	}
 	if originKnown && onOrigin {
 		return remoteColor.Render("(origin)")
+	}
+	if originKnown {
+		return tagColor.Render("(local)")
 	}
 	return muted.Render("(unknown)")
 }
@@ -192,7 +198,7 @@ func formatSectionTargetItem(t state.TargetItem, width int) string {
 		if t.RelativeAge != "" {
 			parts = append(parts, compactWhenText(t.RelativeAge))
 		}
-		parts = append(parts, tagOriginStateLabel(t.OriginKnown, t.OnOrigin))
+		parts = append(parts, tagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin))
 		return fitVisibleWidth(strings.Join(parts, "  "), width)
 	default:
 		return fitVisibleWidth(t.Name, width)
@@ -276,81 +282,70 @@ func renderActionHelpLines(m model) []string {
 
 func renderGraphActionHelpLines(m model) []string {
 	return []string{
-		"• m: merge",
-		"• r: rebase",
-		"• space: checkout",
-		"• H: jump to HEAD",
+		renderHotkeyLine("m", "merge"),
+		renderHotkeyLine("r", "rebase"),
+		renderHotkeyLine("space", "checkout"),
+		renderHotkeyLine("H", "jump to HEAD"),
 	}
 }
 
 func renderLocalActionHelpLines(m model) []string {
 	lines := make([]string, 0, 8)
 	if m.repoStatus.WorktreeDirty {
-		lines = append(lines, "• s: stash changes")
-		lines = append(lines, "• c: clean working tree")
+		lines = append(lines, renderHotkeyLine("s", "stash changes"))
+		lines = append(lines, renderHotkeyLine("c", "clean working tree"))
 	} else {
-		lines = append(lines, disabled.Render("• s: stash changes")+" "+muted.Render("(dirty only)"))
-		lines = append(lines, disabled.Render("• c: clean working tree")+" "+muted.Render("(dirty only)"))
+		lines = append(lines, renderDisabledHotkeyLine("s", "stash changes")+" "+muted.Render("(dirty only)"))
+		lines = append(lines, renderDisabledHotkeyLine("c", "clean working tree")+" "+muted.Render("(dirty only)"))
 	}
 	if m.repoStatus.WorktreeDirty {
-		lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(dirty)"))
+		lines = append(lines, renderDisabledHotkeyLine("space", "checkout")+" "+muted.Render("(dirty)"))
 	} else {
-		lines = append(lines, "• space: checkout")
+		lines = append(lines, renderHotkeyLine("space", "checkout"))
 	}
-	lines = append(lines, "• d: delete branch")
 	if m.repoStatus.MergeInProgress {
-		lines = append(lines, "• a: abort merge")
+		lines = append(lines, renderHotkeyLine("a", "abort merge"))
 	} else {
-		lines = append(lines, disabled.Render("• a: abort merge"))
+		lines = append(lines, renderDisabledHotkeyLine("a", "abort merge"))
 	}
-	deleteLabel := "• d: delete branch"
+	deleteLabel := renderHotkeyLine("d", "delete branch")
 	if item, ok := activeSectionTargetItem(m); ok && item.Current {
-		lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(current branch)"))
+		lines = append(lines, renderDisabledHotkeyLine("d", "delete branch")+" "+muted.Render("(current branch)"))
 	} else {
 		lines = append(lines, deleteLabel)
 	}
 	if pullReady(m.repoStatus) {
-		lines = append(lines, "• p: pull")
-		lines = append(lines, "• P: push")
+		lines = append(lines, renderHotkeyLine("p", "pull"))
+		lines = append(lines, renderHotkeyLine("P", "push"))
 	} else {
-		label := "• p: pull"
-		switch {
-		case m.repoStatus.NoUpstream:
-			label += " (no upstream)"
-		case m.repoStatus.NoRemote:
-			label += " (no remote)"
-		case m.repoStatus.Detached:
-			label += " (detached)"
-		}
-		pushLabel := "• P: push"
 		if m.repoStatus.Detached || m.repoStatus.EmptyRepo {
-			lines = append(lines, disabled.Render(label))
-			lines = append(lines, disabled.Render(pushLabel))
+			lines = append(lines, renderDisabledHotkeyLine("p", "pull"))
+			lines = append(lines, renderDisabledHotkeyLine("P", "push"))
 		} else {
-			lines = append(lines, disabled.Render(label))
-			lines = append(lines, pushLabel)
+			lines = append(lines, renderDisabledHotkeyLine("p", "pull"))
+			lines = append(lines, renderHotkeyLine("P", "push"))
 		}
 	}
 	if canCreateBranch(m.repoStatus) {
-		lines = append(lines, "• n: new branch")
+		lines = append(lines, renderHotkeyLine("n", "new branch"))
 	} else {
-		lines = append(lines, disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
+		lines = append(lines, renderDisabledHotkeyLine("n", "new branch")+" "+muted.Render("(dirty)"))
 	}
 	return lines
 }
 
 func renderRemoteActionHelpLines(m model) []string {
 	return []string{
-		"• space: checkout",
-		"• f: fetch",
-		"• p: pull",
-		"• d: delete branch",
+		renderHotkeyLine("space", "checkout"),
+		renderHotkeyLine("f", "fetch"),
+		renderHotkeyLine("p", "pull"),
+		renderHotkeyLine("d", "delete branch"),
 	}
 }
 
 func renderTagActionHelpLines(m model) []string {
 	return []string{
-		"• enter: jump to graph",
-		"• d: delete tag",
+		renderHotkeyLine("enter", "jump to graph"),
+		renderHotkeyLine("d", "delete tag"),
 	}
 }

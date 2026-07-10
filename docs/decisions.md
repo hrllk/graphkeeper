@@ -116,6 +116,12 @@
 - Do not use `(no-up)` when provenance has not been loaded yet; unknown provenance must remain visually distinct from missing remote provenance.
 - Use `unknown` for new local tags until provenance is explicitly known.
 
+## 2026-07-10: Tag rows use explicit provenance states and colors
+
+- Treat Tag provenance as three visible states: `unknown`, `local`, and `origin`.
+- Use muted gray for `unknown`, `#9D00FF` for `local`, and the remote accent for `origin`.
+- Reuse the same provenance label and color mapping in the Tag section rows and the selected-tag detail panel.
+
 ## 2026-07-09: Tag push is explicit and tag fetch does not overwrite conflicts
 
 - Use `t` for local tag creation only.

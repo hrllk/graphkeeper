@@ -80,21 +80,22 @@ const (
 )
 
 type TargetItem struct {
-	Kind            TargetKind
-	Name            string
-	Ref             string
-	CommitHash      string
-	Subject         string
-	RelativeAge     string
-	OriginKnown     bool
-	OnOrigin        bool
-	Current         bool
-	WorktreeDirty   bool
-	Default         bool
-	NeedsPull       bool
-	NeedsPush       bool
-	NoUpstream      bool
-	MergeConflicted bool
+	Kind             TargetKind
+	Name             string
+	Ref              string
+	CommitHash       string
+	Subject          string
+	RelativeAge      string
+	ProvenanceLoaded bool
+	OriginKnown      bool
+	OnOrigin         bool
+	Current          bool
+	WorktreeDirty    bool
+	Default          bool
+	NeedsPull        bool
+	NeedsPush        bool
+	NoUpstream       bool
+	MergeConflicted  bool
 }
 
 type Status struct {

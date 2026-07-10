@@ -14,6 +14,8 @@ var (
 	baseBox         = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
 	activeBox       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("205")).Padding(0, 1)
 	title           = lipgloss.NewStyle().Bold(true)
+	sectionTitle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00b7eb")).Bold(true)
+	hotkey          = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5ca8")).Bold(true)
 	muted           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	accent          = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 	warn            = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
@@ -39,6 +41,22 @@ var (
 	reviewCount     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
 	reviewFooter    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
+
+func renderHotkey(key string) string {
+	return hotkey.Render(key)
+}
+
+func renderHotkeyLine(key, desc string) string {
+	return "• " + renderHotkey(key) + ": " + desc
+}
+
+func renderDisabledHotkeyLine(key, desc string) string {
+	return "• " + renderHotkey(key) + ": " + disabled.Render(desc)
+}
+
+func renderSectionTitle(text string) string {
+	return sectionTitle.Render(text)
+}
 
 func (m model) getBoxStyle(section graphSection) lipgloss.Style {
 	if m.activeSection == section {
