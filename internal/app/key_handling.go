@@ -22,6 +22,9 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.branchOpen {
 		return m.handleBranchOpenKey(msg)
 	}
+	if m.hiddenHotkeysOpen {
+		return m.handleHiddenHotkeysKey(msg)
+	}
 	if m.graphSearchOpen {
 		return m.handleGraphSearchKey(msg)
 	}

@@ -10,33 +10,34 @@ import (
 )
 
 var (
-	border        = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
-	baseBox       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
-	activeBox     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("205")).Padding(0, 1)
-	title         = lipgloss.NewStyle().Bold(true)
-	muted         = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	accent        = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-	warn          = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-	ok            = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-	disabled      = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	headMark      = lipgloss.NewStyle().Foreground(lipgloss.Color("118")).Bold(true)
-	branchMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
-	pointerMark   = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
-	dirtyMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
-	stashMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
-	remoteColor   = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
-	tagColor      = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
-	highlight     = lipgloss.NewStyle().Reverse(true).Bold(true)
-	conflictColor = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	conflictMark  = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
-	reviewCurrent = headMark
-	reviewTarget  = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
-	reviewBase    = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Bold(true)
-	reviewHash    = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
-	reviewBranch  = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
-	reviewMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	reviewCount   = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
-	reviewFooter  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	border          = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
+	baseBox         = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+	activeBox       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("205")).Padding(0, 1)
+	title           = lipgloss.NewStyle().Bold(true)
+	muted           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	accent          = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	warn            = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	ok              = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+	disabled        = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	headMark        = lipgloss.NewStyle().Foreground(lipgloss.Color("118")).Bold(true)
+	branchMark      = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
+	pointerMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
+	dirtyMark       = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	stashMark       = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
+	remoteColor     = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
+	tagColor        = lipgloss.NewStyle().Foreground(lipgloss.Color("#9D00FF"))
+	tagOverlapColor = lipgloss.NewStyle().Foreground(lipgloss.Color("#A14743")).Bold(true)
+	highlight       = lipgloss.NewStyle().Reverse(true).Bold(true)
+	conflictColor   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	conflictMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	reviewCurrent   = headMark
+	reviewTarget    = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+	reviewBase      = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Bold(true)
+	reviewHash      = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
+	reviewBranch    = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	reviewMark      = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	reviewCount     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
+	reviewFooter    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
 func (m model) getBoxStyle(section graphSection) lipgloss.Style {
@@ -132,6 +133,9 @@ func renderAppView(m model) string {
 	}
 	if m.tagPopupOpen {
 		centeredBody = overlayPopup(centeredBody, renderTagPopup(m, bodyWidth, bodyHeight))
+	}
+	if m.hiddenHotkeysOpen {
+		centeredBody = overlayPopup(centeredBody, renderHiddenHotkeysPopup(m, bodyWidth))
 	}
 	if m.graphSearchOpen {
 		centeredBody = overlayPopup(centeredBody, renderGraphSearchPopup(m, bodyWidth))

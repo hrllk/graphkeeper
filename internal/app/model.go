@@ -38,6 +38,7 @@ type model struct {
 	graphSearchIndex     []graphSearchEntry
 	graphSearchCursor    int
 	graphSearchError     string
+	hiddenHotkeysOpen    bool
 	awaitingGoTop        bool
 	branchOpen           bool
 	branchDraft          string

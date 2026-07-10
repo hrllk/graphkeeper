@@ -58,8 +58,23 @@ func TestStatusDoesNotAutoLoadTagEntries(t *testing.T) {
 	if entries[0].Name != "v1.1.0" || entries[0].CommitHash != second {
 		t.Fatalf("expected newest tag first, got %+v", entries[0])
 	}
+	if entries[0].Annotated {
+		t.Fatalf("expected lightweight tag to stay unannotated, got %+v", entries[0])
+	}
+	if entries[0].Tagger != "lightweight" {
+		t.Fatalf("expected lightweight tag marker, got %+v", entries[0])
+	}
 	if entries[1].Name != "v1.0.0" || entries[1].CommitHash != first {
 		t.Fatalf("expected annotated tag to peel to first commit, got %+v", entries[1])
+	}
+	if !entries[1].Annotated {
+		t.Fatalf("expected annotated tag metadata to be detected, got %+v", entries[1])
+	}
+	if entries[1].Tagger == "" {
+		t.Fatalf("expected annotated tag to include tagger metadata, got %+v", entries[1])
+	}
+	if entries[1].TaggedAt.IsZero() {
+		t.Fatalf("expected annotated tag to include tagged time, got %+v", entries[1])
 	}
 }
 

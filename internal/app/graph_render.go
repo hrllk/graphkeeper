@@ -33,12 +33,6 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		} else if searchQuery == "" && pointerFocused && refInfo.HasBranch {
 			refs = branchMark.Render(refs)
 		}
-		if tagBadge := compactTagBadge(row.Commit.Tags); tagBadge != "" {
-			refs = strings.TrimSpace(refs + " " + tagBadge)
-		}
-		if searchQuery == "" && graphActive && selected {
-			hash = pointerMark.Render(hash)
-		}
 	}
 	graphCell := graphLineCell(row, graphActive, selected, laneCursor, graphColWidth, stashCount)
 	graphCell = padRight(graphCell, graphColWidth)
@@ -103,9 +97,6 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		} else if searchQuery == "" && pointerFocused && refInfo.HasBranch {
 			refs = branchMark.Render(refs)
 		}
-		if tagBadge := compactTagBadge(row.Commit.Tags); tagBadge != "" {
-			refs = strings.TrimSpace(refs + " " + tagBadge)
-		}
 	}
 	var graphCell string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
@@ -123,7 +114,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		graphCell = b.String()
 	} else {
 		lane := graph.PointerLane(row)
-		graphCell = highlightRawGraphPrefix(row.Graph, lane, pointerFocused, refInfo.HasLocalHead, stashCount > 0)
+		graphCell = highlightRawGraphPrefix(row.Graph, lane, pointerFocused, refInfo.HasLocalHead, stashCount, len(row.Commit.Tags))
 	}
 	graphCell = padRight(graphCell, graphColWidth)
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" && isHandshake {
@@ -154,6 +145,7 @@ func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int
 			cursorLane = width - 1
 		}
 		pointerFocused := graphActive && selected && cursorLane == lane
+		tagCount := len(row.Commit.Tags)
 		cells := make([]string, 0, width)
 		for i := 0; i < width; i++ {
 			cell := " "
@@ -167,12 +159,19 @@ func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int
 			case beforeActive || afterActive:
 				cell = "|"
 			}
-			if stashCount > 0 && i == lane {
-				cell = stashMark.Render(cell)
-			} else if hasHeadDecoration(row.Commit.Decorations) && i == lane {
-				cell = headMark.Render(cell)
-			} else if pointerFocused && i == lane {
-				cell = pointerMark.Render(cell)
+			if i == lane {
+				switch {
+				case stashCount > 0 && tagCount > 0:
+					cell = tagOverlapColor.Render(cell)
+				case stashCount > 0:
+					cell = stashMark.Render(cell)
+				case tagCount > 0:
+					cell = tagColor.Render(cell)
+				case hasHeadDecoration(row.Commit.Decorations):
+					cell = headMark.Render(cell)
+				case pointerFocused:
+					cell = pointerMark.Render(cell)
+				}
 			}
 			cells = append(cells, cell)
 		}
@@ -186,14 +185,22 @@ func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int
 		cursorLane = width - 1
 	}
 	pointerFocused := graphActive && selected && cursorLane == lane
+	tagCount := len(row.Commit.Tags)
 	var b strings.Builder
 	for i, r := range graphRunes {
-		if stashCount > 0 && i == lane {
-			b.WriteString(stashMark.Render(string(r)))
-			continue
-		}
-		if pointerFocused && i == lane {
-			b.WriteString(pointerMark.Render(string(r)))
+		if i == lane {
+			switch {
+			case stashCount > 0 && tagCount > 0:
+				b.WriteString(tagOverlapColor.Render(string(r)))
+			case stashCount > 0:
+				b.WriteString(stashMark.Render(string(r)))
+			case tagCount > 0:
+				b.WriteString(tagColor.Render(string(r)))
+			case pointerFocused:
+				b.WriteString(pointerMark.Render(string(r)))
+			default:
+				b.WriteRune(r)
+			}
 			continue
 		}
 		b.WriteRune(r)
@@ -201,20 +208,9 @@ func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int
 	return padRight(b.String(), graphColWidth)
 }
 
-func compactTagBadge(tags []string) string {
-	if len(tags) == 0 {
-		return ""
-	}
-	label := tags[0]
-	if len(tags) > 1 {
-		label = fmt.Sprintf("%s+%d", label, len(tags)-1)
-	}
-	return tagColor.Render(label)
-}
-
-func highlightRawGraphPrefix(graph string, lane int, focused bool, hasHead bool, stashFocused bool) string {
+func highlightRawGraphPrefix(graph string, lane int, focused bool, hasHead bool, stashCount int, tagCount int) string {
 	if !focused {
-		if !hasHead && !stashFocused {
+		if !hasHead && stashCount == 0 && tagCount == 0 {
 			return graph
 		}
 	}
@@ -225,14 +221,19 @@ func highlightRawGraphPrefix(graph string, lane int, focused bool, hasHead bool,
 	var b strings.Builder
 	for i, r := range runes {
 		if i == lane {
-			if stashFocused {
+			switch {
+			case stashCount > 0 && tagCount > 0:
+				b.WriteString(tagOverlapColor.Render(string(r)))
+			case stashCount > 0:
 				b.WriteString(stashMark.Render(string(r)))
-				continue
-			}
-			if hasHead {
+			case tagCount > 0:
+				b.WriteString(tagColor.Render(string(r)))
+			case hasHead:
 				b.WriteString(headMark.Render(string(r)))
-			} else {
+			case focused:
 				b.WriteString(pointerMark.Render(string(r)))
+			default:
+				b.WriteRune(r)
 			}
 			continue
 		}

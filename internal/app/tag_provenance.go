@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"hrllk/graphkeeper/internal/git"
@@ -75,7 +76,7 @@ func applyTagSnapshot(status git.Status, snapshot tagSnapshot) git.Status {
 		entry.OriginKnown = ok
 		entry.OnOrigin = ok && onOrigin
 	}
-	return status
+	return attachGraphTagEntries(status)
 }
 
 func markTagOriginUnknown(status git.Status) git.Status {
@@ -85,7 +86,7 @@ func markTagOriginUnknown(status git.Status) git.Status {
 		status.TagEntries[i].OriginKnown = false
 		status.TagEntries[i].OnOrigin = false
 	}
-	return status
+	return attachGraphTagEntries(status)
 }
 
 func tagSyncSummaryLabel(summary string) string {
@@ -131,7 +132,7 @@ func loadLocalTagStatus(repo *git.Repo, status git.Status) (git.Status, error) {
 	}
 	status.TagProvenanceLoaded = false
 	status.TagSyncSummary = string(tagSyncNeverSynced)
-	return status, nil
+	return attachGraphTagEntries(status), nil
 }
 
 func tagSnapshotFromRepo(repo *git.Repo, tags []git.TagEntry) (tagSnapshot, error) {
@@ -140,4 +141,30 @@ func tagSnapshotFromRepo(repo *git.Repo, tags []git.TagEntry) (tagSnapshot, erro
 		return tagSnapshot{}, err
 	}
 	return buildTagSnapshot(tags, remoteTags, tagSyncSynced), nil
+}
+
+func attachGraphTagEntries(status git.Status) git.Status {
+	if len(status.GraphCommits) == 0 || len(status.TagEntries) == 0 {
+		return status
+	}
+	tagsByHash := make(map[string][]string)
+	for _, entry := range status.TagEntries {
+		if entry.CommitHash == "" || entry.Name == "" {
+			continue
+		}
+		tagsByHash[entry.CommitHash] = append(tagsByHash[entry.CommitHash], entry.Name)
+	}
+	if len(tagsByHash) == 0 {
+		return status
+	}
+	for i := range status.GraphCommits {
+		commit := &status.GraphCommits[i]
+		names := tagsByHash[commit.Hash]
+		if len(names) == 0 {
+			continue
+		}
+		sort.Strings(names)
+		commit.Tags = append([]string(nil), names...)
+	}
+	return status
 }

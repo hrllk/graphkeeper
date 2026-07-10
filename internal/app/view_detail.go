@@ -2,7 +2,9 @@ package app
 
 import (
 	"fmt"
+	"time"
 
+	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/state"
 )
 
@@ -22,12 +24,12 @@ func (m model) renderGlobalContent(width, height int) string {
 	lines = append(lines, title.Render("Actions"))
 	lines = append(lines, "• tab: next section")
 	lines = append(lines, "• shift+tab: previous section")
-	lines = append(lines, "• j: up")
-	lines = append(lines, "• k: down")
+	lines = append(lines, "• j/k: move")
 	lines = append(lines, "• f: fetch")
 	lines = append(lines, "• F: fetch tags")
 	lines = append(lines, "• S: stash list")
 	lines = append(lines, "• q: quit")
+	lines = append(lines, "• ?: show hidden hotkeys")
 	lines = fitBlockWidth(lines, width)
 	return fitBlockLines(lines, height)
 }
@@ -104,11 +106,102 @@ func (m model) renderContextInfoLines(width int) []string {
 				}
 			}
 		}
+		if m.activeSection == sectionRemote {
+			if m.repoStatus.Upstream != "" {
+				lines = append(lines, fmt.Sprintf("upstream: %s", shorten(m.repoStatus.Upstream, max(width-10, 0))))
+			} else {
+				lines = append(lines, "upstream: -")
+			}
+			if m.repoStatus.DefaultBranch != "" {
+				lines = append(lines, fmt.Sprintf("default: %s", shorten(m.repoStatus.DefaultBranch, max(width-9, 0))))
+			}
+			if !m.repoStatus.LastFetchAt.IsZero() {
+				lines = append(lines, fmt.Sprintf("last fetch: %s", compactWhenTime(m.repoStatus.LastFetchAt)))
+			} else {
+				lines = append(lines, "last fetch: -")
+			}
+			if summary := remoteSyncSummaryForStatus(m.repoStatus); summary != "" {
+				lines = append(lines, fmt.Sprintf("sync: %s", summary))
+			}
+			lines = append(lines, fmt.Sprintf("branches: %d", len(m.repoStatus.RemoteBranches)))
+		}
+		if m.activeSection == sectionTags {
+			if entry, ok := selectedTagEntry(m); ok {
+				lines = append(lines, fmt.Sprintf("selected: %s", entry.Name))
+				lines = append(lines, fmt.Sprintf("commit: %s", shorten(entry.CommitHash, 7)))
+				if entry.Annotated {
+					if entry.Tagger != "" {
+						lines = append(lines, fmt.Sprintf("tagger: %s", shorten(entry.Tagger, max(width-9, 0))))
+					} else {
+						lines = append(lines, "tagger: -")
+					}
+					lines = append(lines, fmt.Sprintf("tagged: %s", compactWhenTime(entry.TaggedAt)))
+					if entry.Message != "" {
+						lines = append(lines, fmt.Sprintf("message: %s", shorten(entry.Message, max(width-9, 0))))
+					}
+				} else {
+					lines = append(lines, "tagger: lightweight")
+					lines = append(lines, fmt.Sprintf("tagged: %s", compactWhenText(entry.RelativeAge)))
+					if entry.Subject != "" {
+						lines = append(lines, fmt.Sprintf("message: %s", shorten(entry.Subject, max(width-9, 0))))
+					}
+				}
+			}
+		}
 	}
 	if len(lines) == 0 {
 		lines = append(lines, muted.Render("  (empty)"))
 	}
 	return lines
+}
+
+func selectedTagEntry(m model) (git.TagEntry, bool) {
+	if len(m.repoStatus.TagEntries) == 0 {
+		return git.TagEntry{}, false
+	}
+	cursor := m.sectionCursor[sectionTags]
+	if cursor < 0 || cursor >= len(m.repoStatus.TagEntries) {
+		return git.TagEntry{}, false
+	}
+	entry := m.repoStatus.TagEntries[cursor]
+	if entry.Name == "" {
+		return git.TagEntry{}, false
+	}
+	return entry, true
+}
+
+func compactWhenTime(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format("2006-01-02 15:04")
+}
+
+func remoteSyncSummaryForStatus(rs git.Status) string {
+	if rs.RemoteSyncSummary != "" {
+		return rs.RemoteSyncSummary
+	}
+	switch {
+	case rs.Root == "":
+		return ""
+	case rs.NoRemote:
+		return "no remote"
+	case rs.NoUpstream:
+		return "no upstream"
+	case rs.Detached:
+		return "detached"
+	}
+	track := rs.Tracking[rs.Branch]
+	switch {
+	case track.Ahead == 0 && track.Behind == 0:
+		return "synced"
+	case track.Ahead > 0 && track.Behind == 0:
+		return fmt.Sprintf("ahead %d", track.Ahead)
+	case track.Ahead == 0 && track.Behind > 0:
+		return fmt.Sprintf("behind %d", track.Behind)
+	default:
+		return fmt.Sprintf("diverged (%d ahead, %d behind)", track.Ahead, track.Behind)
+	}
 }
 
 func (m model) renderDetailContent(width, height int) string {

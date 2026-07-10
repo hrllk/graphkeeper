@@ -1,5 +1,12 @@
 # Decisions
 
+## 2026-07-10: Context and Global rebalance uses a hidden drawer, not +N more
+
+- Keep `?` as the hidden hotkey drawer entrypoint across sections.
+- Keep `Graph` search on `/` and do not reuse the search popup for `?`.
+- Do not introduce `+N more`; use the drawer as the overflow discovery path.
+- Treat `Remote` `last fetch` / `sync status` and richer `Tags` metadata as follow-up work, not part of the first-pass layout rebalance.
+
 ## 2026-06-24: Adopt golangci-lint for analysis, gofumpt/goimports for formatting
 
 - Use `gofumpt` and `goimports` as formatter tools.
@@ -124,6 +131,20 @@
 - When multiple stashes exist, open a picker first and then a confirm overlay for the selected stash.
 - When only one stash exists, skip the picker and open the confirm overlay directly.
 - Keep the Graph pop overlay separate from the global stash list popup so read/browse and execution remain distinct.
+
+## 2026-07-10: Global hotkeys own shared navigation and `?` reveals hidden actions
+
+- Keep `scroll`, `top`, and `bottom` hotkeys in `Global` instead of repeating them in `Graph Actions`.
+- Reassign `?` away from search and use it as the hidden hotkey drawer entrypoint.
+- Keep `Graph` / `Local` / `Remote` / `Tags` action panels compact by default and let `?` expose the overflow.
+- Do not let section help text imply that `?` is a search shortcut after the rebalance.
+
+## 2026-07-10: Graph tag markers should stay compact and use a single overlap color on stash collision
+
+- Keep tag presence in the Graph row as a compact marker, not a separate column.
+- Keep commit hash styling neutral so the identifier never competes with status coloring.
+- When stash and tag land on the same commit point, render a single `#A14743` overlap badge instead of split or dual markers.
+- Do not use the preview SVG as the contract; keep the collision rule text-only and color-specific.
 
 ## 2026-07-06: Diverged merge/rebase review uses a dedicated status inspection modal
 

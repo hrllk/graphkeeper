@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -913,7 +914,7 @@ func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
 		},
 	}
 	got := m.renderGlobalContent(40, 14)
-	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j: up", "k: down", "f: fetch", "F: fetch tags", "S: stash list", "q: quit"} {
+	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j/k: move", "f: fetch", "F: fetch tags", "S: stash list", "q: quit", "?: show hidden hotkeys"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected global hotkeys to include %q, got %q", want, got)
 		}
@@ -1279,25 +1280,19 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 			sectionGraph: 0,
 		},
 	})
-	// merge/rebase labels must be present (may be styled disabled when no local lane)
 	graphJoined := strings.Join(graph, " ")
-	if !strings.Contains(graphJoined, "m: merge") || !strings.Contains(graphJoined, "r: rebase") {
-		t.Fatalf("expected graph actions to include merge/rebase labels, got %v", graph)
+	if len(graph) != 4 {
+		t.Fatalf("expected graph actions to stay at four visible lines, got %v", graph)
 	}
-	if !containsLine(graph, "• space: checkout") {
-		t.Fatalf("expected graph actions to include checkout when a local pointer is focused, got %v", graph)
+	for _, want := range []string{"m: merge", "r: rebase", "space: checkout", "H: jump to HEAD"} {
+		if !strings.Contains(graphJoined, want) {
+			t.Fatalf("expected graph actions to include %q, got %v", want, graph)
+		}
 	}
-	if !containsLine(graph, "• s: reset         • ctrl+u/d: scroll") {
-		t.Fatalf("expected graph actions to include reset/scroll, got %v", graph)
-	}
-	if !containsLine(graph, "• gg: top         • G: bottom") {
-		t.Fatalf("expected graph actions to use gg shortcut, got %v", graph)
-	}
-	if !strings.Contains(graphJoined, "d: delete branch") {
-		t.Fatalf("expected graph actions to include delete branch, got %v", graph)
-	}
-	if !strings.Contains(graphJoined, "o: pop stash") {
-		t.Fatalf("expected graph actions to include stash pop, got %v", graph)
+	for _, hidden := range []string{"s: reset", "d: delete branch", "o: pop stash", "gg: top", "G: bottom", "ctrl+u/d: scroll"} {
+		if strings.Contains(graphJoined, hidden) {
+			t.Fatalf("expected graph actions to hide %q, got %v", hidden, graph)
+		}
 	}
 	current := renderActionHelpLines(model{
 		status:        state.New().WithBrowse(),
@@ -1328,6 +1323,26 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	remoteJoined := strings.Join(remote, " ")
 	if strings.Contains(remoteJoined, "m: merge") || strings.Contains(remoteJoined, "s: reset") {
 		t.Fatalf("expected remote actions to exclude graph-only actions, got %v", remote)
+	}
+}
+
+func TestHiddenHotkeysPopupShowsMovedAndConditionalActions(t *testing.T) {
+	got := ansi.Strip(renderHiddenHotkeysPopup(model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+	}, 90))
+	for _, want := range []string{
+		"Visible:",
+		"m: merge",
+		"Conditional:",
+		"s: reset",
+		"Hidden / moved out:",
+		"tab: next section",
+		"?: hidden hotkeys",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected hidden hotkeys popup to contain %q, got %q", want, got)
+		}
 	}
 }
 
@@ -2180,19 +2195,19 @@ func TestRenderGraphContentShowsStashBadgeForFocusedCommit(t *testing.T) {
 	}
 
 	raw := m.renderGraphContent(80, 8)
-	if !strings.Contains(raw, "38;5;208") {
+	if !strings.Contains(raw, stashMark.Render("*")) {
 		t.Fatalf("expected graph content to color the stash pointer, got %q", raw)
 	}
 }
 
-func TestRenderGraphContentShowsTagBadgeForTaggedCommit(t *testing.T) {
+func TestRenderGraphContentShowsTagPointerForTaggedCommit(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
 		status: state.New().WithBrowse(),
 		repoStatus: git.Status{
 			LocalBranches: []string{"main"},
 			GraphCommits: []git.GraphCommit{
-				{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0"}},
+				{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0"}},
 			},
 		},
 		activeSection: sectionGraph,
@@ -2200,8 +2215,83 @@ func TestRenderGraphContentShowsTagBadgeForTaggedCommit(t *testing.T) {
 	}
 
 	raw := m.renderGraphContent(80, 8)
-	if !strings.Contains(raw, "v1.0.0") {
-		t.Fatalf("expected graph content to surface tag badge, got %q", raw)
+	if !strings.Contains(raw, tagColor.Render("*")) {
+		t.Fatalf("expected graph content to color the tag pointer, got %q", raw)
+	}
+}
+
+func TestFormatSectionTargetItemUsesTagHashColor(t *testing.T) {
+	forceTrueColorProfile(t)
+	got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}, 80)
+	if !strings.Contains(got, "38;2;157;0;255") {
+		t.Fatalf("expected tag hash to use #9D00FF, got %q", got)
+	}
+}
+
+func TestAttachGraphTagEntriesCopiesCommitTags(t *testing.T) {
+	status := git.Status{
+		GraphCommits: []git.GraphCommit{
+			{Hash: "abc1234", Subject: "marker"},
+			{Hash: "def5678", Subject: "other"},
+		},
+		TagEntries: []git.TagEntry{
+			{Name: "v1.1.0", CommitHash: "abc1234"},
+			{Name: "v1.0.0", CommitHash: "abc1234"},
+			{Name: "v2.0.0", CommitHash: "def5678"},
+		},
+	}
+
+	got := attachGraphTagEntries(status)
+	if !reflect.DeepEqual(got.GraphCommits[0].Tags, []string{"v1.0.0", "v1.1.0"}) {
+		t.Fatalf("expected first commit tags to be copied and sorted, got %#v", got.GraphCommits[0].Tags)
+	}
+	if !reflect.DeepEqual(got.GraphCommits[1].Tags, []string{"v2.0.0"}) {
+		t.Fatalf("expected second commit tags to be copied, got %#v", got.GraphCommits[1].Tags)
+	}
+}
+
+func TestRenderGraphContentShowsTagPointerForMultipleTags(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			LocalBranches: []string{"main"},
+			GraphCommits: []git.GraphCommit{
+				{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0", "v1.0.1"}},
+			},
+		},
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+
+	raw := m.renderGraphContent(80, 8)
+	if !strings.Contains(raw, tagColor.Render("*")) {
+		t.Fatalf("expected graph content to color the tag pointer with multiple tags, got %q", raw)
+	}
+}
+
+func TestRenderGraphContentShowsOverlapPointerForStashAndTag(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			LocalBranches: []string{"main"},
+			GraphCommits: []git.GraphCommit{
+				{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0"}},
+			},
+		},
+		stashByBase: map[string][]git.StashEntry{
+			"abc1234": {
+				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+			},
+		},
+		activeSection: sectionGraph,
+		sectionCursor: map[graphSection]int{sectionGraph: 0},
+	}
+
+	raw := m.renderGraphContent(80, 8)
+	if !strings.Contains(raw, tagOverlapColor.Render("*")) {
+		t.Fatalf("expected overlap pointer to use #A14743, got %q", raw)
 	}
 }
 

@@ -268,7 +268,7 @@ func TestGraphSearchIsGraphSectionOnly(t *testing.T) {
 	}
 }
 
-func TestGraphSearchQuestionMarkOpensPopup(t *testing.T) {
+func TestGraphSearchQuestionMarkOpensHiddenHotkeys(t *testing.T) {
 	m := testGraphSearchModel(git.Status{
 		GraphCommits: []git.GraphCommit{{Hash: "a1", Subject: "feat one"}},
 	})
@@ -278,8 +278,11 @@ func TestGraphSearchQuestionMarkOpensPopup(t *testing.T) {
 	if cmd != nil {
 		t.Fatalf("expected question mark in graph section to stay synchronous, got %v", cmd)
 	}
-	if !got.graphSearchOpen {
-		t.Fatal("expected question mark to open search popup in graph section")
+	if got.graphSearchOpen {
+		t.Fatal("expected question mark to stop opening graph search popup")
+	}
+	if !got.hiddenHotkeysOpen {
+		t.Fatal("expected question mark to open hidden hotkeys drawer")
 	}
 }
 

@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,8 @@ type Status struct {
 	TagEntriesLoaded      bool
 	TagProvenanceLoaded   bool
 	TagSyncSummary        string
+	LastFetchAt           time.Time
+	RemoteSyncSummary     string
 	Remotes               []string
 	EmptyRepo             bool
 	NoUpstream            bool
@@ -71,6 +74,10 @@ type TagEntry struct {
 	Subject     string
 	RelativeAge string
 	CommitUnix  int64
+	Tagger      string
+	TaggedAt    time.Time
+	Message     string
+	Annotated   bool
 	OriginKnown bool
 	OnOrigin    bool
 }
@@ -112,6 +119,7 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		return Status{ErrorMessage: graphErr.Error()}, graphErr
 	}
 	worktreeDirty, _ := r.worktreeDirty(ctx)
+	lastFetchAt, _ := r.fetchHeadModTime(ctx)
 	mergeInProgress := false
 	rebaseInProgress := false
 	conflictTarget := ""
@@ -179,6 +187,8 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		RemoteBranches:        remoteBranches,
 		Tags:                  nil,
 		TagEntries:            nil,
+		LastFetchAt:           lastFetchAt,
+		RemoteSyncSummary:     remoteSyncSummary(branch, tracking, remote, noRemote, noUpstream, branch == "HEAD"),
 		Remotes:               remotes,
 		EmptyRepo:             emptyRepo,
 		NoUpstream:            noUpstream,
@@ -189,6 +199,50 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		ConflictTarget:        conflictTarget,
 		ConflictTargetSubject: conflictTargetSubject,
 	}, nil
+}
+
+func (r *Repo) fetchHeadModTime(ctx context.Context) (time.Time, bool) {
+	path, err := r.git(ctx, "rev-parse", "--git-path", "FETCH_HEAD")
+	if err != nil {
+		return time.Time{}, false
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return time.Time{}, false
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(r.root, path)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return info.ModTime(), true
+}
+
+func remoteSyncSummary(branch string, tracking map[string]BranchTracking, remote string, noRemote, noUpstream, detached bool) string {
+	switch {
+	case branch == "":
+		return ""
+	case noRemote:
+		return "no remote"
+	case noUpstream:
+		return "no upstream"
+	case detached:
+		return "detached"
+	}
+	track := tracking[branch]
+	switch {
+	case track.Ahead == 0 && track.Behind == 0:
+		return "synced"
+	case track.Ahead > 0 && track.Behind == 0:
+		return fmt.Sprintf("ahead %d", track.Ahead)
+	case track.Ahead == 0 && track.Behind > 0:
+		return fmt.Sprintf("behind %d", track.Behind)
+	default:
+		_ = remote
+		return fmt.Sprintf("diverged (%d ahead, %d behind)", track.Ahead, track.Behind)
+	}
 }
 
 func (r *Repo) branchMetadata(ctx context.Context) ([]string, map[string]string, map[string]BranchTracking) {

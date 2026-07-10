@@ -15,7 +15,7 @@ func (m *model) replaceTagEntries(status git.Status) {
 
 func (m model) withCachedTagEntries(status git.Status) git.Status {
 	if len(m.tagEntries) == 0 || status.TagEntriesLoaded {
-		return status
+		return attachGraphTagEntries(status)
 	}
 	status.TagEntries = append([]git.TagEntry(nil), m.tagEntries...)
 	status.Tags = make([]string, 0, len(m.tagEntries))
@@ -24,5 +24,5 @@ func (m model) withCachedTagEntries(status git.Status) git.Status {
 	}
 	status.TagProvenanceLoaded = m.repoStatus.TagProvenanceLoaded
 	status.TagSyncSummary = m.repoStatus.TagSyncSummary
-	return status
+	return attachGraphTagEntries(status)
 }

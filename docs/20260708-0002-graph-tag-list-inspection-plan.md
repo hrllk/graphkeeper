@@ -64,13 +64,36 @@ row 안에 tag 이름을 전부 펼치지 않는다.
 
 자세한 이름 목록은 `Tags` 섹션만 담당한다.
 
-### 3. tag target 은 peeled commit hash 를 기준으로 잡는다
+### 3. stash 와 tag 가 같은 point 에 겹치면 색을 섞지 않는다
+
+같은 commit 에 stash 와 tag 가 동시에 있으면, 두 상태를 한 색으로 뭉개지 않는다.
+
+- stash 는 기존 orange 계열 accent 를 유지한다.
+- tag 는 graph 전용 secondary accent 를 유지한다.
+- 둘이 겹치면 `#A14743` 단색 combined badge 로 보여준다.
+- commit hash 자체에는 상태색을 입히지 않는다.
+
+이유는 단순하다. hash 는 식별자고, 색은 상태여야 한다. 둘을 섞으면 읽는 속도가 떨어진다.
+
+### 4. stash 와 tag overlap 은 `#A14743` 단색 badge 로 본다
+
+별도 SVG 시안은 쓰지 않는다.
+
+- stash 와 tag 가 같은 commit 에 겹치면 `#A14743` 단색 badge 를 사용한다.
+- split, dual tone, blended color 는 쓰지 않는다.
+- commit hash 는 계속 중립색으로 유지한다.
+- badge 내부 텍스트는 `S/T` 또는 `ST` 같은 짧은 표기로 충분하다.
+- 공간이 부족하면 badge 폭을 키우는 대신 tag count 나 detail panel 쪽으로 정보를 넘긴다.
+
+핵심은 하나다. 겹침 상태를 구조 분리로 보여주는 대신, 하나의 충돌색으로 읽히게 한다.
+
+### 5. tag target 은 peeled commit hash 를 기준으로 잡는다
 
 이 문서의 read model 은 annotated tag 도 commit 으로 풀어서 읽는다.
 
 그래서 group key 는 tag ref 가 아니라 실제 commit hash 여야 한다.
 
-### 4. `Tags` 섹션에서 `enter` 하면 `Graph` focus 로 연결한다
+### 6. `Tags` 섹션에서 `enter` 하면 `Graph` focus 로 연결한다
 
 읽기 화면은 끝이 아니라 탐색 시작점이다.
 
@@ -243,20 +266,62 @@ func renderTagSectionRow(row tagSectionRow, selected bool, width int) string {
 ```
 
 ```go
-func tagMarkerForCommit(hash string, tags []git.TagEntry) string {
-    count := 0
+type graphMarkerKind string
+
+const (
+    graphMarkerNone     graphMarkerKind = "none"
+    graphMarkerTag      graphMarkerKind = "tag"
+    graphMarkerStash    graphMarkerKind = "stash"
+    graphMarkerCombined graphMarkerKind = "combined"
+)
+
+type graphMarkerSpec struct {
+    Kind        graphMarkerKind
+    TagCount    int
+    HasStash    bool
+    LeftLabel   string
+    RightLabel  string
+}
+
+func graphMarkerForCommit(hash string, tags []git.TagEntry, hasStash bool) graphMarkerSpec {
+    tagCount := 0
     for _, tag := range tags {
         if tag.CommitHash == hash {
-            count++
+            tagCount++
         }
     }
-    switch count {
-    case 0:
-        return ""
-    case 1:
-        return "tag"
+
+    switch {
+    case tagCount == 0 && !hasStash:
+        return graphMarkerSpec{Kind: graphMarkerNone}
+    case tagCount > 0 && !hasStash:
+        return graphMarkerSpec{Kind: graphMarkerTag, TagCount: tagCount, LeftLabel: "T"}
+    case tagCount == 0 && hasStash:
+        return graphMarkerSpec{Kind: graphMarkerStash, HasStash: true, LeftLabel: "S"}
     default:
-        return fmt.Sprintf("tag+%d", count-1)
+        return graphMarkerSpec{
+            Kind:       graphMarkerCombined,
+            TagCount:   tagCount,
+            HasStash:   true,
+            LeftLabel:  "S",
+            RightLabel: "T",
+        }
+    }
+}
+
+func renderGraphMarker(spec graphMarkerSpec) string {
+    switch spec.Kind {
+    case graphMarkerNone:
+        return ""
+    case graphMarkerTag:
+        return tagAccent.Render("[" + spec.LeftLabel + "]")
+    case graphMarkerStash:
+        return stashAccent.Render("[" + spec.LeftLabel + "]")
+    case graphMarkerCombined:
+        return stashAccent.Render("[" + spec.LeftLabel + "]") +
+            tagAccent.Render("[" + spec.RightLabel + "]")
+    default:
+        return ""
     }
 }
 ```
@@ -290,6 +355,7 @@ func TestTagsResolveToCommitHash(t *testing.T)
 func TestTagsSortNewestFirst(t *testing.T)
 func TestTagsSectionShowsTargetSubjectAndAge(t *testing.T)
 func TestGraphShowsCompactTagMarkerForTaggedCommit(t *testing.T)
+func TestGraphShowsCombinedMarkerWhenStashAndTagShareCommit(t *testing.T)
 func TestTagSelectionJumpsToGraphCommit(t *testing.T)
 ```
 
@@ -297,6 +363,7 @@ func TestTagSelectionJumpsToGraphCommit(t *testing.T)
 
 - tag 가 commit hash 로 풀리는지
 - tag 없는 commit 에 marker 가 안 붙는지
+- stash 와 tag 가 같은 point 에 있을 때 합성 marker 가 나오는지
 - `Tags` 에서 선택한 row 가 `Graph` focus 로 연결되는지
 
 ## Verification

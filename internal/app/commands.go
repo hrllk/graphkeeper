@@ -101,6 +101,7 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 		for _, entry := range tags {
 			status.Tags = append(status.Tags, entry.Name)
 		}
+		status = attachGraphTagEntries(status)
 		snapshot := buildTagSnapshot(tags, remoteTags, tagSyncSynced)
 		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
 			return fetchedMsg{status: status, err: err}
@@ -154,6 +155,7 @@ func attachTagEntries(repo *git.Repo, status git.Status) git.Status {
 	for _, entry := range tagEntries {
 		status.Tags = append(status.Tags, entry.Name)
 	}
+	status = attachGraphTagEntries(status)
 	return status
 }
 

@@ -178,13 +178,39 @@ func (r *Repo) LocalTagEntries(ctx context.Context) ([]TagEntry, error) {
 		if err != nil {
 			continue
 		}
-		entries = append(entries, TagEntry{
+
+		tagType, taggerName, taggerDate, tagMessage, err := r.tagMetadata(ctx, name)
+		if err != nil {
+			continue
+		}
+
+		entry := TagEntry{
 			Name:        strings.TrimSpace(name),
 			CommitHash:  strings.TrimSpace(target),
 			Subject:     strings.TrimSpace(subject),
 			RelativeAge: strings.TrimSpace(relativeAge),
 			CommitUnix:  commitUnix,
-		})
+			Tagger:      strings.TrimSpace(taggerName),
+			Message:     strings.TrimSpace(tagMessage),
+		}
+		if strings.TrimSpace(tagType) == "tag" {
+			entry.Annotated = true
+			if ts := strings.TrimSpace(taggerDate); ts != "" {
+				if unix, err := strconv.ParseInt(ts, 10, 64); err == nil {
+					entry.TaggedAt = time.Unix(unix, 0)
+				}
+			}
+		} else {
+			entry.Tagger = "lightweight"
+			entry.TaggedAt = time.Unix(commitUnix, 0)
+			if entry.Message == "" {
+				entry.Message = entry.Subject
+			}
+		}
+		if entry.Annotated && entry.Message == "" {
+			entry.Message = entry.Subject
+		}
+		entries = append(entries, entry)
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
 		if entries[i].CommitUnix != entries[j].CommitUnix {
@@ -193,6 +219,22 @@ func (r *Repo) LocalTagEntries(ctx context.Context) ([]TagEntry, error) {
 		return entries[i].Name < entries[j].Name
 	})
 	return entries, nil
+}
+
+func (r *Repo) tagMetadata(ctx context.Context, name string) (tagType, taggerName, taggerDate, message string, err error) {
+	if tagType, err = r.git(ctx, "for-each-ref", "--format=%(objecttype)", "refs/tags/"+name); err != nil {
+		return "", "", "", "", err
+	}
+	if taggerName, err = r.git(ctx, "for-each-ref", "--format=%(taggername)", "refs/tags/"+name); err != nil {
+		return "", "", "", "", err
+	}
+	if taggerDate, err = r.git(ctx, "for-each-ref", "--format=%(taggerdate:unix)", "refs/tags/"+name); err != nil {
+		return "", "", "", "", err
+	}
+	if message, err = r.git(ctx, "for-each-ref", "--format=%(contents:subject)", "refs/tags/"+name); err != nil {
+		return "", "", "", "", err
+	}
+	return strings.TrimSpace(tagType), strings.TrimSpace(taggerName), strings.TrimSpace(taggerDate), strings.TrimSpace(message), nil
 }
 
 func (r *Repo) OriginTagSet(ctx context.Context) (map[string]bool, error) {

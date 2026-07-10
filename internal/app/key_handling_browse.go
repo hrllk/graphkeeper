@@ -99,6 +99,9 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 			m.stashPopupCursor = maxCursor
 		}
 		return true, m, nil
+	case "?":
+		m.hiddenHotkeysOpen = true
+		return true, m, nil
 	case "tab":
 		m.activeSection = nextGraphSection(m.activeSection)
 		return true, m, nil
@@ -273,7 +276,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		status.Detail = "Enter confirms. Esc returns."
 		m.status = status
 		return m, nil
-	case "/", "?":
+	case "/":
 		m.graphSearchOpen = true
 		m.graphSearchDraft = m.graphSearchQuery
 		m.graphSearchIndex = buildGraphSearchIndex(m.repoStatus)

@@ -229,127 +229,18 @@ func formatSectionBranchTarget(prefix, name string, width int, current, dirty, n
 func renderActionHelpLines(m model) []string {
 	switch m.status.Mode {
 	case state.ModeBrowse:
-		lines := make([]string, 0, 8)
 		switch m.activeSection {
 		case sectionGraph:
-			isLocal := isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor)
-			mergeLabel := "• m: merge"
-			rebaseLabel := "• r: rebase"
-			if isLocal {
-				lines = append(lines, mergeLabel+"         "+rebaseLabel)
-			} else {
-				lines = append(lines, disabled.Render(mergeLabel)+"         "+disabled.Render(rebaseLabel)+" "+muted.Render("(local lane only)"))
-			}
-			if _, ok := graphCheckoutTarget(m); ok {
-				if m.repoStatus.WorktreeDirty {
-					lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(dirty)"))
-				} else {
-					lines = append(lines, "• space: checkout")
-				}
-			} else {
-				lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(local lane only)"))
-			}
-			if pullReady(m.repoStatus) && isLocal {
-				lines = append(lines, "• p: pull")
-			} else {
-				lines = append(lines, disabled.Render("• p: pull")+" "+muted.Render("(current branch lane)"))
-			}
-			lines = append(lines, "• s: reset         • ctrl+u/d: scroll")
-			lines = append(lines, "• gg: top         • G: bottom")
-			lines = append(lines, "• H: jump to HEAD")
-			deleteLabel := "• d: delete branch"
-			if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
-				lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(local lane only)"))
-			} else {
-				target, _ := graphCheckoutTarget(m)
-				if target != "" && !m.repoStatus.Detached && target == m.repoStatus.Branch {
-					lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(current branch)"))
-				} else {
-					lines = append(lines, deleteLabel)
-				}
-			}
-			if strings.TrimSpace(m.graphSearchQuery) != "" {
-				lines = append(lines, "• /: search          • n/N: repeat search")
-			} else if canCreateBranch(m.repoStatus) {
-				lines = append(lines, "• / ?: search        • n: new branch")
-			} else {
-				lines = append(lines, "• / ?: search        "+disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
-			}
-			popEntries := graphStashPopEntriesForFocus(m)
-			if len(popEntries) > 0 {
-				lines = append(lines, "• t: tag commit   • o: pop stash")
-			} else if graphFocusIsHead(m) {
-				line := "• t: tag commit   " + disabled.Render("• o: pop stash") + " " + muted.Render("(no stash)")
-				lines = append(lines, line)
-			} else {
-				line := "• t: tag commit   " + disabled.Render("• o: pop stash") + " " + muted.Render("(HEAD only)")
-				lines = append(lines, line)
-			}
-			return lines
-		case sectionCurrent, sectionRemote:
-			if m.activeSection == sectionCurrent {
-				if m.repoStatus.WorktreeDirty {
-					lines = append(lines, "• s: stash changes")
-					lines = append(lines, "• c: clean working tree")
-				} else {
-					lines = append(lines, disabled.Render("• s: stash changes")+" "+muted.Render("(dirty only)"))
-					lines = append(lines, disabled.Render("• c: clean working tree")+" "+muted.Render("(dirty only)"))
-				}
-			}
-			if m.repoStatus.WorktreeDirty {
-				lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(dirty)"))
-			} else {
-				lines = append(lines, "• space: checkout")
-			}
-			deleteLabel := "• d: delete branch"
-			if item, ok := activeSectionTargetItem(m); ok && m.activeSection == sectionCurrent && item.Current {
-				lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(current branch)"))
-			} else {
-				lines = append(lines, deleteLabel)
-			}
-			if m.activeSection == sectionCurrent {
-				if pullReady(m.repoStatus) {
-					lines = append(lines, "• p: pull")
-					lines = append(lines, "• P: push")
-				} else {
-					label := "• p: pull"
-					switch {
-					case m.repoStatus.NoUpstream:
-						label += " (no upstream)"
-					case m.repoStatus.NoRemote:
-						label += " (no remote)"
-					case m.repoStatus.Detached:
-						label += " (detached)"
-					}
-					pushLabel := "• P: push"
-					if m.repoStatus.Detached || m.repoStatus.EmptyRepo {
-						lines = append(lines, disabled.Render(label))
-						lines = append(lines, disabled.Render(pushLabel))
-					} else {
-						lines = append(lines, disabled.Render(label))
-						lines = append(lines, pushLabel)
-					}
-				}
-				if m.repoStatus.MergeInProgress {
-					lines = append(lines, "• a: abort merge")
-				} else {
-					lines = append(lines, disabled.Render("• a: abort merge"))
-				}
-			}
-			if m.activeSection == sectionCurrent {
-				if canCreateBranch(m.repoStatus) {
-					lines = append(lines, "• n: new branch")
-				} else {
-					lines = append(lines, disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
-				}
-			}
+			return renderGraphActionHelpLines(m)
+		case sectionCurrent:
+			return renderLocalActionHelpLines(m)
+		case sectionRemote:
+			return renderRemoteActionHelpLines(m)
 		case sectionTags:
-			lines = append(lines, "• enter: jump to graph")
-			lines = append(lines, "• d: delete tag")
+			return renderTagActionHelpLines(m)
 		default:
-			lines = append(lines, "• no section actions")
+			return []string{"• no section actions"}
 		}
-		return lines
 	case state.ModeTargetPick:
 		if m.status.Action == state.ActionCheckout {
 			return []string{"• enter: checkout", "• esc: back"}
@@ -366,5 +257,86 @@ func renderActionHelpLines(m model) []string {
 		return []string{"• esc: back"}
 	default:
 		return []string{"• r: refresh"}
+	}
+}
+
+func renderGraphActionHelpLines(m model) []string {
+	return []string{
+		"• m: merge",
+		"• r: rebase",
+		"• space: checkout",
+		"• H: jump to HEAD",
+	}
+}
+
+func renderLocalActionHelpLines(m model) []string {
+	lines := make([]string, 0, 8)
+	if m.repoStatus.WorktreeDirty {
+		lines = append(lines, "• s: stash changes")
+		lines = append(lines, "• c: clean working tree")
+	} else {
+		lines = append(lines, disabled.Render("• s: stash changes")+" "+muted.Render("(dirty only)"))
+		lines = append(lines, disabled.Render("• c: clean working tree")+" "+muted.Render("(dirty only)"))
+	}
+	if m.repoStatus.WorktreeDirty {
+		lines = append(lines, disabled.Render("• space: checkout")+" "+muted.Render("(dirty)"))
+	} else {
+		lines = append(lines, "• space: checkout")
+	}
+	lines = append(lines, "• d: delete branch")
+	if m.repoStatus.MergeInProgress {
+		lines = append(lines, "• a: abort merge")
+	} else {
+		lines = append(lines, disabled.Render("• a: abort merge"))
+	}
+	deleteLabel := "• d: delete branch"
+	if item, ok := activeSectionTargetItem(m); ok && item.Current {
+		lines = append(lines, disabled.Render(deleteLabel)+" "+muted.Render("(current branch)"))
+	} else {
+		lines = append(lines, deleteLabel)
+	}
+	if pullReady(m.repoStatus) {
+		lines = append(lines, "• p: pull")
+		lines = append(lines, "• P: push")
+	} else {
+		label := "• p: pull"
+		switch {
+		case m.repoStatus.NoUpstream:
+			label += " (no upstream)"
+		case m.repoStatus.NoRemote:
+			label += " (no remote)"
+		case m.repoStatus.Detached:
+			label += " (detached)"
+		}
+		pushLabel := "• P: push"
+		if m.repoStatus.Detached || m.repoStatus.EmptyRepo {
+			lines = append(lines, disabled.Render(label))
+			lines = append(lines, disabled.Render(pushLabel))
+		} else {
+			lines = append(lines, disabled.Render(label))
+			lines = append(lines, pushLabel)
+		}
+	}
+	if canCreateBranch(m.repoStatus) {
+		lines = append(lines, "• n: new branch")
+	} else {
+		lines = append(lines, disabled.Render("• n: new branch")+" "+muted.Render("(dirty)"))
+	}
+	return lines
+}
+
+func renderRemoteActionHelpLines(m model) []string {
+	return []string{
+		"• space: checkout",
+		"• f: fetch",
+		"• p: pull",
+		"• d: delete branch",
+	}
+}
+
+func renderTagActionHelpLines(m model) []string {
+	return []string{
+		"• enter: jump to graph",
+		"• d: delete tag",
 	}
 }
