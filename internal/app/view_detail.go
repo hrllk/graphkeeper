@@ -51,7 +51,7 @@ func (m model) renderContextInfoLines(width int) []string {
 	case sectionGraph:
 		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash != "" {
-			lines = append(lines, fmt.Sprintf("focus: %s", shorten(focus.Hash, max(width-7, 0))))
+			lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("focus"), shorten(focus.Hash, max(width-7, 0))))
 			lines = append(lines, focusParentLines(focus, width)...)
 			if branchLines := focusBranchSummaryLines(focus, width); len(branchLines) > 0 {
 				lines = append(lines, "branches:")
@@ -84,67 +84,67 @@ func (m model) renderContextInfoLines(width int) []string {
 		if cursor < 0 || cursor >= len(items) {
 			cursor = 0
 		}
-		lines = append(lines, fmt.Sprintf("target: %s", formatTargetItem(items[cursor])))
-		lines = append(lines, fmt.Sprintf("items: %d", len(items)))
+		lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("target"), formatTargetItem(items[cursor])))
+		lines = append(lines, fmt.Sprintf("%s: %d", renderContextKey("items"), len(items)))
 		if m.activeSection == sectionCurrent {
 			if m.status.WorktreeState != "" {
 				worktree := string(m.status.WorktreeState)
 				if m.status.WorktreeState == state.WorktreeStateDirty {
 					worktree = dirtyMark.Render(worktree)
 				}
-				lines = append(lines, fmt.Sprintf("worktree: %s", worktree))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("worktree"), worktree))
 			}
 			if current := items[cursor]; current.Current {
 				if current.NeedsPull {
-					lines = append(lines, "sync: pull available")
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("sync"), "pull available"))
 				}
 				if current.NeedsPush {
-					lines = append(lines, "sync: push required")
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("sync"), "push required"))
 				}
 				if current.NoUpstream {
-					lines = append(lines, "sync: no upstream")
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("sync"), "no upstream"))
 				}
 			}
 		}
 		if m.activeSection == sectionRemote {
 			if m.repoStatus.Upstream != "" {
-				lines = append(lines, fmt.Sprintf("upstream: %s", shorten(m.repoStatus.Upstream, max(width-10, 0))))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("upstream"), shorten(m.repoStatus.Upstream, max(width-10, 0))))
 			} else {
-				lines = append(lines, "upstream: -")
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("upstream"), "-"))
 			}
 			if m.repoStatus.DefaultBranch != "" {
-				lines = append(lines, fmt.Sprintf("default: %s", shorten(m.repoStatus.DefaultBranch, max(width-9, 0))))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("default"), shorten(m.repoStatus.DefaultBranch, max(width-9, 0))))
 			}
 			if !m.repoStatus.LastFetchAt.IsZero() {
-				lines = append(lines, fmt.Sprintf("last fetch: %s", compactWhenTime(m.repoStatus.LastFetchAt)))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("last fetch"), compactWhenTime(m.repoStatus.LastFetchAt)))
 			} else {
-				lines = append(lines, "last fetch: -")
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("last fetch"), "-"))
 			}
 			if summary := remoteSyncSummaryForStatus(m.repoStatus); summary != "" {
-				lines = append(lines, fmt.Sprintf("sync: %s", summary))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("sync"), summary))
 			}
-			lines = append(lines, fmt.Sprintf("branches: %d", len(m.repoStatus.RemoteBranches)))
+			lines = append(lines, fmt.Sprintf("%s: %d", renderContextKey("branches"), len(m.repoStatus.RemoteBranches)))
 		}
 		if m.activeSection == sectionTags {
 			if entry, ok := selectedTagEntry(m); ok {
-				lines = append(lines, fmt.Sprintf("selected: %s", entry.Name))
-				lines = append(lines, fmt.Sprintf("status: %s", tagProvenanceStateLabel(m.repoStatus.TagProvenanceLoaded, entry.OriginKnown, entry.OnOrigin)))
-				lines = append(lines, fmt.Sprintf("commit: %s", shorten(entry.CommitHash, 7)))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("selected"), entry.Name))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("status"), tagProvenanceStateLabel(m.repoStatus.TagProvenanceLoaded, entry.OriginKnown, entry.OnOrigin)))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("commit"), shorten(entry.CommitHash, 7)))
 				if entry.Annotated {
 					if entry.Tagger != "" {
-						lines = append(lines, fmt.Sprintf("tagger: %s", shorten(entry.Tagger, max(width-9, 0))))
+						lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("tagger"), shorten(entry.Tagger, max(width-9, 0))))
 					} else {
-						lines = append(lines, "tagger: -")
+						lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("tagger"), "-"))
 					}
-					lines = append(lines, fmt.Sprintf("tagged: %s", compactWhenTime(entry.TaggedAt)))
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("tagged"), compactWhenTime(entry.TaggedAt)))
 					if entry.Message != "" {
-						lines = append(lines, fmt.Sprintf("message: %s", shorten(entry.Message, max(width-9, 0))))
+						lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("message"), shorten(entry.Message, max(width-9, 0))))
 					}
 				} else {
-					lines = append(lines, "tagger: lightweight")
-					lines = append(lines, fmt.Sprintf("tagged: %s", compactWhenText(entry.RelativeAge)))
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("tagger"), "lightweight"))
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("tagged"), compactWhenText(entry.RelativeAge)))
 					if entry.Subject != "" {
-						lines = append(lines, fmt.Sprintf("message: %s", shorten(entry.Subject, max(width-9, 0))))
+						lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("message"), shorten(entry.Subject, max(width-9, 0))))
 					}
 				}
 			}
@@ -169,6 +169,10 @@ func selectedTagEntry(m model) (git.TagEntry, bool) {
 		return git.TagEntry{}, false
 	}
 	return entry, true
+}
+
+func renderContextDetailListItem(label, value string) string {
+	return fmt.Sprintf("%s: %s", renderContextKey(label), value)
 }
 
 func compactWhenTime(t time.Time) string {

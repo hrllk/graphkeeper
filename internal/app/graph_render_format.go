@@ -277,12 +277,12 @@ func fitVisibleWidth(value string, width int) string {
 
 func focusParentLines(node graphNode, width int) []string {
 	if len(node.Parents) == 0 {
-		return []string{"parent: -"}
+		return []string{renderContextDetailListItem("parent", "-")}
 	}
 	if len(node.Parents) == 1 {
-		return []string{fmt.Sprintf("parent: %s", node.Parents[0])}
+		return []string{renderContextDetailListItem("parent", node.Parents[0])}
 	}
-	lines := []string{"parent: (multi parent)"}
+	lines := []string{renderContextDetailListItem("parent", "(multi parent)")}
 	parentWidth := max(width-4, 0)
 	for _, parent := range node.Parents {
 		lines = append(lines, fmt.Sprintf("  - %s", shorten(parent, parentWidth)))

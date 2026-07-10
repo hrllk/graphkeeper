@@ -15,6 +15,7 @@ var (
 	activeBox       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("205")).Padding(0, 1)
 	title           = lipgloss.NewStyle().Bold(true)
 	sectionTitle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00b7eb")).Bold(true)
+	contextValue    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00b7eb"))
 	hotkey          = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5ca8")).Bold(true)
 	muted           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	accent          = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
@@ -56,6 +57,14 @@ func renderDisabledHotkeyLine(key, desc string) string {
 
 func renderSectionTitle(text string) string {
 	return sectionTitle.Render(text)
+}
+
+func renderContextKey(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		text = "-"
+	}
+	return contextValue.Render(text)
 }
 
 func (m model) getBoxStyle(section graphSection) lipgloss.Style {
