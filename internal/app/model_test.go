@@ -620,7 +620,7 @@ func TestRenderDetailContentShowsGraphOptionalMetadata(t *testing.T) {
 		sectionCursor: map[graphSection]int{sectionGraph: 0},
 	}
 
-	got := ansi.Strip(m.renderContextContent(60, 14))
+	got := ansi.Strip(m.renderDetailContent(60, 14))
 	for _, want := range []string{"branches:", "stashes:", "tags:"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected graph details to include %q, got %q", want, got)
@@ -637,7 +637,7 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 		repoStatus: git.Status{
 			Branch:        "main",
 			Head:          "abc1234",
-			Upstream:      "",
+			Upstream:      "origin/main",
 			Remote:        "origin",
 			WorktreeDirty: true,
 			LocalBranches: []string{"main"},
@@ -657,8 +657,8 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	if !strings.Contains(got, "target:") || !strings.Contains(got, "worktree:") {
 		t.Fatalf("expected current branch context to show target and worktree, got %q", got)
 	}
-	if !strings.Contains(got, "upstream:") || !strings.Contains(got, "(none)") {
-		t.Fatalf("expected current branch context to show upstream fallback, got %q", got)
+	if !strings.Contains(got, "upstream:") || !strings.Contains(got, "origin/main") {
+		t.Fatalf("expected current branch context to show upstream target, got %q", got)
 	}
 }
 
@@ -1465,6 +1465,21 @@ func TestRenderActionHelpLinesShowsCleanupActionsOnlyForDirtyCurrentSection(t *t
 	cleanJoined := ansi.Strip(strings.Join(clean, " "))
 	if !strings.Contains(cleanJoined, "dirty only") {
 		t.Fatalf("expected clean local actions to show dirty-only gating, got %v", clean)
+	}
+}
+
+func TestRenderTagActionHelpLinesIncludesRemoteDelete(t *testing.T) {
+	got := ansi.Strip(strings.Join(renderTagActionHelpLines(model{
+		status: state.New().WithBrowse(),
+	}), " "))
+	if !strings.Contains(got, "enter: jump to graph") {
+		t.Fatalf("expected tag actions to keep graph jump shortcut, got %q", got)
+	}
+	if !strings.Contains(got, "d: delete tag") {
+		t.Fatalf("expected tag actions to keep local delete shortcut, got %q", got)
+	}
+	if !strings.Contains(got, "D: delete remote tag") {
+		t.Fatalf("expected tag actions to show remote delete shortcut, got %q", got)
 	}
 }
 

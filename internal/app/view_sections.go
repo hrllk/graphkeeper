@@ -347,5 +347,6 @@ func renderTagActionHelpLines(m model) []string {
 	return []string{
 		renderHotkeyLine("enter", "jump to graph"),
 		renderHotkeyLine("d", "delete tag"),
+		renderHotkeyLine("D", "delete remote tag"),
 	}
 }
