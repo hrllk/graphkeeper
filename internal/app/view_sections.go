@@ -187,7 +187,7 @@ func formatSectionTargetItem(t state.TargetItem, width int) string {
 		}
 		parts := []string{
 			tagColor.Render(shorten(t.CommitHash, 7)),
-			shorten(t.Name, 8),
+			compactTagTitleText(t.Name),
 		}
 		if t.RelativeAge != "" {
 			parts = append(parts, compactWhenText(t.RelativeAge))
@@ -197,6 +197,20 @@ func formatSectionTargetItem(t state.TargetItem, width int) string {
 	default:
 		return fitVisibleWidth(t.Name, width)
 	}
+}
+
+func compactTagTitleText(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return strings.Repeat(" ", 10)
+	}
+	if len(name) > 7 {
+		return shorten(name, 7) + "..."
+	}
+	if len(name) < 10 {
+		return name + strings.Repeat(" ", 10-len(name))
+	}
+	return name
 }
 
 func formatSectionBranchTarget(prefix, name string, width int, current, dirty, needsPull, needsPush, noUpstream, conflicted bool) string {

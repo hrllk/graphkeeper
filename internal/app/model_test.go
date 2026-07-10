@@ -2228,6 +2228,18 @@ func TestFormatSectionTargetItemUsesTagHashColor(t *testing.T) {
 	}
 }
 
+func TestCompactTagTitleText(t *testing.T) {
+	if got := compactTagTitleText("tag"); got != "tag       " {
+		t.Fatalf("expected short tag names to pad to 10 chars, got %q", got)
+	}
+	if got := compactTagTitleText("abcdefg"); got != "abcdefg   " {
+		t.Fatalf("expected 7-char tag names to pad to 10 chars, got %q", got)
+	}
+	if got := compactTagTitleText("abcdefgh"); got != "abcdefg..." {
+		t.Fatalf("expected long tag names to truncate to 7 chars plus ellipsis, got %q", got)
+	}
+}
+
 func TestAttachGraphTagEntriesCopiesCommitTags(t *testing.T) {
 	status := git.Status{
 		GraphCommits: []git.GraphCommit{
