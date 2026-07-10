@@ -1,5 +1,10 @@
 # Decisions
 
+## 2026-07-10: Graph branch overflow suffix stays compact without leading padding
+
+- Render overflow branch presence as `+N` with no leading space so the branch column reads as one compact token.
+- Keep the branch field width contract unchanged so the graph layout does not shift.
+
 ## 2026-07-10: Context and Global rebalance uses a hidden drawer, not +N more
 
 - Keep `?` as the hidden hotkey drawer entrypoint across sections.

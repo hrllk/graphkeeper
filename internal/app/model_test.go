@@ -645,8 +645,8 @@ func TestCompactDecorationInfoUsesFourteenCharBranchField(t *testing.T) {
 	if !strings.Contains(got, "l->main") {
 		t.Fatalf("expected compact branch token to keep the branch name visible, got %q", got)
 	}
-	if !strings.Contains(got, " + 2") {
-		t.Fatalf("expected compact branch token to show plus-space count, got %q", got)
+	if !strings.Contains(got, "+2") || strings.Contains(got, " + 2") {
+		t.Fatalf("expected compact branch token to show compact plus count, got %q", got)
 	}
 }
 
@@ -1507,6 +1507,35 @@ func TestRenderHiddenHotkeySectionTitleHighlightsActiveSection(t *testing.T) {
 	}
 }
 
+func TestRenderCherryPickPopupShowsQueueOrderAndHelp(t *testing.T) {
+	got := ansi.Strip(renderCherryPickPopup(model{
+		status: state.Status{
+			Mode: state.ModeCherryPickPick,
+			Targets: []state.TargetItem{
+				{Ref: "pick123", CommitHash: "pick123", Author: "Ada Lovelace", Subject: "first change", RelativeAge: "2 days ago"},
+				{Ref: "other123", CommitHash: "other123", Author: "Grace Hopper", Subject: "second change", RelativeAge: "1 day ago"},
+			},
+			TargetIdx:     1,
+			SelectedQueue: []string{"pick123", "other123"},
+		},
+		repoStatus: git.Status{Branch: "main"},
+	}, 90))
+	for _, want := range []string{
+		"Cherry-pick commits",
+		"destination: current main",
+		"selected: 2 / 2",
+		"[1]  pick123",
+		"[2]  other12",
+		"space: toggle",
+		"enter: run",
+		"uncheck/recheck reorders the queue",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected cherry-pick popup to contain %q, got %q", want, got)
+		}
+	}
+}
+
 func TestRenderActionHelpLinesShowsCleanupActionsOnlyForDirtyCurrentSection(t *testing.T) {
 	dirty := renderActionHelpLines(model{
 		status:        state.New().WithBrowse(),
@@ -2120,8 +2149,8 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 
 func TestFormatCompactDecorations(t *testing.T) {
 	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "origin/main", "tag: v1.0.0"}, []string{"main", "develop"})
-	if !strings.HasPrefix(got, "o/l->") || !strings.Contains(got, " + 1") {
-		t.Fatalf("expected a single compact branch token with overflow count, got %q", got)
+	if !strings.HasPrefix(got, "o/l->") || !strings.Contains(got, "+1") || strings.Contains(got, " + 1") {
+		t.Fatalf("expected a single compact branch token with compact overflow count, got %q", got)
 	}
 	if len([]rune(got)) != graphBranchFieldWidth {
 		t.Fatalf("expected compact decorations to use %d chars, got %q", graphBranchFieldWidth, got)
@@ -2130,8 +2159,8 @@ func TestFormatCompactDecorations(t *testing.T) {
 
 func TestFormatCompactDecorationsUsesHeadThenAlphabeticalWithOverflow(t *testing.T) {
 	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "release"}, []string{"main", "develop", "release"})
-	if !strings.HasPrefix(got, "l->main") || !strings.Contains(got, " + 2") {
-		t.Fatalf("expected HEAD branch to lead with overflow count, got %q", got)
+	if !strings.HasPrefix(got, "l->main") || !strings.Contains(got, "+2") || strings.Contains(got, " + 2") {
+		t.Fatalf("expected HEAD branch to lead with compact overflow count, got %q", got)
 	}
 
 	got = formatCompactDecorations([]string{"release", "develop", "main"}, []string{"main", "develop", "release"})
@@ -2140,8 +2169,8 @@ func TestFormatCompactDecorationsUsesHeadThenAlphabeticalWithOverflow(t *testing
 	}
 
 	got = formatCompactDecorations([]string{"origin/release", "origin/develop"}, nil)
-	if !strings.HasPrefix(got, "o->") || !strings.Contains(got, " + 1") {
-		t.Fatalf("expected alphabetical remote branch fallback with overflow count, got %q", got)
+	if !strings.HasPrefix(got, "o->") || !strings.Contains(got, "+1") || strings.Contains(got, " + 1") {
+		t.Fatalf("expected alphabetical remote branch fallback with compact overflow count, got %q", got)
 	}
 }
 
@@ -2150,8 +2179,8 @@ func TestFormatCompactDecorationsKeepsOverflowCountForLongBranches(t *testing.T)
 		[]string{"HEAD -> feature/very-long-branch-name", "develop", "release"},
 		[]string{"feature/very-long-branch-name", "develop", "release"},
 	)
-	if !strings.Contains(got, " + 2") {
-		t.Fatalf("expected overflow count to survive long branch names, got %q", got)
+	if !strings.Contains(got, "+2") || strings.Contains(got, " + 2") {
+		t.Fatalf("expected compact overflow count to survive long branch names, got %q", got)
 	}
 	if len([]rune(got)) != graphBranchFieldWidth {
 		t.Fatalf("expected compact decorations to stay within %d chars, got %q", graphBranchFieldWidth, got)
@@ -2255,7 +2284,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
 	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 88, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, " + 2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "alexa..") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "alexa..") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
 		t.Fatalf("expected graph line to include hash, branches, date, author, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {

@@ -145,7 +145,7 @@ func compactBranchOverflowSuffix(overflowCount int) string {
 	if overflowCount > 99 {
 		overflowCount = 99
 	}
-	return fmt.Sprintf(" +%2d", overflowCount)
+	return fmt.Sprintf("%-4s", fmt.Sprintf("+%d", overflowCount))
 }
 
 func fitBranchField(value string, width int) string {
