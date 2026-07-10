@@ -126,6 +126,7 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 					items: []hiddenHotkeyItem{
 						{key: "m", desc: "merge"},
 						{key: "r", desc: "rebase"},
+						{key: "x", desc: "cherry-pick"},
 						{key: "space", desc: "checkout"},
 						{key: "H", desc: "jump to HEAD"},
 					},
@@ -139,6 +140,7 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 						{key: "P", desc: "push"},
 						{key: "t", desc: "tag commit"},
 						{key: "o", desc: "pop stash"},
+						{key: "a", desc: "abort in-progress operation"},
 						{key: "n", desc: "new branch or repeat search"},
 						{key: "N", desc: "repeat search backward"},
 					},

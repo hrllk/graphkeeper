@@ -6,6 +6,7 @@ const (
 	ModeBrowse         Mode = "browse"
 	ModePullCheck      Mode = "pull_check"
 	ModeTargetPick     Mode = "target_pick"
+	ModeCherryPickPick Mode = "cherry_pick_pick"
 	ModeOutcomePreview Mode = "outcome_preview"
 	ModeReview         Mode = "review"
 	ModeResetModePick  Mode = "reset_mode_pick"
@@ -25,6 +26,7 @@ const (
 	ActionCheckout         Action = "checkout"
 	ActionMerge            Action = "merge"
 	ActionRebase           Action = "rebase"
+	ActionCherryPick       Action = "cherry-pick"
 	ActionReset            Action = "reset"
 	ActionCreateBranch     Action = "create-branch"
 	ActionDeleteBranch     Action = "delete-branch"
@@ -77,6 +79,7 @@ const (
 	TargetKindLocal  TargetKind = "local"
 	TargetKindRemote TargetKind = "remote"
 	TargetKindTag    TargetKind = "tag"
+	TargetKindCommit TargetKind = "commit"
 )
 
 type TargetItem struct {
@@ -84,6 +87,7 @@ type TargetItem struct {
 	Name             string
 	Ref              string
 	CommitHash       string
+	Author           string
 	Subject          string
 	RelativeAge      string
 	ProvenanceLoaded bool
@@ -108,6 +112,7 @@ type Status struct {
 	Message       string
 	Detail        string
 	Targets       []TargetItem
+	SelectedQueue []string
 	TargetIdx     int
 	Selected      string
 	CanExecute    bool
@@ -155,6 +160,28 @@ func (s Status) WithTargetPick(action Action, targets []TargetItem) Status {
 		s.TargetIdx = 0
 		s.Selected = targets[0].Ref
 	} else {
+		s.Selected = targets[s.TargetIdx].Ref
+	}
+	s.CanExecute = false
+	return s
+}
+
+func (s Status) WithCherryPickPick(targets []TargetItem) Status {
+	s.Mode = ModeCherryPickPick
+	s.Action = ActionCherryPick
+	s.Block = BlockNone
+	s.Title = "Cherry-pick"
+	s.Message = "Choose commits to cherry-pick."
+	s.Detail = "Space toggles. Enter runs. Esc cancels."
+	s.Targets = append([]TargetItem(nil), targets...)
+	s.SelectedQueue = nil
+	if len(targets) == 0 {
+		s.TargetIdx = -1
+		s.Selected = ""
+	} else {
+		if s.TargetIdx < 0 || s.TargetIdx >= len(targets) {
+			s.TargetIdx = 0
+		}
 		s.Selected = targets[s.TargetIdx].Ref
 	}
 	s.CanExecute = false

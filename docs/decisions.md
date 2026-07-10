@@ -1,5 +1,10 @@
 # Decisions
 
+## 2026-07-10: Section lists and target pickers reuse Graph-style selection highlight
+
+- Render active Local/Remote/Tags rows and target-pick popup rows through a shared helper instead of a leading `>` arrow.
+- Use the existing Graph yellow emphasis style for the selected row so the focus cue reads the same across sections.
+
 ## 2026-07-10: Graph branch overflow suffix stays compact without leading padding
 
 - Render overflow branch presence as `+N` with no leading space so the branch column reads as one compact token.

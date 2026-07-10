@@ -129,11 +129,50 @@
 - actions 는 기본 4개 중심
 - 화면이 부족하면 `?` drawer 로 접는다
 
+#### Context Details contract
+
+`Context Details` 는 렌더링 코드에서 문자열 상태를 직접 조립하지 않고, 섹션별 스냅샷을 먼저 만든 뒤 그 스냅샷을 읽는 구조로 고정한다.
+
+이 문서에서는 이를 2안으로 확정한다.
+
+- 공통 진입점은 `ContextDetailsSnapshot` 이다.
+- `ContextDetailsSnapshot` 은 섹션별 전용 구조를 담는 상위 snapshot 이다.
+- 각 섹션은 전용 구조를 유지한다.
+- 상태 판정은 별도 mapper 에서 하고, render 는 결과만 읽는다.
+
+섹션별 필드는 다음을 기준으로 둔다.
+
+- `GraphDetails`: `focus`, `parent`, `branches`, `stashes`, `tags`
+- `LocalDetails`: `target`, `upstream`, `worktree`, `ahead`, `behind`, `divergenceState`
+- `RemoteDetails`: `target`, `defaultBranch`, `lastFetch`, `branches`
+- `TagDetails`: `name`, `hash`, `age`, `message`, `provenance`
+
+상태 이름도 여기서 고정한다.
+
+- `divergenceState`: `equal`, `aheadOnly`, `behindOnly`, `diverged`
+- `provenance`: `unknown`, `local`, `origin`
+
+의도:
+
+- `ahead` / `behind` 는 숫자다.
+- `divergenceState` 는 숫자를 묶는 판단 상태다.
+- `provenance` 는 tag 의 출처 맥락이다.
+- `renderContextInfoLines` 는 위 스냅샷만 읽고, repo 상태 계산을 직접 늘리지 않는다.
+
+설명과 예시:
+
+- `ahead` 는 현재 branch 가 upstream 보다 앞선 커밋 수다. 예: `ahead: 2` 는 아직 upstream 에 안 올라간 커밋이 2개 있다는 뜻이다.
+- `behind` 는 현재 branch 가 upstream 보다 뒤처진 커밋 수다. 예: `behind: 1` 은 upstream 에는 있지만 로컬에 없는 커밋이 1개 있다는 뜻이다.
+- `divergenceState` 는 `ahead` 와 `behind` 를 묶은 상태다. 예: `ahead: 1`, `behind: 1` 이면 `diverged` 다.
+- `provenance` 는 tag 가 어디서 왔는지 나타낸다. `local` 은 로컬에서만 보이는 태그, `origin` 은 origin 쪽에서도 확인된 태그, `unknown` 은 아직 출처를 확정하지 못한 상태다.
+
 ## 섹션별 계획
 
 ### 1. Graph section
 
 `Graph` 는 가장 강한 압축 규칙을 적용한다.
+
+`Graph Details` 는 현재 graph cursor 가 가리키는 commit 을 기준으로 읽는다.
 
 #### Graph Details
 
@@ -142,8 +181,22 @@
 - focus commit
 - parent summary
 - branch summary
+- stash summary
+- tag summary
 
-필요하면 `HEAD` 여부나 parent count 를 한 줄로 압축해서 보여준다.
+표시 규칙:
+
+- `focus` 와 `parent` hash 는 8자까지만 보여준다.
+- `branches` 와 `stashes` 는 이름 목록으로 읽히되, 넘칠 경우 더보기 방식으로 숨긴다.
+- `tags` 는 optional summary 로만 보여주고, 없으면 억지로 공간을 채우지 않는다.
+
+예시:
+
+- `focus: a1b2c3d4`
+- `parent: 9f8e7d6c`
+- `branches: HEAD, feature/login +2`
+- `stashes: stash@{0}, stash@{1} +1`
+- `tags: v1.2.0`
 
 #### Graph Actions
 
@@ -185,14 +238,34 @@
 
 `Local` 은 현재 checkout target 과 local branch 상태를 읽는 영역이다.
 
+`Local Details` 는 현재 checkout target, 즉 현재 branch 기준으로 읽는다.
+
 #### Local Details
 
 시안 기준으로 다음을 보여준다.
 
 - target
 - upstream
-- items count
 - worktree state
+- ahead / behind summary
+- divergence state
+
+표시 규칙:
+
+- `upstream` 이 없으면 `none` 으로 보여준다.
+- 연결된 upstream 이 있으면 `origin/...` 정보를 그대로 보여준다.
+- `ahead` / `behind` 는 `HEAD` 와 upstream 의 차이를 숫자로 읽는다.
+- `diverged` 는 `ahead > 0` 이고 `behind > 0` 일 때 사용한다.
+- `target` 은 현재 checkout 대상이고, detached 상태면 `HEAD` 중심 표현으로 읽힌다.
+
+예시:
+
+- `target: feature/login`
+- `upstream: origin/feature/login`
+- `worktree: clean`
+- `ahead: 2`
+- `behind: 1`
+- `divergenceState: diverged`
 
 #### Local Actions
 
@@ -213,6 +286,8 @@
 
 `Remote` 는 upstream 상태와 remote branch 목록을 읽는 영역이다.
 
+`Remote Details` 는 현재 repo 가 알고 있는 upstream / remote metadata 를 읽고, 선택 커서가 아니라 repo 단위 상태를 보여준다.
+
 #### Remote Details
 
 시안 기준으로 다음을 보여준다.
@@ -220,11 +295,20 @@
 - upstream
 - default branch
 - last fetch
-- sync status
 - branch count
 
-현재 코드에서는 `last fetch` 와 `sync status` 를 바로 읽을 상태가 없으므로,
-이 두 항목은 후속 보강 대상으로 둔다.
+표시 규칙:
+
+- `last fetch` 는 fetch 시점이 없으면 `-` 로 둔다.
+- `sync status` 는 현재 1차 표시 계약에서 제외한다.
+- `branch count` 는 remote 브랜치 개수만 보여준다.
+
+예시:
+
+- `upstream: origin`
+- `default branch: origin/main`
+- `last fetch: 3m ago`
+- `branch count: 8`
 
 #### Remote Actions
 
@@ -241,15 +325,35 @@
 
 `Tags` 는 tag list inspector 로 유지하되, action 수는 적게 가져간다.
 
+`Tags Details` 는 현재 tag cursor 가 가리키는 tag 를 기준으로 읽는다.
+`GraphDetails` 는 `currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])` 를 기준으로 읽고,
+`TagDetails` 는 `m.sectionCursor[sectionTags]` 가 가리키는 현재 tag 를 기준으로 읽는다.
+
 #### Tags Details
 
 시안 기준으로 다음을 보여준다.
 
-- selected tag
-- commit
-- tagger
-- tagged time
+- name
+- hash
+- age
 - message
+- provenance
+
+표시 규칙:
+
+- `name` 은 tag 이름이다.
+- `hash` 는 tag가 가리키는 commit hash다.
+- `age` 는 tag가 마지막으로 읽힌 상대 시점이다.
+- `message` 는 commit subject 가 아니라 tag object message 다.
+- `provenance` 는 `local`, `origin`, `unknown` 중 하나다.
+
+예시:
+
+- `name: v1.2.0`
+- `hash: 68b6a97b`
+- `age: 2w`
+- `message: Release v1.2.0`
+- `provenance: origin`
 
 현재 코드에서는 `tagger` 와 일부 tag metadata 가 별도 필드로 유지되지 않으므로,
 이 영역은 표시 가능한 정보부터 우선 정렬하고 메타데이터 보강은 후속으로 분리한다.
@@ -377,4 +481,3 @@ search popup 과 이름이나 동작을 공유하지 않는다.
 - `Remote` 의 `last fetch` / `sync status` 수집 방식
 - `Tags` 의 `tagger` / `tagged time` / `message` 보강 방식
 - hidden drawer 의 세부 스타일과 애니메이션
-

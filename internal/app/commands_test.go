@@ -708,6 +708,72 @@ func TestExecuteAction(t *testing.T) {
 	})
 }
 
+func TestExecuteCherryPickAppliesQueuedCommitsInOrder(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "checkout", "-b", "feature")
+	first := makeLocalCommit(t, fixture.root, "file.txt", "first\n", "first change")
+	second := makeLocalCommit(t, fixture.root, "file.txt", "second\n", "second change")
+	runGit(t, fixture.root, "checkout", "main")
+	runGit(t, fixture.root, "reset", "--hard", fixture.initialHash)
+
+	got, ok := cmdResult(t, executeCherryPick(fixture.repo, []string{first, second}, 40)).(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeCherryPick(fixture.repo, []string{first, second}, 40)))
+	}
+	if got.action != state.ActionCherryPick {
+		t.Fatalf("action = %s, want cherry-pick", got.action)
+	}
+	if got.err != nil {
+		t.Fatalf("executeCherryPick err = %v", got.err)
+	}
+	if got.status.Head == fixture.initialHash {
+		t.Fatal("expected cherry-pick to move HEAD")
+	}
+	content, err := os.ReadFile(filepath.Join(fixture.root, "file.txt"))
+	if err != nil {
+		t.Fatalf("read cherry-picked file failed: %v", err)
+	}
+	if strings.TrimSpace(string(content)) != "second" {
+		t.Fatalf("expected final file content to reflect queued order, got %q", string(content))
+	}
+}
+
+func TestExecuteCherryPickConflictCanAbort(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "checkout", "-b", "feature")
+	featureHash := makeLocalCommit(t, fixture.root, "file.txt", "feature\n", "feature change")
+	runGit(t, fixture.root, "checkout", "main")
+	_ = makeLocalCommit(t, fixture.root, "file.txt", "main\n", "main change")
+
+	got, ok := cmdResult(t, executeCherryPick(fixture.repo, []string{featureHash}, 40)).(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeCherryPick(fixture.repo, []string{featureHash}, 40)))
+	}
+	if got.action != state.ActionCherryPick {
+		t.Fatalf("action = %s, want cherry-pick", got.action)
+	}
+	if got.err == nil {
+		t.Fatal("expected conflicting cherry-pick to fail")
+	}
+	if !got.status.CherryPickInProgress {
+		t.Fatalf("expected cherry-pick to remain in progress, got %+v", got.status)
+	}
+
+	aborted, ok := cmdResult(t, executeAbort(fixture.repo, 40)).(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeAbort(fixture.repo, 40)))
+	}
+	if aborted.action != state.ActionAbort {
+		t.Fatalf("action = %s, want abort", aborted.action)
+	}
+	if aborted.err != nil {
+		t.Fatalf("executeAbort err = %v", aborted.err)
+	}
+	if aborted.status.CherryPickInProgress {
+		t.Fatalf("expected cherry-pick abort to clear sequencer state, got %+v", aborted.status)
+	}
+}
+
 func TestExecuteResetModes(t *testing.T) {
 	for _, tt := range []struct {
 		name string

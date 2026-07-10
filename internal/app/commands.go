@@ -243,7 +243,9 @@ func executeAbort(repo *git.Repo, limit int) tea.Cmd {
 		// Inspect the current repo state first to distinguish merge abort from rebase abort.
 		currentStatus, statusErr := repo.Status(context.Background(), limit)
 		var err error
-		if statusErr == nil && currentStatus.RebaseInProgress {
+		if statusErr == nil && currentStatus.CherryPickInProgress {
+			_, err = repo.Run("cherry-pick", "--abort")
+		} else if statusErr == nil && currentStatus.RebaseInProgress {
 			_, err = repo.Run("rebase", "--abort")
 		} else {
 			_, err = repo.Run("merge", "--abort")
@@ -253,6 +255,21 @@ func executeAbort(repo *git.Repo, limit int) tea.Cmd {
 			return executedMsg{action: state.ActionAbort, err: statusErr}
 		}
 		return executedMsg{action: state.ActionAbort, status: status, err: err}
+	}
+}
+
+func executeCherryPick(repo *git.Repo, hashes []string, limit int) tea.Cmd {
+	return func() tea.Msg {
+		if len(hashes) == 0 {
+			return executedMsg{action: state.ActionCherryPick, err: fmt.Errorf("no cherry-pick targets selected")}
+		}
+		args := append([]string{"cherry-pick"}, hashes...)
+		_, err := repo.Run(args...)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionCherryPick, target: strings.Join(hashes, ","), err: statusErr}
+		}
+		return executedMsg{action: state.ActionCherryPick, target: strings.Join(hashes, ","), status: status, err: err}
 	}
 }
 

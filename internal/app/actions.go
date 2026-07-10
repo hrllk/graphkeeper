@@ -12,9 +12,12 @@ func deriveStatus(rs git.Status) state.Status {
 	switch {
 	case rs.Root == "":
 		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRepo, "Not inside a Git repository.", "Run this tool from a repo root."), rs)
-	case rs.MergeInProgress || rs.RebaseInProgress:
+	case rs.MergeInProgress || rs.RebaseInProgress || rs.CherryPickInProgress:
 		status := state.New().WithBrowse()
 		status.Message = "Merge/rebase in progress."
+		if rs.CherryPickInProgress {
+			status.Message = "Cherry-pick in progress."
+		}
 		status.Detail = "Press Enter to abort."
 		return applyRepoMetadata(status, rs)
 	case rs.Detached:
@@ -38,8 +41,8 @@ func actionPull(rs git.Status) state.Status {
 	if rs.Detached {
 		return applyRepoMetadata(state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pull needs a branch with an upstream."), rs)
 	}
-	if rs.MergeInProgress || rs.RebaseInProgress {
-		return applyRepoMetadata(state.New().WithBlocked(state.BlockUnknown, "Merge/rebase already in progress.", "Abort or resolve it before pulling again."), rs)
+	if rs.MergeInProgress || rs.RebaseInProgress || rs.CherryPickInProgress {
+		return applyRepoMetadata(state.New().WithBlocked(state.BlockUnknown, "An operation is already in progress.", "Abort or resolve it before pulling again."), rs)
 	}
 	if rs.NoRemote {
 		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRemote, "No remote.", "Pull needs a remote."), rs)
@@ -55,7 +58,7 @@ func pullReady(rs git.Status) bool {
 }
 
 func canCreateBranch(rs git.Status) bool {
-	return rs.Root != "" && !rs.WorktreeDirty && !rs.MergeInProgress && !rs.RebaseInProgress
+	return rs.Root != "" && !rs.WorktreeDirty && !rs.MergeInProgress && !rs.RebaseInProgress && !rs.CherryPickInProgress
 }
 
 func branchNameExists(rs git.Status, name string) bool {
@@ -82,7 +85,7 @@ func branchCreateValidationError(rs git.Status, name, base string) error {
 		return fmt.Errorf("not inside a git repository")
 	case rs.WorktreeDirty:
 		return fmt.Errorf("working tree is not clean")
-	case rs.MergeInProgress || rs.RebaseInProgress:
+	case rs.MergeInProgress || rs.RebaseInProgress || rs.CherryPickInProgress:
 		return fmt.Errorf("merge/rebase already in progress")
 	case base == "":
 		return fmt.Errorf("branch base is empty")
@@ -102,7 +105,7 @@ func branchCreateBaseValidationError(rs git.Status, base string) error {
 		return fmt.Errorf("not inside a git repository")
 	case rs.WorktreeDirty:
 		return fmt.Errorf("working tree is not clean")
-	case rs.MergeInProgress || rs.RebaseInProgress:
+	case rs.MergeInProgress || rs.RebaseInProgress || rs.CherryPickInProgress:
 		return fmt.Errorf("merge/rebase already in progress")
 	case base == "":
 		return fmt.Errorf("branch base is empty")

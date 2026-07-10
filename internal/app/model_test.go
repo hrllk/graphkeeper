@@ -1584,9 +1584,10 @@ func TestRenderCherryPickPopupShowsQueueOrderAndHelp(t *testing.T) {
 		},
 	}, 90))
 	for _, want := range []string{
-		"Cherry-pick Graph",
+		"Cherry-pick Targets",
 		"destination: current main",
 		"selected: 1 / 2",
+		"target   hash      author   age      title",
 		"[x] ",
 		"[ ] ",
 	} {
@@ -2026,8 +2027,34 @@ func TestRenderSectionContentKeepsActiveCursorVisible(t *testing.T) {
 	if !strings.Contains(got, "tmp2-3") {
 		t.Fatalf("expected active cursor item to remain visible, got %q", got)
 	}
+	if strings.Contains(got, ">l->") {
+		t.Fatalf("expected section content to omit selection arrows, got %q", got)
+	}
+	rendered := m.renderSectionContent(sectionCurrent, 30, 4)
+	if !strings.Contains(rendered, branchMark.Render("l->tmp2-3")) {
+		t.Fatalf("expected active cursor item to use branch highlight, got %q", rendered)
+	}
 	if strings.Contains(got, "main\n") && strings.Contains(got, "tmp2-3") {
 		t.Fatalf("expected section view to window toward the cursor, got %q", got)
+	}
+}
+
+func TestRenderTargetPickPopupHighlightsSelectionWithoutArrow(t *testing.T) {
+	status := state.New().WithTargetPick(state.ActionCheckout, []state.TargetItem{
+		{Kind: state.TargetKindLocal, Name: "main", Ref: "main"},
+		{Kind: state.TargetKindLocal, Name: "feature", Ref: "feature"},
+	})
+	status.TargetIdx = 1
+	status.Selected = "feature"
+	m := model{
+		status: status,
+	}
+	got := ansi.Strip(renderTargetPickPopup(m, 80))
+	if strings.Contains(got, ">l->") {
+		t.Fatalf("expected target picker to omit selection arrows, got %q", got)
+	}
+	if !strings.Contains(renderTargetPickPopup(m, 80), branchMark.Render("l->feature")) {
+		t.Fatalf("expected target picker to highlight the selected item, got %q", got)
 	}
 }
 

@@ -223,6 +223,9 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m = openGraphStashPop(m)
 		return m, nil
+	case "x":
+		m.status = actionPickCherryTargets(m.repoStatus)
+		return m, nil
 	case "m":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Merge unavailable.", "Select a local branch.")

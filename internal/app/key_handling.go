@@ -31,6 +31,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.status.Mode {
 	case state.ModeTargetPick:
 		return m.handleTargetPickKey(msg)
+	case state.ModeCherryPickPick:
+		return m.handleCherryPickPickKey(msg)
 	case state.ModeConfirm:
 		return m.handleConfirmKey(msg)
 	case state.ModeReview:

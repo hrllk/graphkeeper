@@ -58,15 +58,11 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 			break
 		}
 		item := items[i]
-		prefix := ""
-		if i == cursor && m.activeSection == section {
-			prefix = ">"
-		}
 		label := formatSectionTargetItem(item, width)
 		if label == "" {
 			continue
 		}
-		lines = append(lines, fitVisibleWidth(prefix+label, width))
+		lines = append(lines, renderSelectableSectionItem(label, i == cursor && m.activeSection == section, width))
 		rendered++
 	}
 	return strings.Join(lines, "\n")
@@ -79,6 +75,8 @@ func renderStatusCompact(s state.Status) string {
 		return ok.Render("Browse") + " | " + msg
 	case state.ModeLoading:
 		return accent.Render("Loading") + " | " + msg
+	case state.ModeCherryPickPick:
+		return ok.Render("Cherry-pick") + " | " + msg
 	case state.ModeResetModePick:
 		return ok.Render("Reset")
 	case state.ModeBlocked:
@@ -94,17 +92,25 @@ func renderTargets(s state.Status) string {
 	}
 	var b strings.Builder
 	for i, t := range s.Targets {
-		prefix := ""
-		if i == s.TargetIdx {
-			prefix = ">"
-		}
 		label := formatTargetItem(t)
 		if label == "" {
 			continue
 		}
-		b.WriteString(prefix + label + "\n")
+		b.WriteString(renderSelectableSectionText(label, i == s.TargetIdx))
+		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func renderSelectableSectionItem(label string, selected bool, width int) string {
+	return fitVisibleWidth(renderSelectableSectionText(label, selected), width)
+}
+
+func renderSelectableSectionText(label string, selected bool) string {
+	if selected {
+		return branchMark.Render(label)
+	}
+	return label
 }
 
 func formatTargetItem(t state.TargetItem) string {

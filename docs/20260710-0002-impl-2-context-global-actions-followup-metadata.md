@@ -4,7 +4,7 @@
 
 이 문서는 1차 rebalance 문서에서 의도적으로 분리한 두 영역만 다룬다.
 
-- `Remote` 의 `last fetch` / `sync status`
+- `Remote` 의 `last fetch`
 - `Tags` 의 `tagger` / `tagged time` / `message`
 
 ## 왜 별도 문서인가
@@ -59,7 +59,6 @@ type Status struct {
     TagProvenanceLoaded   bool
     TagSyncSummary        string
     LastFetchAt           time.Time
-    RemoteSyncSummary     string
     Remotes               []string
     EmptyRepo             bool
     NoUpstream            bool
@@ -169,43 +168,11 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
     if t, ok := r.fetchHeadModTime(ctx); ok {
         status.LastFetchAt = t
     }
-    status.RemoteSyncSummary = remoteSyncSummary(status)
     return status, nil
 }
 ```
 
-### 2-2. sync summary helper
-
-`internal/app` 쪽에 표시용 helper 를 둔다.
-
-```go
-func remoteSyncSummary(rs git.Status) string {
-    switch {
-    case rs.Root == "":
-        return ""
-    case rs.NoRemote:
-        return "no remote"
-    case rs.NoUpstream:
-        return "no upstream"
-    case rs.Detached:
-        return "detached"
-    }
-
-    track := rs.Tracking[rs.Branch]
-    switch {
-    case track.Ahead == 0 && track.Behind == 0:
-        return "synced"
-    case track.Ahead > 0 && track.Behind == 0:
-        return fmt.Sprintf("ahead %d", track.Ahead)
-    case track.Ahead == 0 && track.Behind > 0:
-        return fmt.Sprintf("behind %d", track.Behind)
-    default:
-        return fmt.Sprintf("diverged (%d ahead, %d behind)", track.Ahead, track.Behind)
-    }
-}
-```
-
-### 2-3. Remote detail rendering
+### 2-2. Remote detail rendering
 
 [`internal/app/view_detail.go`]( /Users/hrk/task/sources/opensources/graphkeeper/internal/app/view_detail.go ) 의 `sectionCurrent, sectionRemote, sectionTags` 분기에서 Remote 전용 detail line 을 추가한다.
 
@@ -224,18 +191,15 @@ if m.activeSection == sectionRemote {
     } else {
         lines = append(lines, "last fetch: -")
     }
-    if m.repoStatus.RemoteSyncSummary != "" {
-        lines = append(lines, fmt.Sprintf("sync: %s", m.repoStatus.RemoteSyncSummary))
-    }
     lines = append(lines, fmt.Sprintf("branches: %d", len(m.repoStatus.RemoteBranches)))
 }
 ```
 
-### 2-4. 표시 규칙
+### 2-3. 표시 규칙
 
 - `last fetch` 는 없으면 `-` 로 보인다.
-- `sync` 는 `synced`, `ahead`, `behind`, `diverged`, `no upstream`, `no remote` 중 하나다.
 - `FETCH_HEAD` 가 없으면 최초 fetch 전 상태로 본다.
+- `branch count` 는 remote 브랜치 개수만 보여준다.
 
 ## 3. Tags metadata
 
@@ -423,21 +387,6 @@ func TestRepoStatusExposesLastFetchAt(t *testing.T) {
         t.Fatal("expected last fetch timestamp after fetch")
     }
 }
-
-func TestRemoteSyncSummary(t *testing.T) {
-    status := git.Status{
-        Root:      "/repo",
-        Branch:    "main",
-        Upstream:  "origin/main",
-        Tracking:  map[string]git.BranchTracking{"main": {Ahead: 1, Behind: 0}},
-        Remote:    "origin",
-        NoRemote:  false,
-        NoUpstream: false,
-    }
-    if got := remoteSyncSummary(status); got != "ahead 1" {
-        t.Fatalf("unexpected sync summary: %q", got)
-    }
-}
 ```
 
 ### 5-2. Tag tests
@@ -494,13 +443,11 @@ func TestTagDetailPanelShowsAnnotatedFields(t *testing.T) {
 - `TagProvenance` 는 그대로 둔다. provenance snapshot 은 origin 존재 여부만 담당한다.
 - `TagEntry.Message` 는 provenance 와 무관하다.
 - `LastFetchAt` 는 fetch 직후만이 아니라 `repo.Status` 가 읽을 수 있으면 언제든 보여준다.
-- `RemoteSyncSummary` 는 표시용 파생값이라 캐시하지 않아도 된다.
 
 ## 7. Final checklist
 
-- `Remote` detail panel 에 `last fetch` 와 `sync` 가 보인다.
+- `Remote` detail panel 에 `last fetch` 가 보인다.
 - `Tags` detail panel 에 `tagger` / `tagged` / `message` 가 보인다.
 - lightweight tag 는 빈 메타데이터 때문에 화면이 깨지지 않는다.
 - annotated tag 는 추가 정보가 꽉 채워진다.
 - 1차 rebalance 문서와 충돌하지 않는다.
-

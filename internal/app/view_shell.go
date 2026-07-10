@@ -143,6 +143,9 @@ func renderAppView(m model) string {
 			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
 		}
 	}
+	if m.status.Mode == state.ModeCherryPickPick {
+		centeredBody = overlayPopup(centeredBody, renderCherryPickPopup(m, bodyWidth))
+	}
 	if m.status.Mode == state.ModeTargetPick {
 		centeredBody = overlayPopup(centeredBody, renderTargetPickPopup(m, bodyWidth))
 	}

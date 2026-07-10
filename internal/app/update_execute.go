@@ -91,7 +91,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 			return m, loadStashState(m.repo)
 		}
-		if (msg2.action == state.ActionPull || msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase) && (msg2.status.MergeInProgress || msg2.status.RebaseInProgress) {
+		if (msg2.action == state.ActionPull || msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase) && (msg2.status.MergeInProgress || msg2.status.RebaseInProgress || msg2.status.CherryPickInProgress) {
 			msg2.status = m.withCachedTagEntries(msg2.status)
 			m.repoStatus = msg2.status
 			m.storeTagEntries(msg2.status)
@@ -126,7 +126,21 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			syncBrowseState(&m, msg2.status)
 			m.status = state.New().WithBrowse()
 			m.status.Message = "Rebase conflicted."
-			m.status.Detail = "Resolve conflicts, then abort or continue."
+			m.status.Detail = "Resolve conflicts, then abort."
+			telemetry.Log("app", "execute_conflicted", map[string]string{
+				"action": string(msg2.action),
+				"head":   msg2.status.Head,
+			})
+			return m, nil
+		}
+		if msg2.action == state.ActionCherryPick && msg2.status.CherryPickInProgress {
+			msg2.status = m.withCachedTagEntries(msg2.status)
+			m.repoStatus = msg2.status
+			m.storeTagEntries(msg2.status)
+			syncBrowseState(&m, msg2.status)
+			m.status = state.New().WithBrowse()
+			m.status.Message = "Cherry-pick conflicted."
+			m.status.Detail = "Resolve conflicts, then abort."
 			telemetry.Log("app", "execute_conflicted", map[string]string{
 				"action": string(msg2.action),
 				"head":   msg2.status.Head,
@@ -148,6 +162,12 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			detail = "Check credentials or network: " + msg2.err.Error()
 		} else if msg2.action == state.ActionPush || msg2.action == state.ActionPushTag || msg2.action == state.ActionDeleteRemoteTag || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream {
 			message = "Push failed."
+		} else if msg2.action == state.ActionCherryPick {
+			message = "Cherry-pick failed."
+			if strings.Contains(detail, "empty commit") {
+				message = "Cherry-pick skipped an empty commit."
+				detail = "Adjust the queue and retry."
+			}
 		} else if msg2.action == state.ActionDeleteBranch {
 			message = "Branch delete failed."
 			if strings.Contains(detail, "branch not found") {
@@ -183,6 +203,23 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status.Message = "Working tree cleaned."
 		telemetry.Log("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
+			"head":   msg2.status.Head,
+		})
+		return m, nil
+	}
+	if msg2.action == state.ActionCherryPick {
+		rows := graph.Rows(msg2.status)
+		rowIdx := graph.FindRowByHash(rows, msg2.status.Head)
+		if rowIdx >= 0 {
+			m.sectionCursor[sectionGraph] = rowIdx
+			m.graphScroll = clampScroll(rowIdx, len(rows), graphPageSize(&m))
+		}
+		syncBrowseState(&m, msg2.status)
+		m.status = deriveStatus(msg2.status)
+		m.status.Message = "Cherry-pick complete."
+		telemetry.Log("app", "execute_action", map[string]string{
+			"action": string(msg2.action),
+			"target": msg2.target,
 			"head":   msg2.status.Head,
 		})
 		return m, nil

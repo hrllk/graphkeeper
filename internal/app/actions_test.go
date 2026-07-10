@@ -18,6 +18,7 @@ func TestDeriveStatusCases(t *testing.T) {
 		{name: "no repo", rs: git.Status{}, want: state.ModeBlocked, wantBlk: state.BlockNoRepo, wantMsg: "Not inside a Git repository."},
 		{name: "merge in progress", rs: git.Status{Root: "/repo", MergeInProgress: true}, want: state.ModeBrowse, wantMsg: "Merge/rebase in progress."},
 		{name: "rebase in progress", rs: git.Status{Root: "/repo", RebaseInProgress: true}, want: state.ModeBrowse, wantMsg: "Merge/rebase in progress."},
+		{name: "cherry-pick in progress", rs: git.Status{Root: "/repo", CherryPickInProgress: true}, want: state.ModeBrowse, wantMsg: "Cherry-pick in progress."},
 		{name: "detached", rs: git.Status{Root: "/repo", Detached: true}, want: state.ModeBlocked, wantBlk: state.BlockDetached, wantMsg: "Detached HEAD."},
 		{name: "empty repo", rs: git.Status{Root: "/repo", EmptyRepo: true}, want: state.ModeEmpty, wantMsg: "No commits yet."},
 		{name: "no remote no upstream", rs: git.Status{Root: "/repo", NoRemote: true, NoUpstream: true}, want: state.ModeBlocked, wantBlk: state.BlockNoRemote, wantMsg: "No remote or upstream."},
@@ -53,6 +54,7 @@ func TestActionPullCases(t *testing.T) {
 		{name: "detached", rs: git.Status{Root: "/repo", Detached: true}, want: state.ModeBlocked, wantBlk: state.BlockDetached},
 		{name: "merge in progress", rs: git.Status{Root: "/repo", MergeInProgress: true}, want: state.ModeBlocked, wantBlk: state.BlockUnknown},
 		{name: "rebase in progress", rs: git.Status{Root: "/repo", RebaseInProgress: true}, want: state.ModeBlocked, wantBlk: state.BlockUnknown},
+		{name: "cherry-pick in progress", rs: git.Status{Root: "/repo", CherryPickInProgress: true}, want: state.ModeBlocked, wantBlk: state.BlockUnknown},
 		{name: "no remote", rs: git.Status{Root: "/repo", NoRemote: true}, want: state.ModeBlocked, wantBlk: state.BlockNoRemote},
 		{name: "no upstream", rs: git.Status{Root: "/repo", NoUpstream: true}, want: state.ModeBlocked, wantBlk: state.BlockNoUpstream},
 		{name: "ready", rs: git.Status{Root: "/repo"}, want: state.ModeOutcomePreview, wantMsg: "Pull ready."},
@@ -111,6 +113,9 @@ func TestCanCreateBranch(t *testing.T) {
 	if canCreateBranch(git.Status{Root: "/repo", RebaseInProgress: true}) {
 		t.Fatal("expected rebase in progress to block branch creation")
 	}
+	if canCreateBranch(git.Status{Root: "/repo", CherryPickInProgress: true}) {
+		t.Fatal("expected cherry-pick in progress to block branch creation")
+	}
 }
 
 func TestBranchNameExistsAndValidation(t *testing.T) {
@@ -144,6 +149,9 @@ func TestBranchNameExistsAndValidation(t *testing.T) {
 	}
 	if err := branchCreateValidationError(git.Status{Root: "/repo", RebaseInProgress: true}, "new-branch", "main"); err == nil || err.Error() != "merge/rebase already in progress" {
 		t.Fatalf("expected rebase error, got %v", err)
+	}
+	if err := branchCreateValidationError(git.Status{Root: "/repo", CherryPickInProgress: true}, "new-branch", "main"); err == nil || err.Error() != "merge/rebase already in progress" {
+		t.Fatalf("expected cherry-pick error, got %v", err)
 	}
 	if err := branchCreateValidationError(git.Status{}, "new-branch", "main"); err == nil || err.Error() != "not inside a git repository" {
 		t.Fatalf("expected no repo error, got %v", err)
@@ -203,6 +211,52 @@ func TestActionPickTargets(t *testing.T) {
 		}
 		if got.Selected != "main" {
 			t.Fatalf("selected = %q, want main", got.Selected)
+		}
+	})
+}
+
+func TestBuildCherryPickTargets(t *testing.T) {
+	rs := git.Status{
+		Head: "head123",
+		GraphCommits: []git.GraphCommit{
+			{Hash: "merge123", Parents: []string{"a", "b"}, Subject: "merge"},
+			{Hash: "pick123", Parents: []string{"root"}, Author: "Ada Lovelace", Subject: "pick me", RelativeAge: "2 days ago"},
+			{Hash: "head123", Parents: []string{"pick123"}, Subject: "head"},
+		},
+	}
+	got := buildCherryPickTargets(rs)
+	if len(got) != 1 {
+		t.Fatalf("expected one cherry-pick target, got %#v", got)
+	}
+	if got[0].Kind != state.TargetKindCommit || got[0].Ref != "pick123" {
+		t.Fatalf("unexpected cherry-pick target: %#v", got[0])
+	}
+	if got[0].Author != "Ada Lovelace" {
+		t.Fatalf("expected author to be preserved, got %#v", got[0])
+	}
+}
+
+func TestActionPickCherryTargets(t *testing.T) {
+	t.Run("empty blocked", func(t *testing.T) {
+		got := actionPickCherryTargets(git.Status{Root: "/repo"})
+		if got.Mode != state.ModeBlocked || got.Block != state.BlockTargetEmpty {
+			t.Fatalf("got = %#v", got)
+		}
+	})
+	t.Run("target selection enabled", func(t *testing.T) {
+		got := actionPickCherryTargets(git.Status{
+			Root: "/repo",
+			Head: "head123",
+			GraphCommits: []git.GraphCommit{
+				{Hash: "pick123", Parents: []string{"root"}, Subject: "pick me"},
+				{Hash: "head123", Parents: []string{"pick123"}, Subject: "head"},
+			},
+		})
+		if got.Mode != state.ModeCherryPickPick {
+			t.Fatalf("got = %#v", got)
+		}
+		if got.Selected != "pick123" || got.TargetIdx != 0 {
+			t.Fatalf("expected first cherry-pick target selected, got %#v", got)
 		}
 	})
 }

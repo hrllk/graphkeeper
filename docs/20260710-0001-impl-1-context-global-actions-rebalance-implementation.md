@@ -20,8 +20,8 @@
   - Graph search 와 `?` 분리
   - 섹션별 actions helper 분리
 - 제외
-  - `Remote` last fetch / sync status 상태 수집
-  - `Tags` tagger / tagged time / message 상태 수집
+  - `Remote` sync status 상태 수집
+  - `Tags` tagger / tagged time 상태 수집
   - git 동작 변경
 
 ## 파일별 수정 순서
@@ -526,6 +526,176 @@ func (m model) renderContextContent(width, height int) string {
 }
 ```
 
+`Context Details` 는 render 에서 바로 상태를 만들지 말고, 섹션별 snapshot 을 먼저 만든다.
+
+snapshot 의 의도는 다음과 같다.
+
+- `renderContextInfoLines` 는 단순 출력만 맡는다.
+- `buildContextDetailsSnapshot` 류 helper 가 state 계산을 맡는다.
+- 섹션별 detail field 는 각 섹션 전용 builder 로 채운다.
+- 비어 있는 필드는 `-` 혹은 빈 문자열로 남겨도 된다.
+- `GraphDetails` 는 `currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])` 를 사용한다.
+- `TagDetails` 는 `m.sectionCursor[sectionTags]` 를 selected index 로 사용한다.
+
+```go
+type ContextDetailsSnapshot struct {
+    Graph  GraphDetailsSnapshot
+    Local  LocalDetailsSnapshot
+    Remote RemoteDetailsSnapshot
+    Tags   TagDetailsSnapshot
+}
+
+type GraphDetailsSnapshot struct {
+    FocusHash   string
+    ParentHash  string
+    Branches    []string
+    Stashes     []string
+    Tags        []string
+}
+
+type LocalDetailsSnapshot struct {
+    Target          string
+    Upstream        string
+    WorktreeState   string
+    Ahead           int
+    Behind          int
+    DivergenceState string
+}
+
+type RemoteDetailsSnapshot struct {
+    Target        string
+    DefaultBranch string
+    LastFetch     string
+    BranchCount   int
+}
+
+type TagDetailsSnapshot struct {
+    Name       string
+    Hash       string
+    Age        string
+    Message    string
+    Provenance string
+}
+```
+
+스냅샷은 다음 상태 이름을 고정해서 쓴다.
+
+```go
+const (
+    divergenceEqual     = "equal"
+    divergenceAheadOnly = "aheadOnly"
+    divergenceBehindOnly = "behindOnly"
+    divergenceDiverged  = "diverged"
+
+    tagProvenanceUnknown = "unknown"
+    tagProvenanceLocal   = "local"
+    tagProvenanceOrigin  = "origin"
+)
+```
+
+핵심 규칙은 다음과 같다.
+
+- `ahead` / `behind` 는 숫자만 계산한다.
+- `divergenceState` 는 숫자를 묶는 판단 상태다.
+- `renderContextInfoLines` 는 위 snapshot 만 읽고, repo 상태 계산을 직접 다시 하지 않는다.
+- `TagDetailsSnapshot.Message` 는 commit subject 가 아니라 tag object message 다.
+- `RemoteDetailsSnapshot.LastFetch` 는 값이 없으면 빈 문자열로 두고 render 에서 `-` 로 바꾼다.
+- `RemoteDetailsSnapshot` 은 1차 표시 계약에서 `syncState` 를 드러내지 않는다.
+
+의미와 예시:
+
+- `ahead` 는 현재 branch 가 upstream 보다 앞선 커밋 수다. 예: `ahead: 2` 는 아직 upstream 에 안 올라간 커밋이 2개라는 뜻이다.
+- `behind` 는 현재 branch 가 upstream 보다 뒤처진 커밋 수다. 예: `behind: 1` 은 upstream 에는 있지만 로컬에 없는 커밋이 1개 있다는 뜻이다.
+- `divergenceState` 는 `ahead` 와 `behind` 를 묶은 상태다. 예: `ahead: 1`, `behind: 1` 이면 `diverged` 다.
+- `provenance` 는 tag 가 어디서 왔는지 나타낸다. `local` 은 로컬에서만 보이는 태그, `origin` 은 origin 쪽에서도 확인된 태그, `unknown` 은 아직 출처를 확정하지 못한 상태다.
+
+### builder 분해
+
+구현은 다음 순서를 따른다.
+
+```go
+func buildContextDetailsSnapshot(rs git.Status, focus graphRow, tags []git.TagEntry, selectedTagIndex int) ContextDetailsSnapshot {
+    return ContextDetailsSnapshot{
+        Graph:  buildGraphDetailsSnapshot(rs, focus),
+        Local:  buildLocalDetailsSnapshot(rs),
+        Remote: buildRemoteDetailsSnapshot(rs),
+        Tags:   buildTagDetailsSnapshot(tags, selectedTagIndex),
+    }
+}
+```
+
+```go
+func buildGraphDetailsSnapshot(rs git.Status, focus graphRow) GraphDetailsSnapshot {
+    return GraphDetailsSnapshot{
+        FocusHash:  shortHash(focus.Hash),
+        ParentHash: shortHash(focus.ParentHash),
+        Branches:   renderBranchSummary(rs, focus),
+        Stashes:    renderStashSummary(rs, focus),
+        Tags:       renderTagSummary(rs, focus),
+    }
+}
+```
+
+```go
+func buildLocalDetailsSnapshot(rs git.Status) LocalDetailsSnapshot {
+    upstream := rs.Upstream
+    if upstream == "" {
+        upstream = "none"
+    }
+    divergence := divergenceEqual
+    if track := rs.Tracking[rs.Branch]; track.Ahead > 0 || track.Behind > 0 {
+        switch {
+        case track.Ahead > 0 && track.Behind > 0:
+            divergence = divergenceDiverged
+        case track.Ahead > 0:
+            divergence = divergenceAheadOnly
+        default:
+            divergence = divergenceBehindOnly
+        }
+    }
+    return LocalDetailsSnapshot{
+        Target:          rs.Branch,
+        Upstream:        upstream,
+        WorktreeState:   renderWorktreeState(rs),
+        Ahead:           rs.Tracking[rs.Branch].Ahead,
+        Behind:          rs.Tracking[rs.Branch].Behind,
+        DivergenceState: divergence,
+    }
+}
+```
+
+```go
+func buildRemoteDetailsSnapshot(rs git.Status) RemoteDetailsSnapshot {
+    return RemoteDetailsSnapshot{
+        Target:        rs.Remote,
+        DefaultBranch: rs.DefaultBranch,
+        LastFetch:     renderLastFetch(rs),
+        BranchCount:   len(rs.RemoteBranches),
+    }
+}
+```
+
+```go
+func buildTagDetailsSnapshot(tags []git.TagEntry, selectedTagIndex int) TagDetailsSnapshot {
+    if len(tags) == 0 {
+        return TagDetailsSnapshot{Provenance: tagProvenanceUnknown}
+    }
+    if selectedTagIndex < 0 || selectedTagIndex >= len(tags) {
+        selectedTagIndex = 0
+    }
+    selected := tags[selectedTagIndex]
+    return TagDetailsSnapshot{
+        Name:       selected.Name,
+        Hash:       shortHash(selected.CommitHash),
+        Age:        selected.RelativeAge,
+        Message:    selected.Message,
+        Provenance: tagProvenanceForEntry(selected),
+    }
+}
+```
+
+이 시점의 목적은 완성형 UI 가 아니라, “무슨 값을 어디서 읽는지”를 고정하는 것이다.
+
 ## 6. Action helper 분리
 
 현재 `renderActionHelpLines` 는 너무 많은 조건을 한 함수에 담고 있다.
@@ -704,4 +874,3 @@ func TestSlashStillOpensGraphSearch(t *testing.T) {
 - `Graph` 기본 action 은 4개만 보인다.
 - `scroll`, `top`, `bottom` 은 Graph main help 에서 사라진다.
 - `Local` / `Remote` / `Tags` 는 섹션별 helper 로 분리된다.
-

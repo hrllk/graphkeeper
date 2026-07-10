@@ -46,6 +46,7 @@ type Status struct {
 	WorktreeDirty         bool
 	MergeInProgress       bool
 	RebaseInProgress      bool
+	CherryPickInProgress  bool
 	ConflictTarget        string
 	ConflictTargetSubject string
 	ErrorMessage          string
@@ -140,6 +141,13 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		conflictTarget = strings.TrimSpace(string(data))
 	}
 
+	cherryPickHeadFile := filepath.Join(gitDirPath, "CHERRY_PICK_HEAD")
+	cherryPickInProgress := false
+	if data, err := os.ReadFile(cherryPickHeadFile); err == nil {
+		cherryPickInProgress = true
+		conflictTarget = strings.TrimSpace(string(data))
+	}
+
 	// 2. 리베이스 상태 및 충돌 대상 검사
 	rebaseMergeDir := filepath.Join(gitDirPath, "rebase-merge")
 	if stat, err := os.Stat(rebaseMergeDir); err == nil && stat.IsDir() {
@@ -196,6 +204,7 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		WorktreeDirty:         worktreeDirty,
 		MergeInProgress:       mergeInProgress,
 		RebaseInProgress:      rebaseInProgress,
+		CherryPickInProgress:  cherryPickInProgress,
 		ConflictTarget:        conflictTarget,
 		ConflictTargetSubject: conflictTargetSubject,
 	}, nil

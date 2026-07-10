@@ -7,7 +7,7 @@ import (
 )
 
 func moveTarget(s state.Status, delta int) state.Status {
-	if s.Mode != state.ModeTargetPick || len(s.Targets) == 0 {
+	if s.Mode != state.ModeTargetPick && s.Mode != state.ModeCherryPickPick || len(s.Targets) == 0 {
 		return s
 	}
 	next := s.TargetIdx + delta
