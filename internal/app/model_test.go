@@ -1416,17 +1416,75 @@ func TestHiddenHotkeysPopupShowsMovedAndConditionalActions(t *testing.T) {
 		activeSection: sectionGraph,
 	}, 90))
 	for _, want := range []string{
+		"Hidden hotkeys by section",
+		"focus: Graph",
+		"Global",
+		"Graph",
+		"Local",
+		"Remote",
+		"Tags",
+		"Common:",
+		"Moved out:",
 		"Visible:",
 		"m: merge",
 		"Conditional:",
+		"s: stash changes",
 		"s: reset",
-		"Hidden / moved out:",
 		"tab: next section",
 		"?: hidden hotkeys",
+		"enter: jump to graph",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected hidden hotkeys popup to contain %q, got %q", want, got)
 		}
+	}
+}
+
+func TestHiddenHotkeysPopupCentersHeaderAndFooter(t *testing.T) {
+	got := ansi.Strip(renderHiddenHotkeysPopup(model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+	}, 90))
+	lines := strings.Split(got, "\n")
+	findLine := func(want string) string {
+		for _, line := range lines {
+			if strings.Contains(line, want) {
+				return line
+			}
+		}
+		return ""
+	}
+
+	headerLine := findLine("Hidden hotkeys by section")
+	if headerLine == "" {
+		t.Fatal("expected centered header line to be present")
+	}
+	headerBody := strings.TrimPrefix(headerLine, "│")
+	headerBody = strings.TrimSuffix(headerBody, "│")
+	if leading := len(headerBody) - len(strings.TrimLeft(headerBody, " ")); leading <= 2 {
+		t.Fatalf("expected header to be centered, got %q", headerLine)
+	}
+
+	footerLine := findLine("esc: close")
+	if footerLine == "" {
+		t.Fatal("expected centered footer line to be present")
+	}
+	footerBody := strings.TrimPrefix(footerLine, "│")
+	footerBody = strings.TrimSuffix(footerBody, "│")
+	if leading := len(footerBody) - len(strings.TrimLeft(footerBody, " ")); leading <= 2 {
+		t.Fatalf("expected footer to be centered, got %q", footerLine)
+	}
+}
+
+func TestRenderHiddenHotkeySectionTitleHighlightsActiveSection(t *testing.T) {
+	active := renderHiddenHotkeySectionTitle("Graph", true)
+	if want := sectionTitle.Render("› Graph"); active != want {
+		t.Fatalf("expected active hidden hotkey section title to use a subtle marker, got %q", active)
+	}
+
+	inactive := renderHiddenHotkeySectionTitle("Local", false)
+	if want := muted.Render("  Local"); inactive != want {
+		t.Fatalf("expected inactive hidden hotkey section title to be muted, got %q", inactive)
 	}
 }
 

@@ -5,9 +5,23 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-
-	"hrllk/graphkeeper/internal/state"
 )
+
+type hiddenHotkeyItem struct {
+	key  string
+	desc string
+}
+
+type hiddenHotkeyGroup struct {
+	title string
+	items []hiddenHotkeyItem
+}
+
+type hiddenHotkeySection struct {
+	title  string
+	active bool
+	groups []hiddenHotkeyGroup
+}
 
 func (m model) handleHiddenHotkeysKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
@@ -20,7 +34,7 @@ func (m model) handleHiddenHotkeysKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func renderHiddenHotkeysPopup(m model, bodyWidth int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	popupWidth := popupWidthForBody(bodyWidth, 44, 72)
 	popupBox := lipgloss.NewStyle().
@@ -31,16 +45,22 @@ func renderHiddenHotkeysPopup(m model, bodyWidth int) string {
 		Align(lipgloss.Left)
 
 	lines := []string{
-		descStyle.Render(sectionName(m.activeSection) + " hidden hotkeys"),
+		renderCenteredPopupLine(headerStyle.Render("Hidden hotkeys by section"), popupWidth),
+		renderCenteredPopupLine(helpStyle.Render("focus: "+sectionName(m.activeSection)), popupWidth),
 		"",
 	}
-	lines = append(lines, renderHiddenHotkeyGroup("Visible", hiddenVisibleHotkeys(m))...)
+	sections := hiddenHotkeySections(m)
+	for i, section := range sections {
+		lines = append(lines, renderHiddenHotkeySectionTitle(section.title, section.active))
+		for _, group := range section.groups {
+			lines = append(lines, renderHiddenHotkeyGroupLines(group.title, group.items, popupWidth)...)
+		}
+		if i < len(sections)-1 {
+			lines = append(lines, "")
+		}
+	}
 	lines = append(lines, "")
-	lines = append(lines, renderHiddenHotkeyGroup("Conditional", hiddenConditionalHotkeys(m))...)
-	lines = append(lines, "")
-	lines = append(lines, renderHiddenHotkeyGroup("Hidden / moved out", hiddenMovedOutHotkeys(m))...)
-	lines = append(lines, "")
-	lines = append(lines, helpStyle.Render("esc: close"))
+	lines = append(lines, renderCenteredPopupLine(helpStyle.Render("esc: close"), popupWidth))
 
 	return renderFloatingTitlePopup(
 		popupBox,
@@ -50,99 +70,137 @@ func renderHiddenHotkeysPopup(m model, bodyWidth int) string {
 	)
 }
 
-func renderHiddenHotkeyGroup(title string, items []string) []string {
-	lines := []string{title + ":"}
+func renderHiddenHotkeySectionTitle(title string, active bool) string {
+	if active {
+		return sectionTitle.Render("› " + title)
+	}
+	return muted.Render("  " + title)
+}
+
+func renderHiddenHotkeyGroupLines(title string, items []hiddenHotkeyItem, width int) []string {
+	lines := []string{"  " + title + ":"}
 	if len(items) == 0 {
-		lines = append(lines, "  (none)")
+		lines = append(lines, "    "+muted.Render("(none)"))
 		return lines
 	}
 	for _, item := range items {
-		lines = append(lines, "  • "+item)
+		lines = append(lines, fitVisibleWidth("    • "+renderHotkey(item.key)+": "+item.desc, width))
 	}
 	return lines
 }
 
-func hiddenVisibleHotkeys(m model) []string {
-	switch m.activeSection {
-	case sectionGraph:
-		return []string{
-			renderHotkeyLine("m", "merge"),
-			renderHotkeyLine("r", "rebase"),
-			renderHotkeyLine("space", "checkout"),
-			renderHotkeyLine("H", "jump to HEAD"),
-		}
-	case sectionCurrent:
-		return []string{
-			renderHotkeyLine("s", "stash changes"),
-			renderHotkeyLine("c", "clean working tree"),
-			renderHotkeyLine("space", "checkout"),
-			renderHotkeyLine("d", "delete branch"),
-		}
-	case sectionRemote:
-		return []string{
-			renderHotkeyLine("space", "checkout"),
-			renderHotkeyLine("f", "fetch"),
-			renderHotkeyLine("p", "pull"),
-			renderHotkeyLine("d", "delete branch"),
-		}
-	case sectionTags:
-		return []string{
-			renderHotkeyLine("enter", "jump to graph"),
-			renderHotkeyLine("d", "delete tag"),
-		}
-	default:
-		return nil
+func hiddenHotkeySections(m model) []hiddenHotkeySection {
+	return []hiddenHotkeySection{
+		{
+			title: "Global",
+			groups: []hiddenHotkeyGroup{
+				{
+					title: "Common",
+					items: []hiddenHotkeyItem{
+						{key: "tab", desc: "next section"},
+						{key: "shift+tab", desc: "previous section"},
+						{key: "j/k", desc: "move"},
+						{key: "f", desc: "fetch"},
+						{key: "F", desc: "fetch tags"},
+						{key: "S", desc: "stash list"},
+						{key: "q", desc: "quit"},
+						{key: "?", desc: "hidden hotkeys"},
+					},
+				},
+				{
+					title: "Moved out",
+					items: []hiddenHotkeyItem{
+						{key: "gg", desc: "top"},
+						{key: "G", desc: "bottom"},
+						{key: "ctrl+u/d", desc: "scroll"},
+					},
+				},
+			},
+		},
+		{
+			title:  "Graph",
+			active: m.activeSection == sectionGraph,
+			groups: []hiddenHotkeyGroup{
+				{
+					title: "Visible",
+					items: []hiddenHotkeyItem{
+						{key: "m", desc: "merge"},
+						{key: "r", desc: "rebase"},
+						{key: "space", desc: "checkout"},
+						{key: "H", desc: "jump to HEAD"},
+					},
+				},
+				{
+					title: "Conditional",
+					items: []hiddenHotkeyItem{
+						{key: "s", desc: "reset"},
+						{key: "d", desc: "delete branch"},
+						{key: "p", desc: "pull"},
+						{key: "P", desc: "push"},
+						{key: "t", desc: "tag commit"},
+						{key: "o", desc: "pop stash"},
+						{key: "n", desc: "new branch or repeat search"},
+						{key: "N", desc: "repeat search backward"},
+					},
+				},
+			},
+		},
+		{
+			title:  "Local",
+			active: m.activeSection == sectionCurrent,
+			groups: []hiddenHotkeyGroup{
+				{
+					title: "Visible",
+					items: []hiddenHotkeyItem{
+						{key: "s", desc: "stash changes"},
+						{key: "c", desc: "clean working tree"},
+						{key: "space", desc: "checkout"},
+						{key: "d", desc: "delete branch"},
+					},
+				},
+				{
+					title: "Conditional",
+					items: []hiddenHotkeyItem{
+						{key: "a", desc: "abort merge"},
+						{key: "P", desc: "push"},
+					},
+				},
+			},
+		},
+		{
+			title:  "Remote",
+			active: m.activeSection == sectionRemote,
+			groups: []hiddenHotkeyGroup{
+				{
+					title: "Visible",
+					items: []hiddenHotkeyItem{
+						{key: "space", desc: "checkout"},
+						{key: "f", desc: "fetch"},
+						{key: "p", desc: "pull"},
+						{key: "d", desc: "delete branch"},
+					},
+				},
+			},
+		},
+		{
+			title:  "Tags",
+			active: m.activeSection == sectionTags,
+			groups: []hiddenHotkeyGroup{
+				{
+					title: "Visible",
+					items: []hiddenHotkeyItem{
+						{key: "enter", desc: "jump to graph"},
+						{key: "d", desc: "delete tag"},
+					},
+				},
+			},
+		},
 	}
 }
 
-func hiddenConditionalHotkeys(m model) []string {
-	switch m.activeSection {
-	case sectionGraph:
-		return []string{
-			"s: reset",
-			"d: delete branch",
-			"p: pull",
-			"P: push",
-			"t: tag commit",
-			"o: pop stash",
-			"n: new branch or repeat search",
-			"N: repeat search backward",
-		}
-	case sectionCurrent:
-		return []string{
-			"a: abort merge",
-			"P: push",
-		}
-	case sectionRemote:
-		return []string{
-			"push is read elsewhere",
-		}
-	case sectionTags:
-		return []string{
-			"tag metadata is shown in Details",
-		}
-	default:
-		return nil
+func renderCenteredPopupLine(text string, width int) string {
+	if width <= 0 {
+		return text
 	}
-}
-
-func hiddenMovedOutHotkeys(m model) []string {
-	lines := []string{
-		renderHotkeyLine("tab", "next section"),
-		renderHotkeyLine("shift+tab", "previous section"),
-		renderHotkeyLine("j/k", "move"),
-		renderHotkeyLine("f", "fetch"),
-		renderHotkeyLine("F", "fetch tags"),
-		renderHotkeyLine("S", "stash list"),
-		renderHotkeyLine("q", "quit"),
-	}
-	if m.status.Mode == state.ModeBrowse {
-		lines = append(lines, renderHotkeyLine("?", "hidden hotkeys"))
-	}
-	lines = append(lines,
-		renderHotkeyLine("gg", "top"),
-		renderHotkeyLine("G", "bottom"),
-		renderHotkeyLine("ctrl+u/d", "scroll"),
-	)
-	return lines
+	return lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(text)
 }
