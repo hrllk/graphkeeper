@@ -467,6 +467,7 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 				{
 					Hash:        "c2",
 					Subject:     "Merge branch 'main' into develop with a longer title",
+					Author:      "hrllk",
 					Parents:     []string{"c1"},
 					Decorations: []string{"HEAD -> main"},
 					RelativeAge: "5 minutes ago",
@@ -479,6 +480,12 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 	got := m.renderGraphContent(80, 6)
 	if !strings.Contains(got, "date") {
 		t.Fatalf("expected graph header to use date label, got %q", got)
+	}
+	if !strings.Contains(got, "author") {
+		t.Fatalf("expected graph header to use author label, got %q", got)
+	}
+	if !strings.Contains(got, "hrllk") {
+		t.Fatalf("expected graph row to include author name, got %q", got)
 	}
 	if !strings.Contains(got, "Merge branch 'mai...") {
 		t.Fatalf("expected graph title to use 20-character ellipsis form, got %q", got)
@@ -2080,8 +2087,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
 	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
-		t.Fatalf("expected graph line to include hash, branches, date, title and graph, got %q", line)
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "hrllk") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
+		t.Fatalf("expected graph line to include hash, branches, date, author, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
 		t.Fatalf("expected HEAD pointer to be highlighted, got %q", line)
@@ -2092,8 +2099,18 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5m") || strings.Index(line, "5m") > strings.Index(line, "Merge branch 'mai...") {
 		t.Fatalf("expected commit columns to stay ordered, got %q", line)
 	}
+	if strings.Index(line, "5m") > strings.Index(line, "hrllk") || strings.Index(line, "hrllk") > strings.Index(line, "Merge branch 'mai...") {
+		t.Fatalf("expected author to sit between date and title, got %q", line)
+	}
 	if strings.Contains(line, "Merge branch 'main' into develop") || strings.Contains(line, "origin/") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
+	}
+	narrow := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 70, false, 0)
+	if strings.Contains(narrow, "hrllk") {
+		t.Fatalf("expected author to shrink away before title on narrow rows, got %q", narrow)
+	}
+	if !strings.Contains(narrow, "Merge branch") {
+		t.Fatalf("expected title to stay visible on narrow rows, got %q", narrow)
 	}
 	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24, 80, false, 0)
 	if !strings.Contains(connector, "|\\") {

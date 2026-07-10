@@ -9,6 +9,12 @@ import (
 	"hrllk/graphkeeper/internal/graph"
 )
 
+const (
+	graphAuthorWidthTarget = 12
+	graphTitleWidthTarget  = 20
+	graphDateWidth         = 7
+)
+
 func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
 	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount, "")
 }
@@ -51,7 +57,7 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		title = conflictColor.Render(row.Commit.Subject)
 	} else {
 		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
-		title = renderSearchField(compactTitleText(row.Commit.Subject), searchQuery, 20, selected && graphActive)
+		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, graphColWidth, selected && graphActive)
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	return fitVisibleWidth(line, rowWidth)
@@ -127,10 +133,44 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		title = conflictColor.Render(row.Commit.Subject)
 	} else {
 		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
-		title = renderSearchField(compactTitleText(row.Commit.Subject), searchQuery, 20, selected && graphActive)
+		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, graphColWidth, selected && graphActive)
 	}
 	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
 	return fitVisibleWidth(line, rowWidth)
+}
+
+func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth, graphColWidth int, focused bool) string {
+	author = compactAuthorText(author)
+	subject = compactTitleText(subject)
+	available := rowWidth - (8 + 1 + 10 + 1 + graphColWidth + 2 + graphDateWidth + 1)
+	if available <= 0 {
+		return ""
+	}
+	if available <= graphTitleWidthTarget {
+		return renderSearchField(subject, searchQuery, available, focused)
+	}
+
+	authorWidth := min(graphAuthorWidthTarget, available-graphTitleWidthTarget-1)
+	if authorWidth < 0 {
+		authorWidth = 0
+	}
+	titleWidth := available - authorWidth - 1
+	if titleWidth > graphTitleWidthTarget {
+		titleWidth = graphTitleWidthTarget
+	}
+	if authorWidth <= 0 {
+		return renderSearchField(subject, searchQuery, titleWidth, focused)
+	}
+
+	renderedAuthor := renderSearchField(author, searchQuery, authorWidth, focused)
+	if renderedAuthor == "" {
+		return renderSearchField(subject, searchQuery, titleWidth, focused)
+	}
+	renderedTitle := renderSearchField(subject, searchQuery, titleWidth, focused)
+	if renderedTitle == "" {
+		return renderedAuthor
+	}
+	return renderedAuthor + " " + renderedTitle
 }
 
 func graphLineCell(row graphRow, graphActive bool, selected bool, laneCursor int, graphColWidth int, stashCount int) string {

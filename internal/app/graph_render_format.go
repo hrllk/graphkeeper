@@ -221,6 +221,14 @@ func compactTitleText(subject string) string {
 	return string(runes[:17]) + "..."
 }
 
+func compactAuthorText(author string) string {
+	author = strings.TrimSpace(author)
+	if author == "" {
+		return "-"
+	}
+	return author
+}
+
 func padRight(value string, width int) string {
 	if lipgloss.Width(value) >= width {
 		return value
