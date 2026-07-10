@@ -153,7 +153,7 @@ func TestCreateBranchShortcutBlockedWhenMergeInProgress(t *testing.T) {
 	}
 }
 
-func TestCherryPickHotkeyOpensPopupAndReordersQueue(t *testing.T) {
+func TestCherryPickHotkeyIsDisabled(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{
 		Root: fixture.root,
@@ -169,60 +169,16 @@ func TestCherryPickHotkeyOpensPopupAndReordersQueue(t *testing.T) {
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	got := gotModel.(model)
 	if cmd != nil {
-		t.Fatalf("expected cherry-pick hotkey to stay synchronous, got %v", cmd)
+		t.Fatalf("expected disabled hotkey to stay synchronous, got %v", cmd)
 	}
-	if got.status.Mode != state.ModeCherryPickPick {
-		t.Fatalf("expected cherry-pick popup mode, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeBlocked {
+		t.Fatalf("expected cherry-pick hotkey to be blocked, got %s", got.status.Mode)
 	}
-	if len(got.status.Targets) != 2 {
-		t.Fatalf("expected merge commits and HEAD to be excluded, got %#v", got.status.Targets)
+	if got.status.Message != "Cherry-pick is disabled." {
+		t.Fatalf("expected disable message, got %q", got.status.Message)
 	}
-	originalGraphCursor := got.sectionCursor[sectionGraph]
-	originalLaneCursor := got.graphLaneCursor
-
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeySpace})
-	got = gotModel.(model)
-	if cmd != nil {
-		t.Fatalf("expected cherry-pick toggle to stay synchronous, got %v", cmd)
-	}
-	if len(got.status.SelectedQueue) != 1 || got.status.SelectedQueue[0] != "pick123" {
-		t.Fatalf("expected first commit to be queued, got %#v", got.status.SelectedQueue)
-	}
-
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
-	got = gotModel.(model)
-	if cmd != nil {
-		t.Fatalf("expected move to stay synchronous, got %v", cmd)
-	}
-	if got.sectionCursor[sectionGraph] != originalGraphCursor || got.graphLaneCursor != originalLaneCursor {
-		t.Fatalf("expected graph focus to remain unchanged, got cursor=%d lane=%d", got.sectionCursor[sectionGraph], got.graphLaneCursor)
-	}
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeySpace})
-	got = gotModel.(model)
-	if cmd != nil {
-		t.Fatalf("expected cherry-pick toggle to stay synchronous, got %v", cmd)
-	}
-	if len(got.status.SelectedQueue) != 2 || got.status.SelectedQueue[1] != "other123" {
-		t.Fatalf("expected second commit to be appended, got %#v", got.status.SelectedQueue)
-	}
-
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
-	got = gotModel.(model)
-	if cmd != nil {
-		t.Fatalf("expected move to stay synchronous, got %v", cmd)
-	}
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeySpace})
-	got = gotModel.(model)
-	if cmd != nil {
-		t.Fatalf("expected toggle to stay synchronous, got %v", cmd)
-	}
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeySpace})
-	got = gotModel.(model)
-	if cmd != nil {
-		t.Fatalf("expected recheck to stay synchronous, got %v", cmd)
-	}
-	if len(got.status.SelectedQueue) != 2 || got.status.SelectedQueue[0] != "other123" || got.status.SelectedQueue[1] != "pick123" {
-		t.Fatalf("expected queue reorder after uncheck/recheck, got %#v", got.status.SelectedQueue)
+	if len(got.status.Targets) != 0 {
+		t.Fatalf("expected no cherry-pick targets to be prepared, got %#v", got.status.Targets)
 	}
 }
 

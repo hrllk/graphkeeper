@@ -126,7 +126,6 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 					items: []hiddenHotkeyItem{
 						{key: "m", desc: "merge"},
 						{key: "r", desc: "rebase"},
-						{key: "x", desc: "cherry-pick"},
 						{key: "space", desc: "checkout"},
 						{key: "H", desc: "jump to HEAD"},
 					},

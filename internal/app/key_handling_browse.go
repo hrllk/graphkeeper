@@ -224,7 +224,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m = openGraphStashPop(m)
 		return m, nil
 	case "x":
-		m.status = actionPickCherryTargets(m.repoStatus)
+		m.status = state.New().WithBlocked(state.BlockUnknown, "Cherry-pick is disabled.", "This mode is temporarily unavailable.")
 		return m, nil
 	case "m":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
