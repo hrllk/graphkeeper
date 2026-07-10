@@ -91,6 +91,7 @@ func (m model) renderContextInfoLines(width int) []string {
 				}
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("worktree"), worktree))
 			}
+			lines = append(lines, renderBranchDivergenceLines(m.repoStatus, items[cursor].Name)...)
 		case sectionRemote:
 			lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("target"), renderRemoteDetailTarget(items[cursor])))
 			if !m.repoStatus.LastFetchAt.IsZero() {
@@ -102,6 +103,13 @@ func (m model) renderContextInfoLines(width int) []string {
 			if entry, ok := selectedTagEntry(m); ok {
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("title"), entry.Name))
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("target"), shorten(entry.CommitHash, 8)))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("age"), compactWhenText(entry.RelativeAge)))
+				if message := strings.TrimSpace(entry.Message); message != "" {
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("message"), shorten(message, max(width-9, 0))))
+				} else {
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("message"), "-"))
+				}
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("provenance"), renderTagProvenanceLabel(m.repoStatus.TagProvenanceLoaded, entry)))
 			}
 		}
 	}
@@ -185,6 +193,52 @@ func compactWhenTime(t time.Time) string {
 		return "-"
 	}
 	return t.Format("2006-01-02 15:04")
+}
+
+func renderBranchDivergenceLines(rs git.Status, branch string) []string {
+	branch = strings.TrimSpace(branch)
+	if branch == "" || branch == "HEAD" {
+		return nil
+	}
+	upstream, known := branchUpstream(rs, branch)
+	if !known || strings.TrimSpace(upstream) == "" {
+		return nil
+	}
+	track, ok := rs.Tracking[branch]
+	if !ok {
+		track = git.BranchTracking{}
+	}
+	return []string{
+		fmt.Sprintf("%s: %d", renderContextKey("ahead"), track.Ahead),
+		fmt.Sprintf("%s: %d", renderContextKey("behind"), track.Behind),
+		fmt.Sprintf("%s: %s", renderContextKey("divergence"), renderDivergenceStateLabel(track.Ahead, track.Behind)),
+	}
+}
+
+func renderDivergenceStateLabel(ahead, behind int) string {
+	switch {
+	case ahead == 0 && behind == 0:
+		return "equal"
+	case ahead > 0 && behind == 0:
+		return "aheadOnly"
+	case ahead == 0 && behind > 0:
+		return "behindOnly"
+	default:
+		return "diverged"
+	}
+}
+
+func renderTagProvenanceLabel(provenanceLoaded bool, entry git.TagEntry) string {
+	if !provenanceLoaded {
+		return muted.Render("(unknown)")
+	}
+	if entry.OriginKnown && entry.OnOrigin {
+		return remoteColor.Render("(origin)")
+	}
+	if entry.OriginKnown {
+		return tagColor.Render("(local)")
+	}
+	return muted.Render("(unknown)")
 }
 
 func remoteSyncSummaryForStatus(rs git.Status) string {

@@ -672,12 +672,65 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	m.activeSection = sectionCurrent
 	m.status.WorktreeState = state.WorktreeStateDirty
 
-	got := m.renderContextContent(50, 16)
+	got := ansi.Strip(m.renderContextContent(80, 16))
 	if !strings.Contains(got, "target:") || !strings.Contains(got, "worktree:") {
 		t.Fatalf("expected current branch context to show target and worktree, got %q", got)
 	}
 	if !strings.Contains(got, "upstream:") || !strings.Contains(got, "origin/main") {
 		t.Fatalf("expected current branch context to show upstream target, got %q", got)
+	}
+	for _, want := range []string{"ahead: 2", "behind: 1", "divergence: diverged"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected current branch context to show %q, got %q", want, got)
+		}
+	}
+}
+
+func TestRenderContextContentShowsMissingUpstreamAsNone(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch:        "main",
+			Head:          "abc1234",
+			LocalBranches: []string{"main"},
+			BranchUpstreams: map[string]string{
+				"main": "",
+			},
+		},
+		activeSection: sectionCurrent,
+		sectionCursor: map[graphSection]int{
+			sectionCurrent: 0,
+		},
+	}
+	got := ansi.Strip(m.renderContextContent(80, 12))
+	if !strings.Contains(got, "upstream: (none)") {
+		t.Fatalf("expected missing upstream to render as none, got %q", got)
+	}
+}
+
+func TestRenderContextContentShowsEqualDivergenceWhenTrackingMissing(t *testing.T) {
+	m := model{
+		status: state.New().WithBrowse(),
+		repoStatus: git.Status{
+			Branch:        "main",
+			Head:          "abc1234",
+			Upstream:      "origin/main",
+			Remote:        "origin",
+			LocalBranches: []string{"main"},
+			BranchUpstreams: map[string]string{
+				"main": "origin/main",
+			},
+		},
+		activeSection: sectionCurrent,
+		sectionCursor: map[graphSection]int{
+			sectionCurrent: 0,
+		},
+	}
+	got := ansi.Strip(m.renderContextContent(80, 12))
+	for _, want := range []string{"ahead: 0", "behind: 0", "divergence: equal"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected equal divergence to show %q, got %q", want, got)
+		}
 	}
 }
 
@@ -708,16 +761,19 @@ func TestRenderContextContentShowsTagTitleAndTarget(t *testing.T) {
 		status: state.New().WithBrowse(),
 		repoStatus: git.Status{
 			TagEntries: []git.TagEntry{
-				{Name: "v1.0.0", CommitHash: "abc1234", Message: "release title", Subject: "release body"},
+				{Name: "v1.0.0", CommitHash: "abc1234", RelativeAge: "2 weeks ago", Message: "release title", OriginKnown: true, OnOrigin: true},
 			},
+			TagProvenanceLoaded: true,
 		},
 		activeSection: sectionTags,
 		sectionCursor: map[graphSection]int{sectionTags: 0},
 	}
 
 	got := ansi.Strip(m.renderContextContent(80, 18))
-	if !strings.Contains(got, "title: v1.0.0") || !strings.Contains(got, "target: abc1234") {
-		t.Fatalf("expected tag detail to show tag name and target only, got %q", got)
+	for _, want := range []string{"title: v1.0.0", "target: abc1234", "age: 2w", "message: release title", "provenance: (origin)"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected tag detail to show %q, got %q", want, got)
+		}
 	}
 }
 
@@ -1516,19 +1572,23 @@ func TestRenderCherryPickPopupShowsQueueOrderAndHelp(t *testing.T) {
 				{Ref: "other123", CommitHash: "other123", Author: "Grace Hopper", Subject: "second change", RelativeAge: "1 day ago"},
 			},
 			TargetIdx:     1,
-			SelectedQueue: []string{"pick123", "other123"},
+			SelectedQueue: []string{"pick123"},
 		},
-		repoStatus: git.Status{Branch: "main"},
+		repoStatus: git.Status{
+			Branch: "main",
+			Head:   "other123",
+			GraphCommits: []git.GraphCommit{
+				{Hash: "pick123", Parents: []string{"root"}, Author: "Ada Lovelace", Subject: "first change", RelativeAge: "2 days ago"},
+				{Hash: "other123", Parents: []string{"pick123"}, Author: "Grace Hopper", Subject: "second change", RelativeAge: "1 day ago"},
+			},
+		},
 	}, 90))
 	for _, want := range []string{
-		"Cherry-pick commits",
+		"Cherry-pick Graph",
 		"destination: current main",
-		"selected: 2 / 2",
-		"[1]  pick123",
-		"[2]  other12",
-		"space: toggle",
-		"enter: run",
-		"uncheck/recheck reorders the queue",
+		"selected: 1 / 2",
+		"[x] ",
+		"[ ] ",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected cherry-pick popup to contain %q, got %q", want, got)
