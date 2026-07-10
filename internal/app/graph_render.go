@@ -31,7 +31,7 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 	} else {
 		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
 		hash = renderSearchField(shorten(row.Commit.Hash, 7), searchQuery, 8, selected && graphActive)
-		refs = renderSearchField(refInfo.Text, searchQuery, 10, selected && graphActive)
+		refs = renderSearchField(refInfo.Text, searchQuery, graphBranchFieldWidth, selected && graphActive)
 		isHead := hasHeadDecoration(row.Commit.Decorations)
 		pointerFocused := graphActive && selected
 		if searchQuery == "" && isHead {
@@ -74,7 +74,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 			pinkBg := lipgloss.NewStyle().Background(lipgloss.Color("162")).Foreground(lipgloss.Color("255")).Bold(true)
 			graphCell = strings.ReplaceAll(graphCell, "*", pinkBg.Render("*"))
 		}
-		line := fmt.Sprintf("%-8s %-10s %s  %-7s %-10s", "", "", graphCell, "", "")
+		line := fmt.Sprintf("%-8s %-14s %s  %-7s %-*s", "", "", graphCell, "", graphBranchFieldWidth, "")
 		return fitVisibleWidth(line, rowWidth)
 	}
 	var hash, refs string
@@ -97,7 +97,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 			hash = pointerMark.Render(hash)
 		}
 		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
-		refs = renderSearchField(refInfo.Text, searchQuery, 10, selected && graphActive)
+		refs = renderSearchField(refInfo.Text, searchQuery, graphBranchFieldWidth, selected && graphActive)
 		if searchQuery == "" && refInfo.HasLocalHead {
 			refs = headMark.Render(refs)
 		} else if searchQuery == "" && pointerFocused && refInfo.HasBranch {
@@ -142,7 +142,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth, graphColWidth int, focused bool) string {
 	author = compactAuthorText(author)
 	subject = compactTitleText(subject)
-	available := rowWidth - (8 + 1 + 10 + 1 + graphColWidth + 2 + graphDateWidth + 1)
+	available := rowWidth - (8 + 1 + graphBranchFieldWidth + 1 + graphColWidth + 2 + graphDateWidth + 1)
 	if available <= 0 {
 		return ""
 	}

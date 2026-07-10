@@ -9,6 +9,12 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+const (
+	graphBranchTokenWidth    = 10
+	graphBranchOverflowWidth = 4
+	graphBranchFieldWidth    = graphBranchTokenWidth + graphBranchOverflowWidth
+)
+
 func hasHeadDecoration(decorations []string) bool {
 	for _, decoration := range decorations {
 		if strings.HasPrefix(strings.TrimSpace(decoration), "HEAD -> ") {
@@ -113,35 +119,47 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 		return decorationInfo{Text: "-", HasBranch: false}
 	}
 	state := branches[name]
+	token := compactBranchToken(name, state)
+	overflowCount := len(branches) - 1
+	return decorationInfo{
+		Text:         token + compactBranchOverflowSuffix(overflowCount),
+		HasBranch:    hasBranch,
+		HasLocalHead: hasLocalHead,
+	}
+}
+
+func compactBranchToken(name string, state *branchState) string {
 	token := "l->" + name
-	if state.remote && state.local {
+	if state != nil && state.remote && state.local {
 		token = "o/l->" + name
-	} else if state.remote {
+	} else if state != nil && state.remote {
 		token = "o->" + name
 	}
-	overflowCount := len(branches) - 1
-	if overflowCount > 0 {
-		suffix := fmt.Sprintf(" +%d", overflowCount)
-		candidate := token + suffix
-		if len([]rune(candidate)) <= 10 {
-			token = candidate
-		} else {
-			maxBaseWidth := 10 - len([]rune(suffix))
-			if maxBaseWidth < 1 {
-				maxBaseWidth = 1
-			}
-			base := []rune(token)
-			if len(base) > maxBaseWidth {
-				token = string(base[:maxBaseWidth]) + suffix
-			} else {
-				token = token + suffix
-			}
-		}
-	} else if len([]rune(token)) > 10 {
-		runes := []rune(token)
-		token = string(runes[:9]) + "."
+	return fitBranchField(token, graphBranchTokenWidth)
+}
+
+func compactBranchOverflowSuffix(overflowCount int) string {
+	if overflowCount <= 0 {
+		return strings.Repeat(" ", graphBranchOverflowWidth)
 	}
-	return decorationInfo{Text: token, HasBranch: hasBranch, HasLocalHead: hasLocalHead}
+	if overflowCount > 99 {
+		overflowCount = 99
+	}
+	return fmt.Sprintf(" +%2d", overflowCount)
+}
+
+func fitBranchField(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(value) <= width {
+		return padRight(value, width)
+	}
+	runes := []rune(value)
+	if width <= 3 {
+		return string(runes[:width])
+	}
+	return string(runes[:width-3]) + "..."
 }
 
 func pickCompactBranchName(branches map[string]*branchState, headBranch string) string {

@@ -54,15 +54,15 @@ func (m model) renderGraphContent(width, height int) string {
 }
 
 func renderGraphHeader(width, graphColWidth int) string {
-	available := width - (8 + 1 + 10 + 1 + graphColWidth + 2 + graphDateWidth + 1)
+	available := width - (8 + 1 + graphBranchFieldWidth + 1 + graphColWidth + 2 + graphDateWidth + 1)
 	if available <= 0 {
 		return ""
 	}
 	if available <= graphTitleWidthTarget {
-		return fmt.Sprintf("%-8s %-10s %-*s %-*s %-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphTitleWidthTarget, "title")
+		return fmt.Sprintf("%-8s %-14s %-*s %-*s %-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphTitleWidthTarget, "title")
 	}
 	if available < graphTitleWidthTarget+graphAuthorWidthTarget {
-		return fmt.Sprintf("%-8s %-10s %-*s %-*s %-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphTitleWidthTarget, "title")
+		return fmt.Sprintf("%-8s %-14s %-*s %-*s %-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphTitleWidthTarget, "title")
 	}
-	return fmt.Sprintf("%-8s %-10s %-*s %-*s %-*s%-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphAuthorWidthTarget, "author", graphTitleWidthTarget, "title")
+	return fmt.Sprintf("%-8s %-14s %-*s %-*s %-*s%-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphAuthorWidthTarget, "author", graphTitleWidthTarget, "title")
 }

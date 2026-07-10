@@ -477,7 +477,7 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 		activeSection: sectionGraph,
 		sectionCursor: map[graphSection]int{sectionGraph: 0},
 	}
-	got := m.renderGraphContent(84, 6)
+	got := m.renderGraphContent(88, 6)
 	if !strings.Contains(got, "date") {
 		t.Fatalf("expected graph header to use date label, got %q", got)
 	}
@@ -628,6 +628,25 @@ func TestRenderDetailContentShowsGraphOptionalMetadata(t *testing.T) {
 	}
 	if !strings.Contains(got, "v1.0.0") || !strings.Contains(got, "v1.1.0") {
 		t.Fatalf("expected graph details to include tag list, got %q", got)
+	}
+}
+
+func TestCompactDecorationInfoUsesFourteenCharBranchField(t *testing.T) {
+	info := compactDecorationInfo([]string{
+		"HEAD -> main",
+		"origin/main",
+		"featureone",
+		"featuretwo",
+	}, []string{"main"})
+	got := ansi.Strip(info.Text)
+	if width := lipgloss.Width(got); width != graphBranchFieldWidth {
+		t.Fatalf("expected branch field width %d, got %d for %q", graphBranchFieldWidth, width, got)
+	}
+	if !strings.Contains(got, "l->main") {
+		t.Fatalf("expected compact branch token to keep the branch name visible, got %q", got)
+	}
+	if !strings.Contains(got, " + 2") {
+		t.Fatalf("expected compact branch token to show plus-space count, got %q", got)
 	}
 }
 
@@ -2101,17 +2120,17 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 
 func TestFormatCompactDecorations(t *testing.T) {
 	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "origin/main", "tag: v1.0.0"}, []string{"main", "develop"})
-	if !strings.HasPrefix(got, "o/l->") || !strings.Contains(got, "+1") {
+	if !strings.HasPrefix(got, "o/l->") || !strings.Contains(got, " + 1") {
 		t.Fatalf("expected a single compact branch token with overflow count, got %q", got)
 	}
-	if len([]rune(got)) > 10 {
-		t.Fatalf("expected compact decorations to stay within 10 chars, got %q", got)
+	if len([]rune(got)) != graphBranchFieldWidth {
+		t.Fatalf("expected compact decorations to use %d chars, got %q", graphBranchFieldWidth, got)
 	}
 }
 
 func TestFormatCompactDecorationsUsesHeadThenAlphabeticalWithOverflow(t *testing.T) {
 	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "release"}, []string{"main", "develop", "release"})
-	if got != "l->main +2" {
+	if !strings.HasPrefix(got, "l->main") || !strings.Contains(got, " + 2") {
 		t.Fatalf("expected HEAD branch to lead with overflow count, got %q", got)
 	}
 
@@ -2121,7 +2140,7 @@ func TestFormatCompactDecorationsUsesHeadThenAlphabeticalWithOverflow(t *testing
 	}
 
 	got = formatCompactDecorations([]string{"origin/release", "origin/develop"}, nil)
-	if !strings.HasPrefix(got, "o->") || !strings.Contains(got, "+1") {
+	if !strings.HasPrefix(got, "o->") || !strings.Contains(got, " + 1") {
 		t.Fatalf("expected alphabetical remote branch fallback with overflow count, got %q", got)
 	}
 }
@@ -2131,11 +2150,11 @@ func TestFormatCompactDecorationsKeepsOverflowCountForLongBranches(t *testing.T)
 		[]string{"HEAD -> feature/very-long-branch-name", "develop", "release"},
 		[]string{"feature/very-long-branch-name", "develop", "release"},
 	)
-	if !strings.Contains(got, "+2") {
+	if !strings.Contains(got, " + 2") {
 		t.Fatalf("expected overflow count to survive long branch names, got %q", got)
 	}
-	if len([]rune(got)) > 10 {
-		t.Fatalf("expected compact decorations to stay within 10 chars, got %q", got)
+	if len([]rune(got)) != graphBranchFieldWidth {
+		t.Fatalf("expected compact decorations to stay within %d chars, got %q", graphBranchFieldWidth, got)
 	}
 }
 
@@ -2235,8 +2254,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.HasPrefix(rows[0].Graph, "*") || rows[1].Commit.Hash != "" || !strings.HasPrefix(rows[2].Graph, "| *") {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
-	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 84, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "alexa..") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
+	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 88, false, 0)
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, " + 2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "alexa..") < 0 || strings.Index(line, "Merge branch 'mai...") < 0 {
 		t.Fatalf("expected graph line to include hash, branches, date, author, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
@@ -2929,6 +2948,24 @@ func TestRenderTagsEmptyStateStopsPromptAfterProvenanceLoad(t *testing.T) {
 	}
 	if !strings.Contains(got, "No local tags found.") {
 		t.Fatalf("expected empty tags state to explain no tags were found, got %q", got)
+	}
+}
+
+func TestRenderTagsSectionAddsColumnHeader(t *testing.T) {
+	m := model{
+		repoStatus: git.Status{
+			TagEntries: []git.TagEntry{
+				{Name: "v1.0.0", CommitHash: "abc1234", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
+			},
+		},
+		sectionCursor: map[graphSection]int{sectionTags: 0},
+	}
+	got := m.renderSectionContent(sectionTags, 80, 4)
+	if !strings.Contains(ansi.Strip(got), "hash") || !strings.Contains(ansi.Strip(got), "name") || !strings.Contains(ansi.Strip(got), "age") || !strings.Contains(ansi.Strip(got), "state") {
+		t.Fatalf("expected tags section to render column headers, got %q", got)
+	}
+	if !strings.Contains(got, renderContextKey("hash")) || !strings.Contains(got, renderContextKey("state")) {
+		t.Fatalf("expected tags column headers to use blue styling, got %q", got)
 	}
 }
 

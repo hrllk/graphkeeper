@@ -9,6 +9,12 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
+const (
+	tagHashColumnWidth = 24
+	tagNameColumnWidth = 8
+	tagAgeColumnWidth  = 10
+)
+
 func (m model) renderSectionContent(section graphSection, width, height int) string {
 	items := sectionTargets(m.repoStatus, section)
 	if len(items) == 0 {
@@ -23,6 +29,17 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 	}
 	cursor := m.sectionCursor[section]
 	start := 0
+	header := ""
+	if section == sectionTags {
+		header = renderTagSectionHeader(width)
+		height--
+	}
+	if height <= 0 {
+		if header != "" {
+			return fitBlockLines([]string{header}, 1)
+		}
+		return ""
+	}
 	if m.activeSection == section && height > 0 && len(items) > height {
 		start = cursor - height + 1
 		if start < 0 {
@@ -32,7 +49,10 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 			start = len(items) - height
 		}
 	}
-	var b strings.Builder
+	lines := make([]string, 0, height+1)
+	if header != "" {
+		lines = append(lines, header)
+	}
 	rendered := 0
 	for i := start; i < len(items); i++ {
 		if rendered >= height {
@@ -47,11 +67,10 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 		if label == "" {
 			continue
 		}
-		b.WriteString(fitVisibleWidth(prefix+label, width))
-		b.WriteString("\n")
+		lines = append(lines, fitVisibleWidth(prefix+label, width))
 		rendered++
 	}
-	return b.String()
+	return strings.Join(lines, "\n")
 }
 
 func renderStatusCompact(s state.Status) string {
@@ -141,9 +160,12 @@ func formatTargetItem(t state.TargetItem) string {
 	case state.TargetKindTag:
 		if t.CommitHash != "" {
 			source := tagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin)
-			return fmt.Sprintf("%-24s  %-8s  %-10s  %s",
+			return fmt.Sprintf("%-*s  %-*s  %-*s  %s",
+				tagHashColumnWidth,
 				shorten(t.CommitHash, 7),
+				tagNameColumnWidth,
 				shorten(t.Name, 8),
+				tagAgeColumnWidth,
 				compactWhenText(t.RelativeAge),
 				source,
 			)
@@ -152,6 +174,16 @@ func formatTargetItem(t state.TargetItem) string {
 	default:
 		return t.Name
 	}
+}
+
+func renderTagSectionHeader(width int) string {
+	parts := []string{
+		padRight(renderContextKey("hash"), tagHashColumnWidth),
+		padRight(renderContextKey("name"), tagNameColumnWidth),
+		padRight(renderContextKey("age"), tagAgeColumnWidth),
+		renderContextKey("state"),
+	}
+	return fitVisibleWidth(strings.Join(parts, "  "), width)
 }
 
 func tagProvenanceStateLabel(provenanceLoaded, originKnown, onOrigin bool) string {
