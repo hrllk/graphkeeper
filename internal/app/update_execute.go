@@ -71,6 +71,11 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 			return m, nil
 		}
+		if msg2.action == state.ActionDeleteRemoteTag && strings.Contains(strings.ToLower(msg2.err.Error()), "not found") {
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Remote tag not found.", "Refresh tag provenance and try again.")
+			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
+			return m, nil
+		}
 		if msg2.action == state.ActionStashPop {
 			if msg2.status.Root != "" {
 				msg2.status = m.withCachedTagEntries(msg2.status)
@@ -138,10 +143,10 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				message = "Checkout blocked by local changes."
 				detail = "Commit or stash changes first."
 			}
-		} else if isAuthError && (msg2.action == state.ActionPush || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream) {
+		} else if isAuthError && (msg2.action == state.ActionPush || msg2.action == state.ActionPushTag || msg2.action == state.ActionDeleteRemoteTag || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream) {
 			message = "Auth or permission error."
 			detail = "Check credentials or network: " + msg2.err.Error()
-		} else if msg2.action == state.ActionPush || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream {
+		} else if msg2.action == state.ActionPush || msg2.action == state.ActionPushTag || msg2.action == state.ActionDeleteRemoteTag || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream {
 			message = "Push failed."
 		} else if msg2.action == state.ActionDeleteBranch {
 			message = "Branch delete failed."
@@ -158,6 +163,9 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg2.status = m.withCachedTagEntries(msg2.status)
 	}
 	m.repoStatus = msg2.status
+	if msg2.status.TagProvenanceLoaded {
+		m.tagSyncAttempted = true
+	}
 	m.storeTagEntries(msg2.status)
 	if msg2.action == state.ActionStash {
 		syncBrowseState(&m, msg2.status)
@@ -179,12 +187,14 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		return m, nil
 	}
-	if msg2.action == state.ActionPush || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream || msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase {
+	if msg2.action == state.ActionPush || msg2.action == state.ActionPushTag || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream || msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase {
 		m.handshakeCommits = make(map[string]bool)
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		if msg2.action == state.ActionPullMerge || msg2.action == state.ActionPullRebase {
 			m.status.Message = "Pull complete."
+		} else if msg2.action == state.ActionPushTag {
+			m.status.Message = fmt.Sprintf("Tag pushed: %s.", msg2.target)
 		} else {
 			m.status.Message = fmt.Sprintf("Push complete: %s.", msg2.target)
 		}
@@ -214,6 +224,18 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.replaceTagEntries(msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.status.Message = "Tag deleted."
+		telemetry.Log("app", "execute_action", map[string]string{
+			"action": string(msg2.action),
+			"target": msg2.target,
+			"head":   msg2.status.Head,
+		})
+		return m, nil
+	}
+	if msg2.action == state.ActionDeleteRemoteTag {
+		syncBrowseState(&m, msg2.status)
+		m.replaceTagEntries(msg2.status)
+		m.status = deriveStatus(msg2.status)
+		m.status.Message = "Remote tag deleted."
 		telemetry.Log("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,

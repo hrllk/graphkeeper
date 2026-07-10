@@ -57,8 +57,8 @@ func TestFetchTagsWritesSnapshotAndMarksProvenance(t *testing.T) {
 	if !fetched.status.TagProvenanceLoaded {
 		t.Fatal("expected provenance to be loaded after fetch")
 	}
-	if fetched.status.TagSyncSummary != string(tagSyncStale) {
-		t.Fatalf("expected stale summary after fetch, got %q", fetched.status.TagSyncSummary)
+	if fetched.status.TagSyncSummary != string(tagSyncSynced) {
+		t.Fatalf("expected synced summary after fetch, got %q", fetched.status.TagSyncSummary)
 	}
 	if len(fetched.status.TagEntries) != 1 {
 		t.Fatalf("expected one tag entry after fetch, got %+v", fetched.status.TagEntries)
@@ -76,8 +76,8 @@ func TestFetchTagsWritesSnapshotAndMarksProvenance(t *testing.T) {
 	if err := json.Unmarshal(data, &snapshot); err != nil {
 		t.Fatalf("snapshot unmarshal failed: %v", err)
 	}
-	if snapshot.Summary != tagSyncStale {
-		t.Fatalf("expected stale snapshot summary, got %q", snapshot.Summary)
+	if snapshot.Summary != tagSyncSynced {
+		t.Fatalf("expected synced snapshot summary, got %q", snapshot.Summary)
 	}
 	if !snapshot.OriginSeen["v1.0.0"] {
 		t.Fatalf("expected snapshot to record remote tag presence, got %+v", snapshot.OriginSeen)

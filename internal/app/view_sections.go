@@ -140,15 +140,10 @@ func formatTargetItem(t state.TargetItem) string {
 		return label
 	case state.TargetKindTag:
 		if t.CommitHash != "" {
-			source := muted.Render("(unknown)")
-			if t.OriginKnown && t.OnOrigin {
-				source = remoteColor.Render("(origin)")
-			} else if t.OriginKnown {
-				source = warn.Render("(no-up)")
-			}
-			return fmt.Sprintf("%-24s  %-28s  %-10s  %s",
-				t.Name,
-				compactTitleText(t.Subject),
+			source := tagOriginStateLabel(t.OriginKnown, t.OnOrigin)
+			return fmt.Sprintf("%-24s  %-8s  %-10s  %s",
+				shorten(t.CommitHash, 7),
+				shorten(t.Name, 8),
 				compactWhenText(t.RelativeAge),
 				source,
 			)
@@ -157,6 +152,13 @@ func formatTargetItem(t state.TargetItem) string {
 	default:
 		return t.Name
 	}
+}
+
+func tagOriginStateLabel(originKnown, onOrigin bool) string {
+	if originKnown && onOrigin {
+		return remoteColor.Render("(origin)")
+	}
+	return muted.Render("(unknown)")
 }
 
 func formatSectionTargetItem(t state.TargetItem, width int) string {
@@ -184,21 +186,13 @@ func formatSectionTargetItem(t state.TargetItem, width int) string {
 			return fitVisibleWidth(tagColor.Render(t.Name), width)
 		}
 		parts := []string{
-			tagColor.Render(shorten(t.Name, max(width-18, 4))),
-		}
-		if t.Subject != "" {
-			parts = append(parts, compactTitleText(t.Subject))
+			tagColor.Render(shorten(t.CommitHash, 7)),
+			shorten(t.Name, 8),
 		}
 		if t.RelativeAge != "" {
 			parts = append(parts, compactWhenText(t.RelativeAge))
 		}
-		source := muted.Render("(unknown)")
-		if t.OriginKnown && t.OnOrigin {
-			source = remoteColor.Render("(origin)")
-		} else if t.OriginKnown {
-			source = warn.Render("(no-up)")
-		}
-		parts = append(parts, source)
+		parts = append(parts, tagOriginStateLabel(t.OriginKnown, t.OnOrigin))
 		return fitVisibleWidth(strings.Join(parts, "  "), width)
 	default:
 		return fitVisibleWidth(t.Name, width)

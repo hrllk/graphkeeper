@@ -43,6 +43,10 @@ func (r *Repo) DeleteTag(ctx context.Context, name string) (string, error) {
 	return r.Run("tag", "-d", name)
 }
 
+func (r *Repo) DeleteRemoteTag(ctx context.Context, remote, name string) (string, error) {
+	return r.Run("push", remote, "--delete", name)
+}
+
 func (r *Repo) DeleteRemoteBranch(ctx context.Context, remote, branch string) (string, error) {
 	return r.Run("push", remote, "--delete", branch)
 }

@@ -507,6 +507,35 @@ func TestExecutePushVariants(t *testing.T) {
 	})
 }
 
+func TestExecutePushTagUpdatesRemoteSnapshot(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "tag", "v1.0.0", fixture.initialHash)
+
+	got, ok := cmdResult(t, executePushTag(fixture.repo, "v1.0.0", 40)).(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", cmdResult(t, executePushTag(fixture.repo, "v1.0.0", 40)))
+	}
+	if got.action != state.ActionPushTag {
+		t.Fatalf("action = %s, want push-tag", got.action)
+	}
+	if got.err != nil {
+		t.Fatalf("push tag err = %v", got.err)
+	}
+	if !got.status.TagProvenanceLoaded {
+		t.Fatalf("expected push-tag result to record provenance, got %+v", got.status)
+	}
+	snapshot, err := loadTagSnapshot(fixture.root)
+	if err != nil {
+		t.Fatalf("loadTagSnapshot failed: %v", err)
+	}
+	if snapshot.Summary != tagSyncSynced {
+		t.Fatalf("expected synced snapshot summary, got %q", snapshot.Summary)
+	}
+	if !snapshot.OriginSeen["v1.0.0"] {
+		t.Fatalf("expected pushed tag to be recorded in snapshot, got %+v", snapshot.OriginSeen)
+	}
+}
+
 func TestExecuteDeleteBranchVariants(t *testing.T) {
 	t.Run("local branch delete", func(t *testing.T) {
 		fixture := newCommandRepo(t)
@@ -726,6 +755,49 @@ func TestExecuteResetModes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExecuteDeleteRemoteTagVariants(t *testing.T) {
+	t.Run("remote tag delete", func(t *testing.T) {
+		fixture := newCommandRepo(t)
+		if err := fixture.repo.CreateTag(context.Background(), "v1.0.0", fixture.initialHash); err != nil {
+			t.Fatalf("CreateTag failed: %v", err)
+		}
+		runGit(t, fixture.root, "push", "origin", "v1.0.0")
+
+		got, ok := cmdResult(t, executeDeleteRemoteTag(fixture.repo, "v1.0.0", 40)).(executedMsg)
+		if !ok {
+			t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeDeleteRemoteTag(fixture.repo, "v1.0.0", 40)))
+		}
+		if got.action != state.ActionDeleteRemoteTag {
+			t.Fatalf("action = %s, want delete-remote-tag", got.action)
+		}
+		if got.err != nil {
+			t.Fatalf("remote tag delete err = %v", got.err)
+		}
+		if got.target != "v1.0.0" {
+			t.Fatalf("expected delete target v1.0.0, got %q", got.target)
+		}
+		entries := got.status.TagEntries
+		if len(entries) != 1 || entries[0].Name != "v1.0.0" || entries[0].OnOrigin {
+			t.Fatalf("expected local tag to remain and lose origin provenance, got %+v", entries)
+		}
+		runGitExpectError(t, fixture.remote, "show-ref", "--verify", "refs/tags/v1.0.0")
+	})
+
+	t.Run("remote tag delete missing", func(t *testing.T) {
+		fixture := newCommandRepo(t)
+		got, ok := cmdResult(t, executeDeleteRemoteTag(fixture.repo, "v9.9.9", 40)).(executedMsg)
+		if !ok {
+			t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeDeleteRemoteTag(fixture.repo, "v9.9.9", 40)))
+		}
+		if got.action != state.ActionDeleteRemoteTag {
+			t.Fatalf("action = %s, want delete-remote-tag", got.action)
+		}
+		if got.err == nil {
+			t.Fatal("expected missing remote tag delete to fail")
+		}
+	})
 }
 
 func TestCreateBranch(t *testing.T) {

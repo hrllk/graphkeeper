@@ -29,6 +29,7 @@ const (
 	ActionCreateBranch     Action = "create-branch"
 	ActionDeleteBranch     Action = "delete-branch"
 	ActionDeleteTag        Action = "delete-tag"
+	ActionDeleteRemoteTag  Action = "delete-remote-tag"
 	ActionStash            Action = "stash"
 	ActionStashPop         Action = "stash-pop"
 	ActionCleanWorkingTree Action = "clean-working-tree"

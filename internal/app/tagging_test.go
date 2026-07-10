@@ -160,6 +160,15 @@ func TestCreateTagFlowRefreshesAndFocusesSameCommit(t *testing.T) {
 	if created.Err != nil {
 		t.Fatalf("tag creation command failed: %v", created.Err)
 	}
+	if len(created.Status.TagEntries) != 1 {
+		t.Fatalf("expected one created tag entry, got %+v", created.Status.TagEntries)
+	}
+	if created.Status.TagEntries[0].OriginKnown {
+		t.Fatalf("expected newly created tag to stay local-only, got %+v", created.Status.TagEntries[0])
+	}
+	if created.Status.TagProvenanceLoaded {
+		t.Fatalf("expected provenance to remain unknown before sync, got %+v", created.Status)
+	}
 
 	nextModel, nextCmd := got.Update(created)
 	next := nextModel.(model)

@@ -19,6 +19,9 @@
 4. fetch 결과와 remote tags 정보를 합쳐 provenance snapshot 을 쓴다.
 5. 다음 startup 때 그 파일을 읽어서 `origin` 표시를 복원한다.
 6. `t` 는 local tag 생성, `P` 는 tag push, `F` 는 provenance sync 로 역할을 분리한다.
+7. `t` 직후 provenance 는 `unknown` 이다.
+8. `P` 성공 후 provenance 는 `synced` 이다.
+9. `d` 는 local delete, `D` 는 remote delete 로 분리한다.
 
 즉, raw `git fetch --tags` 를 가로채는 게 아니라,
 `graphkeeper` 가 fetch 를 “대행”할 때만 provenance 를 갱신한다.
@@ -39,12 +42,12 @@
 ## 사용자 목표
 
 1. 최초 진입 시 local tag 는 바로 보인다.
-2. origin provenance 는 없으면 unknown 으로 시작한다.
+2. origin provenance 는 없으면 `unknown` 으로 시작한다.
 3. `F` 또는 fetch hotkey 로 provenance 를 갱신한다.
 4. 갱신 결과는 file 에 남아서 restart 후에도 복원된다.
-5. raw git 명령을 직접 써도 앱은 stale 상태를 명확히 다룬다.
+5. raw git 명령을 직접 써도 앱은 synced / unknown 상태를 명확히 다룬다.
 6. local tag 가 아예 없을 때만 empty state 를 보여준다.
-7. summary state 는 `never synced` 와 `stale` 두 개만 쓴다.
+7. summary state 는 `never synced` 와 `synced` 두 개만 쓴다.
 8. `F` 는 tag 충돌을 자동 overwrite 하지 않고, 비파괴적으로 실패한다.
 
 ## 범위
@@ -101,7 +104,7 @@ type TagEntry struct {
 ```
 
 `OriginKnown` 이 핵심이다.
-이 값이 `false` 이면 `OnOrigin=false` 여도 `(no-up)` 로 표시하면 안 된다.
+이 값이 `false` 이면 `OnOrigin=false` 여도 `(unknown)` 으로 남아야 한다.
 그 상태는 아직 모른다는 뜻이어야 한다.
 
 ### 2. git layer 에는 두 개의 조회 경로를 둔다
@@ -194,7 +197,7 @@ type TagSyncSummary string
 
 const (
 	TagSyncNeverSynced TagSyncSummary = "never_synced"
-	TagSyncStale       TagSyncSummary = "stale"
+	TagSyncSynced      TagSyncSummary = "synced"
 )
 
 type TagSnapshot struct {
@@ -285,7 +288,7 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 			status.Tags = append(status.Tags, entry.Name)
 		}
 
-		snapshot := buildTagSnapshot(tags, remoteTags, TagSyncStale)
+		snapshot := buildTagSnapshot(tags, remoteTags, TagSyncSynced)
 		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
 			return fetchedMsg{status: status, err: err}
 		}
@@ -299,7 +302,7 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 ### 5-1. tag push 는 `P` 로 분리한다
 
 `P` 는 Tags 섹션에서 선택된 tag 를 origin 에 push 하는 명시적 액션이다.
-push 가 성공하면 provenance snapshot 을 stale 로 다시 계산하거나, 곧바로 `ls-remote --tags origin` 을 다시 돌려 갱신한다.
+push 가 성공하면 provenance snapshot 을 synced 로 다시 계산하거나, 곧바로 `ls-remote --tags origin` 을 다시 돌려 갱신한다.
 
 ### 5-2. `F` 는 tag 충돌을 자동 overwrite 하지 않는다
 
@@ -325,7 +328,7 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 			return fetchedMsg{status: status, err: err}
 		}
 		// overwrite 하지 않고, 최신 remote snapshot 을 기준으로만 다시 계산한다.
-		snapshot := buildTagSnapshot(tags, remoteTags, TagSyncStale)
+		snapshot := buildTagSnapshot(tags, remoteTags, TagSyncSynced)
 		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
 			return fetchedMsg{status: status, err: err}
 		}
@@ -341,6 +344,8 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 t : local tag 생성
 P : selected tag push
 F : tag provenance sync / fetch
+d : local tag delete
+D : remote tag delete
 ```
 
 ### 6. snapshot 적용은 local tag 를 지우지 않는다
@@ -351,8 +356,9 @@ snapshot 이 없거나 손상돼도 local tag 목록은 유지한다.
 func applyTagSnapshot(status git.Status, snapshot TagSnapshot) git.Status {
 	for i := range status.TagEntries {
 		entry := &status.TagEntries[i]
-		entry.OriginKnown = true
-		entry.OnOrigin = snapshot.OriginSeen[entry.Name]
+		onOrigin, ok := snapshot.OriginSeen[entry.Name]
+		entry.OriginKnown = ok
+		entry.OnOrigin = ok && onOrigin
 	}
 	return status
 }
@@ -392,7 +398,7 @@ Fetch 를 통해 Sync를 진행해주세요.
 
 persisted summary 값과 user-facing label 을 분리한다.
 
-`TagSyncSummary` 의 persisted token 은 위의 `never_synced` / `stale` 를 그대로 쓰고,
+`TagSyncSummary` 의 persisted token 은 위의 `never_synced` / `synced` 를 그대로 쓰고,
 UI 는 아래처럼 표시만 바꾼다.
 
 ```go
@@ -400,8 +406,8 @@ func renderTagSyncSummary(summary TagSyncSummary) string {
 	switch summary {
 	case TagSyncNeverSynced:
 		return "never synced"
-	case TagSyncStale:
-		return "stale"
+	case TagSyncSynced:
+		return "synced"
 	default:
 		return "never synced"
 	}
@@ -411,7 +417,7 @@ func renderTagSyncSummary(summary TagSyncSummary) string {
 표시 규칙:
 
 - `never synced` -> `Fetch 를 통해 Sync를 진행해주세요`
-- `stale` -> `Tag sync is stale. Press F to refresh.`
+- `synced` -> `Tag provenance is synced. Press F to refresh.`
 
 summary 는 마지막 동기화 상태를 말하고,
 provenance 는 각 tag 의 origin 여부를 말한다.
@@ -436,7 +442,7 @@ func formatTargetItem(t state.TargetItem) string {
 		case t.OnOrigin:
 			return base + "  " + remoteColor.Render("(origin)")
 		default:
-			return base + "  " + warn.Render("(no-up)")
+			return base + "  " + warn.Render("(unknown)")
 		}
 	default:
 		return t.Name
@@ -446,6 +452,7 @@ func formatTargetItem(t state.TargetItem) string {
 
 `state.TargetItem` 에도 `OriginKnown bool` 을 추가해야 한다.
 기존 `OnOrigin bool` 만으로는 unknown 과 missing 을 구분할 수 없다.
+`d` 는 local ref 삭제이므로 row 자체가 사라지고, `D` 는 remote tag 삭제이므로 local tag 는 남아 `unknown` 으로 회귀한다.
 
 ## BEFORE
 
@@ -534,7 +541,7 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 			return fetchedMsg{status: status, err: err}
 		}
 
-		snapshot := buildTagSnapshot(tags, remoteTags, TagSyncStale)
+		snapshot := buildTagSnapshot(tags, remoteTags, TagSyncSynced)
 		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
 			return fetchedMsg{status: status, err: err}
 		}
@@ -594,7 +601,7 @@ func TestTagFetchHotkeyShowsSpecificToast(t *testing.T)
 
 - snapshot 이 없어도 local tag 가 보이는지
 - snapshot 이 있으면 origin badge 만 복원되는지
-- `OriginKnown=false` 인 경우 `(no-up)` 를 절대 쓰지 않는지
+- `OriginKnown=false` 인 경우 `(unknown)` 을 절대 쓰지 않는지
 - `F` 후 snapshot 이 실제로 파일에 써지는지
 
 ## Verification
@@ -617,8 +624,9 @@ go test ./...
 - snapshot 이 없으면 empty state 에서 fetch 를 유도한다.
 - `P` 는 tag push 전용 키로 분리한다.
 - `F` 는 충돌을 덮어쓰지 않고 비파괴적으로 실패한다.
+- `d` 와 `D` 는 local/remote delete 를 분리한다.
 
-사용자 노출 summary 는 `never synced` 와 `stale` 두 개만 쓴다.
+사용자 노출 summary 는 `never synced` 와 `synced` 두 개만 쓴다.
 
 이 방식이면 raw `git fetch --tags` 를 커스터마이즈하지 않아도 된다.
 앱이 자기 책임 범위 안에서 provenance 를 관리하면 된다.

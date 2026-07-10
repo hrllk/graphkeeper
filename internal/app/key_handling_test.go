@@ -890,6 +890,48 @@ func TestDeleteTagShortcutOpensConfirm(t *testing.T) {
 	}
 }
 
+func TestDeleteRemoteTagShortcutOpensConfirm(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "tag", "v1.0.0", fixture.initialHash)
+	runGit(t, fixture.root, "push", "origin", "v1.0.0")
+
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:             fixture.root,
+		TagEntries:       []git.TagEntry{{Name: "v1.0.0", CommitHash: fixture.initialHash, Subject: "initial", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true}},
+		TagEntriesLoaded: true,
+		TagSyncSummary:   string(tagSyncSynced),
+	})
+	m.activeSection = sectionTags
+	m.sectionCursor[sectionTags] = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected remote tag delete shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if got.status.Action != state.ActionDeleteRemoteTag {
+		t.Fatalf("expected delete-remote-tag action, got %s", got.status.Action)
+	}
+	if got.status.Title != "Delete remote tag?" {
+		t.Fatalf("expected remote tag delete confirm title, got %q", got.status.Title)
+	}
+	if got.status.Selected != "v1.0.0" {
+		t.Fatalf("expected remote tag target to be stored, got %q", got.status.Selected)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected remote tag delete confirm acceptance to execute")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Deleting remote tag..." {
+		t.Fatalf("expected remote tag delete loading state, got %+v", got.status)
+	}
+}
+
 func TestDeleteBranchShortcutOpensConfirmFromGraph(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{
@@ -1473,6 +1515,56 @@ func TestGraphCheckoutShortcutOpensTargetPickWhenMultipleBranches(t *testing.T) 
 		if strings.HasPrefix(target.Ref, "origin/") {
 			t.Fatalf("expected origin refs to be hidden, got %+v", target)
 		}
+	}
+}
+
+func TestTagSectionPushHotkeyPushesSelectedTag(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "tag", "v1.0.0", fixture.initialHash)
+
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:             fixture.root,
+		TagEntries:       []git.TagEntry{{Name: "v1.0.0", CommitHash: fixture.initialHash, Subject: "initial", RelativeAge: "1 day ago"}},
+		TagEntriesLoaded: true,
+		Tags:             []string{"v1.0.0"},
+	})
+	m.activeSection = sectionTags
+	m.sectionCursor[sectionTags] = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	got := gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected tag push command")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Pushing tag..." {
+		t.Fatalf("expected tag push loading state, got %+v", got.status)
+	}
+
+	msg := cmd()
+	executed, ok := msg.(executedMsg)
+	if !ok {
+		t.Fatalf("expected executedMsg, got %T", msg)
+	}
+	if executed.action != state.ActionPushTag {
+		t.Fatalf("expected push-tag action, got %s", executed.action)
+	}
+	if executed.target != "v1.0.0" {
+		t.Fatalf("expected tag target v1.0.0, got %q", executed.target)
+	}
+	if executed.err != nil {
+		t.Fatalf("expected push-tag to succeed, got %v", executed.err)
+	}
+
+	nextModel, nextCmd := got.Update(executed)
+	next := nextModel.(model)
+	if nextCmd != nil {
+		t.Fatalf("expected no follow-up command, got %v", nextCmd)
+	}
+	if next.status.Message != "Tag pushed: v1.0.0." {
+		t.Fatalf("expected tag push status message, got %+v", next.status)
+	}
+	if !next.tagSyncAttempted {
+		t.Fatal("expected tag provenance sync to be marked after push")
 	}
 }
 

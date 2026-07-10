@@ -18,24 +18,9 @@ func loadRepoState(repo *git.Repo, limit int) tea.Cmd {
 		if err != nil {
 			return loadedMsg{status: status, err: err}
 		}
-		tags, tagErr := repo.LocalTagEntries(context.Background())
-		if tagErr == nil {
-			status.TagEntries = tags
-			status.TagEntriesLoaded = true
-			status.Tags = make([]string, 0, len(tags))
-			for _, entry := range tags {
-				status.Tags = append(status.Tags, entry.Name)
-			}
-		}
-		snapshot, snapErr := loadTagSnapshot(status.Root)
-		if snapErr == nil {
-			status = applyTagSnapshot(status, snapshot)
-			status.TagProvenanceLoaded = true
-		} else if len(status.TagEntries) > 0 {
-			status = markTagOriginUnknown(status)
-		} else {
-			status.TagProvenanceLoaded = false
-			status.TagSyncSummary = string(tagSyncNeverSynced)
+		status, err = loadLocalTagStatus(repo, status)
+		if err != nil {
+			return loadedMsg{status: status, err: err}
 		}
 		return loadedMsg{status: status, err: err}
 	}
@@ -116,13 +101,43 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 		for _, entry := range tags {
 			status.Tags = append(status.Tags, entry.Name)
 		}
-		snapshot := buildTagSnapshot(tags, remoteTags, tagSyncStale)
+		snapshot := buildTagSnapshot(tags, remoteTags, tagSyncSynced)
 		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
 			return fetchedMsg{status: status, err: err}
 		}
 		status = applyTagSnapshot(status, snapshot)
 		status.TagProvenanceLoaded = true
 		return fetchedMsg{status: status, err: err}
+	}
+}
+
+func executePushTag(repo *git.Repo, tag string, limit int) tea.Cmd {
+	return func() tea.Msg {
+		if tag == "" {
+			return executedMsg{action: state.ActionPushTag, err: fmt.Errorf("tag is empty")}
+		}
+		_, err := repo.PushTag(context.Background(), tag)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionPushTag, target: tag, err: statusErr}
+		}
+		status, statusErr = loadLocalTagStatus(repo, status)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: statusErr}
+		}
+		if err != nil {
+			return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: err}
+		}
+		remoteTags, remoteErr := repo.OriginTagSet(context.Background())
+		if remoteErr != nil {
+			return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: remoteErr}
+		}
+		snapshot := buildTagSnapshot(status.TagEntries, remoteTags, tagSyncSynced)
+		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
+			return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: err}
+		}
+		status = applyTagSnapshot(status, snapshot)
+		return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: err}
 	}
 }
 
@@ -134,7 +149,7 @@ func attachTagEntries(repo *git.Repo, status git.Status) git.Status {
 	status.TagEntries = tagEntries
 	status.TagEntriesLoaded = true
 	status.TagProvenanceLoaded = true
-	status.TagSyncSummary = string(tagSyncStale)
+	status.TagSyncSummary = string(tagSyncSynced)
 	status.Tags = make([]string, 0, len(tagEntries))
 	for _, entry := range tagEntries {
 		status.Tags = append(status.Tags, entry.Name)
@@ -315,8 +330,38 @@ func executeDeleteTag(repo *git.Repo, target string, limit int) tea.Cmd {
 		if statusErr != nil {
 			return executedMsg{action: state.ActionDeleteTag, target: target, err: statusErr}
 		}
-		status = attachTagEntries(repo, status)
+		status, statusErr = loadLocalTagStatus(repo, status)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionDeleteTag, target: target, status: status, err: statusErr}
+		}
 		return executedMsg{action: state.ActionDeleteTag, target: target, status: status, err: err}
+	}
+}
+
+func executeDeleteRemoteTag(repo *git.Repo, target string, limit int) tea.Cmd {
+	return func() tea.Msg {
+		if target == "" {
+			return executedMsg{action: state.ActionDeleteRemoteTag, err: fmt.Errorf("target is empty")}
+		}
+		_, err := repo.DeleteRemoteTag(context.Background(), "origin", target)
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, err: statusErr}
+		}
+		status, statusErr = loadLocalTagStatus(repo, status)
+		if statusErr != nil {
+			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: statusErr}
+		}
+		remoteTags, remoteErr := repo.OriginTagSet(context.Background())
+		if remoteErr != nil {
+			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: remoteErr}
+		}
+		snapshot := buildTagSnapshot(status.TagEntries, remoteTags, tagSyncSynced)
+		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
+			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: err}
+		}
+		status = applyTagSnapshot(status, snapshot)
+		return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: err}
 	}
 }
 

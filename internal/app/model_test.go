@@ -2096,14 +2096,14 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindLocal, Name: "main", Ref: "main", Current: true, WorktreeDirty: true}); !strings.Contains(got, "(dirty)") {
 		t.Fatalf("expected current dirty local target to show dirty badge, got %q", got)
 	}
-	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}); !strings.Contains(got, "(unknown)") || strings.Contains(got, "abc1234") {
-		t.Fatalf("expected tags without provenance to use unknown and omit hash, got %q", got)
+	if got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}, 80); !strings.Contains(got, "abc1234") || !strings.Contains(got, "v1.0.0") || !strings.Contains(got, "2d") || !strings.Contains(got, "(unknown)") {
+		t.Fatalf("expected tag rows to use hash, name, age and unknown state, got %q", got)
 	}
-	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.1.0", Ref: "v1.1.0", CommitHash: "def5678", Subject: "second release", RelativeAge: "1 day ago", OriginKnown: true, OnOrigin: true}); !strings.Contains(got, "(origin)") || strings.Contains(got, "def5678") {
-		t.Fatalf("expected origin-synced tags to show origin marker and omit hash, got %q", got)
+	if got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.1.0", Ref: "v1.1.0", CommitHash: "def5678", Subject: "second release", RelativeAge: "1 day ago", OriginKnown: true, OnOrigin: true}, 80); !strings.Contains(got, "def5678") || !strings.Contains(got, "v1.1.0") || !strings.Contains(got, "(origin)") {
+		t.Fatalf("expected origin-synced tag rows to show hash, name and origin marker, got %q", got)
 	}
-	if got := formatTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.2.0", Ref: "v1.2.0", CommitHash: "fedcba9", Subject: "third release", RelativeAge: "just now", OriginKnown: true}); !strings.Contains(got, "(no-up)") {
-		t.Fatalf("expected known but missing remote tags to show no-up, got %q", got)
+	if got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.2.0", Ref: "v1.2.0", CommitHash: "fedcba9", Subject: "third release", RelativeAge: "just now", OriginKnown: true}, 80); !strings.Contains(got, "fedcba9") || !strings.Contains(got, "v1.2.0") || !strings.Contains(got, "(unknown)") {
+		t.Fatalf("expected known but missing remote tags to show name and unknown state, got %q", got)
 	}
 }
 
@@ -2609,8 +2609,8 @@ func TestRenderRightRailRendersStackedCards(t *testing.T) {
 	if !strings.Contains(ansi.Strip(got), "super-long-remote") {
 		t.Fatalf("expected remote section to remain readable, got %q", got)
 	}
-	if !strings.Contains(ansi.Strip(got), "v1.0.0") {
-		t.Fatalf("expected tag section to show the tag name, got %q", got)
+	if !strings.Contains(ansi.Strip(got), "abc1234") {
+		t.Fatalf("expected tag section to show the commit hash, got %q", got)
 	}
 }
 
@@ -2618,7 +2618,7 @@ func TestRenderTagsEmptyStateStopsPromptAfterProvenanceLoad(t *testing.T) {
 	m := model{
 		repoStatus: git.Status{
 			TagProvenanceLoaded: true,
-			TagSyncSummary:      string(tagSyncStale),
+			TagSyncSummary:      string(tagSyncSynced),
 		},
 		tagSyncAttempted: true,
 	}

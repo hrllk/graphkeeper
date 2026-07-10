@@ -14,7 +14,7 @@ type tagSyncSummary string
 
 const (
 	tagSyncNeverSynced tagSyncSummary = "never_synced"
-	tagSyncStale       tagSyncSummary = "stale"
+	tagSyncSynced      tagSyncSummary = "synced"
 )
 
 type tagSnapshot struct {
@@ -90,8 +90,8 @@ func markTagOriginUnknown(status git.Status) git.Status {
 
 func tagSyncSummaryLabel(summary string) string {
 	switch tagSyncSummary(summary) {
-	case tagSyncStale:
-		return "stale"
+	case tagSyncSynced:
+		return "synced"
 	case tagSyncNeverSynced:
 		fallthrough
 	default:
@@ -101,7 +101,7 @@ func tagSyncSummaryLabel(summary string) string {
 
 func tagSyncSummaryHelp(summary string) string {
 	switch tagSyncSummary(summary) {
-	case tagSyncStale:
+	case tagSyncSynced:
 		return "Press F to refresh tag provenance."
 	case tagSyncNeverSynced:
 		fallthrough
@@ -110,10 +110,34 @@ func tagSyncSummaryHelp(summary string) string {
 	}
 }
 
+func loadLocalTagStatus(repo *git.Repo, status git.Status) (git.Status, error) {
+	tags, err := repo.LocalTagEntries(context.Background())
+	if err != nil {
+		return status, err
+	}
+	status.TagEntries = tags
+	status.TagEntriesLoaded = true
+	status.Tags = make([]string, 0, len(tags))
+	for _, entry := range tags {
+		status.Tags = append(status.Tags, entry.Name)
+	}
+	snapshot, snapErr := loadTagSnapshot(status.Root)
+	if snapErr == nil {
+		status = applyTagSnapshot(status, snapshot)
+		return status, nil
+	}
+	if len(tags) > 0 {
+		return markTagOriginUnknown(status), nil
+	}
+	status.TagProvenanceLoaded = false
+	status.TagSyncSummary = string(tagSyncNeverSynced)
+	return status, nil
+}
+
 func tagSnapshotFromRepo(repo *git.Repo, tags []git.TagEntry) (tagSnapshot, error) {
 	remoteTags, err := repo.OriginTagSet(context.Background())
 	if err != nil {
 		return tagSnapshot{}, err
 	}
-	return buildTagSnapshot(tags, remoteTags, tagSyncStale), nil
+	return buildTagSnapshot(tags, remoteTags, tagSyncSynced), nil
 }

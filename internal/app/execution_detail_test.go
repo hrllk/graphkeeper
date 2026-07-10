@@ -23,6 +23,7 @@ func TestExecutionDetail(t *testing.T) {
 		{name: "delete local", action: state.ActionDeleteBranch, target: "feature", want: "Branch deleted: feature."},
 		{name: "delete origin", action: state.ActionDeleteBranch, target: "origin/feature", want: "Origin branch deleted: origin/feature."},
 		{name: "delete tag", action: state.ActionDeleteTag, target: "v1.0.0", want: "Tag deleted: v1.0.0."},
+		{name: "delete remote tag", action: state.ActionDeleteRemoteTag, target: "v1.0.0", want: "Remote tag deleted: v1.0.0."},
 		{name: "default", action: state.ActionNone, want: "Action complete."},
 	}
 

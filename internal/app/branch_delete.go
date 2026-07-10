@@ -110,6 +110,7 @@ func deleteBranchLoadingMessage(remote bool) string {
 
 type tagDeleteSelection struct {
 	target  string
+	remote  bool
 	title   string
 	detail  string
 	blocked state.Status
@@ -141,6 +142,41 @@ func deleteTagSelection(m model) tagDeleteSelection {
 	}
 }
 
+func deleteRemoteTagSelection(m model) tagDeleteSelection {
+	item, ok := activeSectionTargetItem(m)
+	if !ok {
+		return tagDeleteSelection{
+			blocked: state.New().WithBlocked(state.BlockTargetEmpty, "No tag selected.", "Choose a tag row."),
+		}
+	}
+	if item.Kind != state.TargetKindTag {
+		return tagDeleteSelection{
+			blocked: state.New().WithBlocked(state.BlockUnknown, "Delete unavailable.", "Choose a tag row."),
+		}
+	}
+	if !item.OriginKnown || !item.OnOrigin {
+		return tagDeleteSelection{
+			blocked: state.New().WithBlocked(state.BlockUnknown, "Remote tag not confirmed.", "Sync tag provenance first."),
+		}
+	}
+	if item.Ref == "" {
+		return tagDeleteSelection{
+			blocked: state.New().WithBlocked(state.BlockTargetEmpty, "Tag target is missing.", "Refresh the tag list and try again."),
+		}
+	}
+	return tagDeleteSelection{
+		target: item.Ref,
+		remote: true,
+		title:  "Delete remote tag?",
+		detail: "Remote: origin/" + item.Ref,
+		ok:     true,
+	}
+}
+
 func deleteTagLoadingMessage() string {
 	return "Deleting tag..."
+}
+
+func deleteRemoteTagLoadingMessage() string {
+	return "Deleting remote tag..."
 }

@@ -77,7 +77,7 @@ func executeCreateTag(repo *git.Repo, name, target string, limit int) tea.Cmd {
 		}
 		status, err := repo.Status(context.Background(), limit)
 		if err == nil {
-			status = attachTagEntries(repo, status)
+			status, err = loadLocalTagStatus(repo, status)
 		}
 		return tagCreatedMsg{Name: name, Target: target, Status: status, Err: err}
 	}

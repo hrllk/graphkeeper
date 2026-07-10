@@ -51,6 +51,10 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 		target := m.status.Selected
 		m.status = loadingToast(deleteTagLoadingMessage())
 		return m, executeDeleteTag(m.repo, target, m.commitLimit)
+	case state.ActionDeleteRemoteTag:
+		target := m.status.Selected
+		m.status = loadingToast(deleteRemoteTagLoadingMessage())
+		return m, executeDeleteRemoteTag(m.repo, target, m.commitLimit)
 	case state.ActionStash:
 		m.status = loadingToast("Stashing changes...")
 		return m, executeStashAll(m.repo, m.commitLimit, "graphkeeper: local cleanup")

@@ -76,6 +76,15 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		m.status = loadingToast("Fetching tags...")
 		return true, m, fetchTagsRepoState(m.repo, m.commitLimit)
 	case "P":
+		if m.activeSection == sectionTags {
+			item, ok := activeSectionTargetItem(m)
+			if !ok || item.Ref == "" {
+				m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No tag selected.", "Choose a tag row.")
+				return true, m, nil
+			}
+			m.status = loadingToast("Pushing tag...")
+			return true, m, executePushTag(m.repo, item.Ref, m.commitLimit)
+		}
 		if m.repoStatus.Root == "" || m.repoStatus.Detached || m.repoStatus.EmptyRepo {
 			return true, m, nil
 		}
@@ -428,6 +437,19 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.status = state.New().WithConfirm(state.ActionDeleteBranch, selection.title, selection.detail)
+			m.status.Title = selection.title
+			m.status.Selected = selection.target
+			return m, nil
+		}
+		return m, nil
+	case "D":
+		if m.activeSection == sectionTags {
+			selection := deleteRemoteTagSelection(m)
+			if !selection.ok {
+				m.status = selection.blocked
+				return m, nil
+			}
+			m.status = state.New().WithConfirm(state.ActionDeleteRemoteTag, selection.title, selection.detail)
 			m.status.Title = selection.title
 			m.status.Selected = selection.target
 			return m, nil

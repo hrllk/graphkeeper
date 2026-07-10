@@ -105,14 +105,16 @@
 - Read local tags from local refs on startup so the Tag section can render immediately without waiting for remote provenance.
 - Keep remote provenance in `.git/graphkeeper/tag-provenance.json` as app-owned metadata instead of trying to extend Git refs.
 - Use `F` as the explicit refresh path for `git fetch --tags` plus `git ls-remote --tags origin`, then persist the resulting provenance snapshot.
-- Treat `never synced` and `stale` as the only user-facing sync summary states.
+- Treat `never synced` and `synced` as the only user-facing sync summary states.
 - Do not use `(no-up)` when provenance has not been loaded yet; unknown provenance must remain visually distinct from missing remote provenance.
+- Use `unknown` for new local tags until provenance is explicitly known.
 
 ## 2026-07-09: Tag push is explicit and tag fetch does not overwrite conflicts
 
 - Use `t` for local tag creation only.
 - Use `P` in the Tags section for explicit tag push.
 - Keep `F` focused on provenance sync and remote tag refresh.
+- Use `d` for local tag delete and `D` for remote tag delete.
 - If `F` hits a tag-name or tag-content conflict, fail without overwriting the existing local tag ref.
 
 ## 2026-07-09: Graph stash pop is HEAD-gated and uses a two-step overlay
