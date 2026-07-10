@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -10,9 +9,9 @@ import (
 )
 
 const (
-	tagHashColumnWidth = 24
-	tagNameColumnWidth = 8
-	tagAgeColumnWidth  = 10
+	tagHashColumnWidth = 7
+	tagNameColumnWidth = 10
+	tagAgeColumnWidth  = 3
 )
 
 func (m model) renderSectionContent(section graphSection, width, height int) string {
@@ -160,15 +159,13 @@ func formatTargetItem(t state.TargetItem) string {
 	case state.TargetKindTag:
 		if t.CommitHash != "" {
 			source := tagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin)
-			return fmt.Sprintf("%-*s  %-*s  %-*s  %s",
-				tagHashColumnWidth,
-				shorten(t.CommitHash, 7),
-				tagNameColumnWidth,
-				shorten(t.Name, 8),
-				tagAgeColumnWidth,
-				compactWhenText(t.RelativeAge),
+			parts := []string{
+				padRight(shorten(t.CommitHash, 7), tagHashColumnWidth),
+				padRight(shorten(t.Name, 8), tagNameColumnWidth),
+				padRight(compactWhenText(t.RelativeAge), tagAgeColumnWidth),
 				source,
-			)
+			}
+			return strings.Join(parts, "  ")
 		}
 		return "tag    " + t.Name
 	default:
@@ -181,7 +178,7 @@ func renderTagSectionHeader(width int) string {
 		padRight(renderContextKey("hash"), tagHashColumnWidth),
 		padRight(renderContextKey("name"), tagNameColumnWidth),
 		padRight(renderContextKey("age"), tagAgeColumnWidth),
-		renderContextKey("state"),
+		renderContextKey("status"),
 	}
 	return fitVisibleWidth(strings.Join(parts, "  "), width)
 }

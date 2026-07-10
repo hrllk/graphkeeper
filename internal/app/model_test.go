@@ -2954,6 +2954,7 @@ func TestRenderTagsEmptyStateStopsPromptAfterProvenanceLoad(t *testing.T) {
 func TestRenderTagsSectionAddsColumnHeader(t *testing.T) {
 	m := model{
 		repoStatus: git.Status{
+			TagProvenanceLoaded: true,
 			TagEntries: []git.TagEntry{
 				{Name: "v1.0.0", CommitHash: "abc1234", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
 			},
@@ -2961,10 +2962,10 @@ func TestRenderTagsSectionAddsColumnHeader(t *testing.T) {
 		sectionCursor: map[graphSection]int{sectionTags: 0},
 	}
 	got := m.renderSectionContent(sectionTags, 80, 4)
-	if !strings.Contains(ansi.Strip(got), "hash") || !strings.Contains(ansi.Strip(got), "name") || !strings.Contains(ansi.Strip(got), "age") || !strings.Contains(ansi.Strip(got), "state") {
+	if !strings.Contains(ansi.Strip(got), "hash") || !strings.Contains(ansi.Strip(got), "name") || !strings.Contains(ansi.Strip(got), "age") || !strings.Contains(ansi.Strip(got), "status") {
 		t.Fatalf("expected tags section to render column headers, got %q", got)
 	}
-	if !strings.Contains(got, renderContextKey("hash")) || !strings.Contains(got, renderContextKey("state")) {
+	if !strings.Contains(got, renderContextKey("hash")) || !strings.Contains(got, renderContextKey("status")) {
 		t.Fatalf("expected tags column headers to use blue styling, got %q", got)
 	}
 }
