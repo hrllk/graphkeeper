@@ -79,7 +79,7 @@ func (m model) renderContextInfoLines(width int) []string {
 		switch m.activeSection {
 		case sectionCurrent:
 			lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("target"), renderLocalDetailTarget(items[cursor])))
-			if upstream := strings.TrimSpace(m.repoStatus.Upstream); upstream != "" {
+			if upstream, known := branchUpstream(m.repoStatus, items[cursor].Name); known && strings.TrimSpace(upstream) != "" {
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("upstream"), upstream))
 			} else {
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("upstream"), warn.Render("(none)")))
@@ -98,10 +98,9 @@ func (m model) renderContextInfoLines(width int) []string {
 			} else {
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("last fetch"), "-"))
 			}
-			lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("sync status"), remoteSyncSummaryForStatus(m.repoStatus)))
 		case sectionTags:
 			if entry, ok := selectedTagEntry(m); ok {
-				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("title"), tagDetailTitle(entry)))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("title"), entry.Name))
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("target"), shorten(entry.CommitHash, 8)))
 			}
 		}
@@ -181,16 +180,6 @@ func renderTagList(tags []string) string {
 	return strings.Join(parts, " ")
 }
 
-func tagDetailTitle(entry git.TagEntry) string {
-	if strings.TrimSpace(entry.Message) != "" {
-		return entry.Message
-	}
-	if strings.TrimSpace(entry.Subject) != "" {
-		return entry.Subject
-	}
-	return "-"
-}
-
 func compactWhenTime(t time.Time) string {
 	if t.IsZero() {
 		return "-"
@@ -261,6 +250,9 @@ func (m model) renderDetailContent(width, height int) string {
 		if stashLines := stashSummaryLines(m.stashesForCommit(focus.Hash), width); len(stashLines) > 0 {
 			lines = append(lines, "stashes:")
 			lines = append(lines, stashLines...)
+		}
+		if len(focus.Tags) > 0 {
+			lines = append(lines, fmt.Sprintf("tags: %s", renderTagList(focus.Tags)))
 		}
 	}
 	lines = append(lines, fmt.Sprintf("active: %s", sectionName(m.activeSection)))

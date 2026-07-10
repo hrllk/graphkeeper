@@ -203,12 +203,6 @@ func (r *Repo) LocalTagEntries(ctx context.Context) ([]TagEntry, error) {
 		} else {
 			entry.Tagger = "lightweight"
 			entry.TaggedAt = time.Unix(commitUnix, 0)
-			if entry.Message == "" {
-				entry.Message = entry.Subject
-			}
-		}
-		if entry.Annotated && entry.Message == "" {
-			entry.Message = entry.Subject
 		}
 		entries = append(entries, entry)
 	}
@@ -231,8 +225,10 @@ func (r *Repo) tagMetadata(ctx context.Context, name string) (tagType, taggerNam
 	if taggerDate, err = r.git(ctx, "for-each-ref", "--format=%(taggerdate:unix)", "refs/tags/"+name); err != nil {
 		return "", "", "", "", err
 	}
-	if message, err = r.git(ctx, "for-each-ref", "--format=%(contents:subject)", "refs/tags/"+name); err != nil {
-		return "", "", "", "", err
+	if strings.TrimSpace(tagType) == "tag" {
+		if message, err = r.git(ctx, "for-each-ref", "--format=%(contents:subject)", "refs/tags/"+name); err != nil {
+			return "", "", "", "", err
+		}
 	}
 	return strings.TrimSpace(tagType), strings.TrimSpace(taggerName), strings.TrimSpace(taggerDate), strings.TrimSpace(message), nil
 }

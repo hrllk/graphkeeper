@@ -697,8 +697,8 @@ func TestRenderContextContentShowsTagTitleAndTarget(t *testing.T) {
 	}
 
 	got := ansi.Strip(m.renderContextContent(80, 18))
-	if !strings.Contains(got, "title: release title") || !strings.Contains(got, "target: abc1234") {
-		t.Fatalf("expected tag detail to show title and target only, got %q", got)
+	if !strings.Contains(got, "title: v1.0.0") || !strings.Contains(got, "target: abc1234") {
+		t.Fatalf("expected tag detail to show tag name and target only, got %q", got)
 	}
 }
 
