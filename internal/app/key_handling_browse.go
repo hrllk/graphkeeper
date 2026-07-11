@@ -266,11 +266,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if len(targets) == 1 {
-			target := targets[0].Ref
-			titleMsg := "Checkout branch?"
-			m.status = state.New().WithConfirm(state.ActionCheckout, titleMsg, "Switch to "+target+".")
-			m.status.Title = titleMsg
-			m.status.Selected = target
+			m.status = checkoutConfirmStatus(targets[0].Ref)
 			return m, nil
 		}
 		status := state.New().WithTargetPick(state.ActionCheckout, targets)
@@ -280,11 +276,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.status = status
 		return m, nil
 	case "/":
-		m.graphSearchOpen = true
-		m.graphSearchDraft = m.graphSearchQuery
-		m.graphSearchIndex = buildGraphSearchIndex(m.repoStatus)
-		m.graphSearchError = ""
-		return m, nil
+		return openGraphSearch(m), nil
 	case "n":
 		if strings.TrimSpace(m.graphSearchQuery) != "" {
 			return applyGraphSearchRepeat(m, 1), nil
@@ -419,11 +411,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activeSection != sectionGraph || m.status.Mode != state.ModeBrowse {
 			return m, nil
 		}
-		m.graphSearchOpen = true
-		m.graphSearchDraft = m.graphSearchQuery
-		m.graphSearchIndex = buildGraphSearchIndex(m.repoStatus)
-		m.graphSearchError = ""
-		return m, nil
+		return openGraphSearch(m), nil
 	case "d":
 		if m.activeSection == sectionTags {
 			selection := deleteTagSelection(m)
@@ -431,9 +419,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = selection.blocked
 				return m, nil
 			}
-			m.status = state.New().WithConfirm(state.ActionDeleteTag, selection.title, selection.detail)
-			m.status.Title = selection.title
-			m.status.Selected = selection.target
+			m.status = deleteConfirmStatus(state.ActionDeleteTag, selection.title, selection.detail, selection.target)
 			return m, nil
 		}
 		if m.activeSection == sectionGraph || m.activeSection == sectionCurrent || m.activeSection == sectionRemote {
@@ -442,9 +428,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = selection.blocked
 				return m, nil
 			}
-			m.status = state.New().WithConfirm(state.ActionDeleteBranch, selection.title, selection.detail)
-			m.status.Title = selection.title
-			m.status.Selected = selection.target
+			m.status = deleteConfirmStatus(state.ActionDeleteBranch, selection.title, selection.detail, selection.target)
 			return m, nil
 		}
 		return m, nil
@@ -455,9 +439,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = selection.blocked
 				return m, nil
 			}
-			m.status = state.New().WithConfirm(state.ActionDeleteRemoteTag, selection.title, selection.detail)
-			m.status.Title = selection.title
-			m.status.Selected = selection.target
+			m.status = deleteConfirmStatus(state.ActionDeleteRemoteTag, selection.title, selection.detail, selection.target)
 			return m, nil
 		}
 		return m, nil

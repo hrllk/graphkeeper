@@ -2754,6 +2754,31 @@ func TestRenderConfirmPopupCentersHotkeys(t *testing.T) {
 	}
 }
 
+func TestRenderConfirmPopupCentersPushYesNoFooter(t *testing.T) {
+	m := model{
+		status: state.New().WithConfirm(state.ActionSetUpstream, "Push and track remote?", "Set upstream to origin/tmp2?"),
+	}
+	got := ansi.Strip(renderConfirmPopup(m, 60))
+	lines := strings.Split(got, "\n")
+	const want = "y: yes  •  n: no"
+	found := false
+	for _, line := range lines {
+		if !strings.Contains(line, want) {
+			continue
+		}
+		found = true
+		if idx := strings.Index(line, want); idx <= 1 {
+			t.Fatalf("expected push footer to be centered, got %q", line)
+		}
+		if trailing := len(line) - strings.Index(line, want) - len(want); trailing <= 1 {
+			t.Fatalf("expected push footer to leave trailing padding as well, got %q", line)
+		}
+	}
+	if !found {
+		t.Fatalf("expected push footer line, got %q", got)
+	}
+}
+
 func TestRenderStashMessagePopupShowsInputAndHelp(t *testing.T) {
 	m := model{
 		stashMessageDraft: "wip: local cleanup",
@@ -2767,6 +2792,26 @@ func TestRenderStashMessagePopupShowsInputAndHelp(t *testing.T) {
 	}
 	if !strings.Contains(got, "enter: stash  •  esc: cancel") {
 		t.Fatalf("expected stash message help, got %q", got)
+	}
+}
+
+func TestRenderTagPopupUsesSingleTitleStrip(t *testing.T) {
+	forceTrueColorProfile(t)
+	got := ansi.Strip(renderTagPopup(model{
+		tagPopupTarget: "abc1234",
+		tagPopupDraft:  "v1.2.3",
+	}, 72, 24))
+	if !strings.Contains(got, "Create tag") {
+		t.Fatalf("expected tag popup title, got %q", got)
+	}
+	if strings.Contains(got, "Tag commit") {
+		t.Fatalf("expected tag popup to avoid nested body title, got %q", got)
+	}
+	if !strings.Contains(got, "target: abc1234") || !strings.Contains(got, "name: v1.2.3") {
+		t.Fatalf("expected tag popup fields, got %q", got)
+	}
+	if !strings.Contains(got, "enter: create") || !strings.Contains(got, "esc: cancel") {
+		t.Fatalf("expected tag popup help, got %q", got)
 	}
 }
 

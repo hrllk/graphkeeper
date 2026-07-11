@@ -1,5 +1,18 @@
 # Decisions
 
+## 2026-07-11: Shell overlay precedence and shared status labels are centralized
+
+- Keep the shell overlay order in one helper so confirm/review/reset, popups, hidden hotkeys, search, loading, and blocked states stay in a single readable stack.
+- Use one shared tag provenance label renderer for both section rows and detail rows so the local/origin/unknown mapping cannot drift.
+- Keep browse key handling thin by routing repeated popup-open and confirm-status setup through small helpers instead of duplicating the same state writes in multiple cases.
+
+## 2026-07-11: Overlay families share centered titles and tag popup keeps a single title strip
+
+- Keep overlay popups grouped as `toast`, `confirm`, and `inspect` so new surfaces fit an existing family instead of inventing a one-off frame.
+- Keep popup titles centered, footer shortcut hints centered, and the body block centered on the popup axis.
+- Keep dense list bodies readable, but do not let them drift off the popup center line.
+- Render tag creation with the popup title strip only; do not repeat a nested title inside the body.
+
 ## 2026-07-10: Section lists and target pickers reuse Graph-style selection highlight
 
 - Render active Local/Remote/Tags rows and target-pick popup rows through a shared helper instead of a leading `>` arrow.

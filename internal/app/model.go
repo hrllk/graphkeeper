@@ -8,13 +8,42 @@ import (
 )
 
 type model struct {
-	repo                 *git.Repo
-	status               state.Status
-	repoStatus           git.Status
-	tagEntries           []git.TagEntry
-	tagSyncAttempted     bool
-	stashEntries         []git.StashEntry
-	stashByBase          map[string][]git.StashEntry
+	repo       *git.Repo
+	status     state.Status
+	repoStatus git.Status
+
+	// Repository-derived caches and snapshots.
+	tagEntries        []git.TagEntry
+	tagSyncAttempted  bool
+	stashEntries      []git.StashEntry
+	stashByBase       map[string][]git.StashEntry
+	handshakeCommits  map[string]bool
+	pullIsFastForward bool
+
+	// Section navigation and graph focus.
+	activeSection   graphSection
+	sectionCursor   map[graphSection]int
+	graphLaneCursor int
+	graphScroll     int
+	awaitingGoTop   bool
+
+	// Graph search state.
+	graphSearchOpen   bool
+	graphSearchDraft  string
+	graphSearchQuery  string
+	graphSearchIndex  []graphSearchEntry
+	graphSearchCursor int
+	graphSearchError  string
+
+	// Modal and popup state.
+	branchOpen           bool
+	branchDraft          string
+	branchBase           string
+	branchError          string
+	tagPopupOpen         bool
+	tagPopupDraft        string
+	tagPopupError        string
+	tagPopupTarget       string
 	stashMessageOpen     bool
 	stashMessageDraft    string
 	stashMessageError    string
@@ -24,32 +53,13 @@ type model struct {
 	graphStashPopMode    graphStashPopMode
 	graphStashPopCursor  int
 	graphStashPopEntries []git.StashEntry
-	tagPopupOpen         bool
-	tagPopupDraft        string
-	tagPopupError        string
-	tagPopupTarget       string
-	activeSection        graphSection
-	sectionCursor        map[graphSection]int
-	graphLaneCursor      int
-	graphScroll          int
-	graphSearchOpen      bool
-	graphSearchDraft     string
-	graphSearchQuery     string
-	graphSearchIndex     []graphSearchEntry
-	graphSearchCursor    int
-	graphSearchError     string
 	hiddenHotkeysOpen    bool
-	awaitingGoTop        bool
-	branchOpen           bool
-	branchDraft          string
-	branchBase           string
-	branchError          string
-	width                int
-	height               int
-	commitLimit          int
-	err                  error
-	handshakeCommits     map[string]bool
-	pullIsFastForward    bool
+
+	// Viewport and transient errors.
+	width       int
+	height      int
+	commitLimit int
+	err         error
 }
 
 type graphSection int

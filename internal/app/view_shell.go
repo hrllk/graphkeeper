@@ -133,49 +133,7 @@ func renderAppView(m model) string {
 
 	body := lipgloss.JoinVertical(lipgloss.Left, headerRow, graphRow)
 	centeredBody := applyOuterMargins(body, bodyWidth, bodyHeight, hMargin, topMargin, max(bottomMargin-1, 0))
-
-	if m.status.Mode == state.ModeConfirm || m.status.Mode == state.ModeReview || m.status.Mode == state.ModeResetModePick {
-		if m.status.Mode == state.ModeResetModePick {
-			centeredBody = overlayPopup(centeredBody, renderResetModePopup(bodyWidth))
-		} else if m.status.Mode == state.ModeReview {
-			centeredBody = overlayPopup(centeredBody, renderReviewPopup(m, bodyWidth))
-		} else {
-			centeredBody = overlayPopup(centeredBody, renderConfirmPopup(m, bodyWidth))
-		}
-	}
-	if m.status.Mode == state.ModeCherryPickPick {
-		centeredBody = overlayPopup(centeredBody, renderCherryPickPopup(m, bodyWidth))
-	}
-	if m.status.Mode == state.ModeTargetPick {
-		centeredBody = overlayPopup(centeredBody, renderTargetPickPopup(m, bodyWidth))
-	}
-	if m.branchOpen {
-		centeredBody = overlayPopup(centeredBody, renderBranchInputPopup(m, bodyWidth))
-	}
-	if m.stashMessageOpen {
-		centeredBody = overlayPopup(centeredBody, renderStashMessagePopup(m, bodyWidth))
-	}
-	if m.graphStashPopOpen {
-		centeredBody = overlayPopup(centeredBody, renderGraphStashPopPopup(m, bodyWidth, bodyHeight))
-	}
-	if m.stashPopupOpen {
-		centeredBody = overlayPopup(centeredBody, renderStashPopup(m, bodyWidth, bodyHeight))
-	}
-	if m.tagPopupOpen {
-		centeredBody = overlayPopup(centeredBody, renderTagPopup(m, bodyWidth, bodyHeight))
-	}
-	if m.hiddenHotkeysOpen {
-		centeredBody = overlayPopup(centeredBody, renderHiddenHotkeysPopup(m, bodyWidth))
-	}
-	if m.graphSearchOpen {
-		centeredBody = overlayPopup(centeredBody, renderGraphSearchPopup(m, bodyWidth))
-	}
-	if m.status.Mode == state.ModeLoading && !m.branchOpen {
-		centeredBody = overlayPopup(centeredBody, renderLoadingPopup(m, bodyWidth))
-	}
-	if m.status.Mode == state.ModeBlocked && !m.branchOpen {
-		centeredBody = overlayPopup(centeredBody, renderAlertPopup(blockedAlertContent(m.status), bodyWidth))
-	}
+	centeredBody = applyShellOverlays(m, centeredBody, bodyWidth, bodyHeight)
 
 	shell := centeredBody + "\n"
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, shell)
@@ -245,7 +203,7 @@ func renderReviewPopup(m model, bodyWidth int) string {
 		BorderForeground(lipgloss.Color("205")).
 		Padding(1, 2).
 		Width(width).
-		Align(lipgloss.Left)
+		Align(lipgloss.Center)
 	popupTitle := m.status.Message
 	if popupTitle == "" {
 		popupTitle = "Branch has diverged"
@@ -283,11 +241,10 @@ func centerReviewLineInWidth(line string, width int) string {
 	if visible >= width {
 		return line
 	}
-	leftPad := (width - visible) / 2
-	if leftPad < 0 {
-		leftPad = 0
-	}
-	return strings.Repeat(" ", leftPad) + line
+	return lipgloss.NewStyle().
+		Width(width).
+		Align(lipgloss.Center).
+		Render(line)
 }
 
 func renderResetModePopup(bodyWidth int) string {
@@ -338,7 +295,7 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 		BorderForeground(lipgloss.Color("205")).
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 28, 40)).
-		Align(lipgloss.Left)
+		Align(lipgloss.Center)
 	helpText := "enter: preview  •  esc: back"
 	if m.status.Action == state.ActionCheckout {
 		helpText = "enter: checkout  •  esc: back"

@@ -164,7 +164,7 @@ func formatTargetItem(t state.TargetItem) string {
 		return label
 	case state.TargetKindTag:
 		if t.CommitHash != "" {
-			source := tagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin)
+			source := renderTagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin)
 			parts := []string{
 				padRight(shorten(t.CommitHash, 7), tagHashColumnWidth),
 				padRight(shorten(t.Name, 8), tagNameColumnWidth),
@@ -187,19 +187,6 @@ func renderTagSectionHeader(width int) string {
 		renderContextKey("status"),
 	}
 	return fitVisibleWidth(strings.Join(parts, "  "), width)
-}
-
-func tagProvenanceStateLabel(provenanceLoaded, originKnown, onOrigin bool) string {
-	if !provenanceLoaded {
-		return muted.Render("(unknown)")
-	}
-	if originKnown && onOrigin {
-		return remoteColor.Render("(origin)")
-	}
-	if originKnown {
-		return tagColor.Render("(local)")
-	}
-	return muted.Render("(unknown)")
 }
 
 func formatSectionTargetItem(t state.TargetItem, width int) string {
@@ -233,7 +220,7 @@ func formatSectionTargetItem(t state.TargetItem, width int) string {
 		if t.RelativeAge != "" {
 			parts = append(parts, compactWhenText(t.RelativeAge))
 		}
-		parts = append(parts, tagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin))
+		parts = append(parts, renderTagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin))
 		return fitVisibleWidth(strings.Join(parts, "  "), width)
 	default:
 		return fitVisibleWidth(t.Name, width)

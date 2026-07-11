@@ -24,6 +24,8 @@ internal/
     target_items.go
     preview.go
     execution_detail.go
+    status_labels.go
+    view_overlays.go
     view.go
     graph_render.go
     actions_test.go
@@ -59,6 +61,8 @@ internal/
 - `preview.go` holds merge, rebase, and reset preview helpers
 - `execution_detail.go` holds completion messaging and remote commit lookup helpers
 - `graph_render.go` holds the render helpers that still depend on app state
+- `view_overlays.go` keeps the shell overlay priority in one place
+- `status_labels.go` keeps shared status label rendering in one place
 
 #### `internal/graph`
 - owns graph rules, lane order, row width, and focus helpers
@@ -78,4 +82,5 @@ internal/
 - `internal/ui` does not exist yet.
 - The current split keeps render helpers in `internal/app` because they still depend on app state.
 - Target selection policy is shared between browse and action flows to avoid drift.
+- Shell overlay precedence is centralized so popup ordering is easier to reason about and test.
 - Tests live next to the code they protect, usually as `_test.go` files in the same package. This document should stay close to the actual tree, not the aspirational one.

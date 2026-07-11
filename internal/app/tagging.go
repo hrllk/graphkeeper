@@ -140,10 +140,8 @@ func renderTagPopup(m model, bodyWidth, bodyHeight int) string {
 		BorderForeground(lipgloss.Color("205")).
 		Padding(1, 2).
 		Width(width).
-		Align(lipgloss.Left)
+		Align(lipgloss.Center)
 	lines := []string{
-		title.Render("Tag commit"),
-		"",
 		fmt.Sprintf("target: %s", shorten(m.tagPopupTarget, 8)),
 		fmt.Sprintf("name: %s", m.tagPopupDraft),
 	}

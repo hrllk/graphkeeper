@@ -109,7 +109,7 @@ func (m model) renderContextInfoLines(width int) []string {
 				} else {
 					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("message"), "-"))
 				}
-				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("provenance"), renderTagProvenanceLabel(m.repoStatus.TagProvenanceLoaded, entry)))
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("provenance"), renderTagProvenanceStateLabel(m.repoStatus.TagProvenanceLoaded, entry.OriginKnown, entry.OnOrigin)))
 			}
 		}
 	}
@@ -228,14 +228,14 @@ func renderDivergenceStateLabel(ahead, behind int) string {
 	}
 }
 
-func renderTagProvenanceLabel(provenanceLoaded bool, entry git.TagEntry) string {
+func renderTagProvenanceStateLabel(provenanceLoaded, originKnown, onOrigin bool) string {
 	if !provenanceLoaded {
 		return muted.Render("(unknown)")
 	}
-	if entry.OriginKnown && entry.OnOrigin {
+	if originKnown && onOrigin {
 		return remoteColor.Render("(origin)")
 	}
-	if entry.OriginKnown {
+	if originKnown {
 		return tagColor.Render("(local)")
 	}
 	return muted.Render("(unknown)")
