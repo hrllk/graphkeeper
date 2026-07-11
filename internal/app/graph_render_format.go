@@ -328,11 +328,43 @@ func focusBranchSummaryLines(node graphNode, width int) []string {
 	}
 	lines := make([]string, 0, len(node.Decorations))
 	for _, dec := range node.Decorations {
-		trimmed := strings.TrimSpace(dec)
-		if trimmed == "" || strings.HasPrefix(trimmed, "origin/") || strings.HasPrefix(trimmed, "tag: ") {
+		line, ok := formatBranchSummaryDecoration(dec)
+		if !ok {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("  - %s", shorten(dec, max(width-6, 0))))
+		lines = append(lines, fmt.Sprintf("  - %s", shorten(line, max(width-6, 0))))
 	}
 	return lines
+}
+
+func formatBranchSummaryDecoration(decoration string) (string, bool) {
+	decoration = strings.TrimSpace(decoration)
+	if decoration == "" || strings.HasPrefix(decoration, "tag: ") {
+		return "", false
+	}
+	switch {
+	case strings.HasPrefix(decoration, "HEAD -> "):
+		name := strings.TrimSpace(strings.TrimPrefix(decoration, "HEAD -> "))
+		if name == "" {
+			return "", false
+		}
+		return "l->" + name + " (HEAD)", true
+	case strings.HasPrefix(decoration, "origin/HEAD -> origin/"):
+		name := strings.TrimSpace(strings.TrimPrefix(decoration, "origin/HEAD -> origin/"))
+		if name == "" {
+			return "", false
+		}
+		return "o->" + name, true
+	case strings.HasPrefix(decoration, "origin/"):
+		name := strings.TrimSpace(strings.TrimPrefix(decoration, "origin/"))
+		if name == "" || name == "HEAD" {
+			return "", false
+		}
+		return "o->" + name, true
+	default:
+		if strings.Contains(decoration, "/") {
+			return "l->" + decoration, true
+		}
+		return "l->" + decoration, true
+	}
 }

@@ -592,7 +592,7 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 	if !strings.Contains(got, "parent: (multi parent)") || !strings.Contains(got, "  - def56789") || !strings.Contains(got, "  - 98765432") {
 		t.Fatalf("expected focus block to include multi-parent list, got %q", got)
 	}
-	if !strings.Contains(got, "branches:") || !strings.Contains(got, "  - HEAD -> main") || strings.Contains(got, "origin/main") {
+	if !strings.Contains(got, "branches:") || !strings.Contains(got, "  - l->main (HEAD)") || !strings.Contains(got, "  - o->main") {
 		t.Fatalf("expected focus block to include branches list, got %q", got)
 	}
 	if strings.Contains(got, "hash:") {
@@ -647,6 +647,33 @@ func TestCompactDecorationInfoUsesFourteenCharBranchField(t *testing.T) {
 	}
 	if !strings.Contains(got, "+2") || strings.Contains(got, " + 2") {
 		t.Fatalf("expected compact branch token to show compact plus count, got %q", got)
+	}
+}
+
+func TestFormatBranchSummaryDecorationUsesLocalAndRemotePrefixes(t *testing.T) {
+	tests := []struct {
+		name       string
+		decoration string
+		want       string
+		wantOK     bool
+	}{
+		{name: "head", decoration: "HEAD -> tmp2", want: "l->tmp2 (HEAD)", wantOK: true},
+		{name: "local", decoration: "tmp2-3", want: "l->tmp2-3", wantOK: true},
+		{name: "remote", decoration: "origin/tmp2", want: "o->tmp2", wantOK: true},
+		{name: "remote head", decoration: "origin/HEAD -> origin/tmp2", want: "o->tmp2", wantOK: true},
+		{name: "tag", decoration: "tag: v1.0.0", wantOK: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := formatBranchSummaryDecoration(tt.decoration)
+			if ok != tt.wantOK {
+				t.Fatalf("expected ok=%t, got %t with %q", tt.wantOK, ok, got)
+			}
+			if tt.wantOK && got != tt.want {
+				t.Fatalf("expected %q, got %q", tt.want, got)
+			}
+		})
 	}
 }
 
