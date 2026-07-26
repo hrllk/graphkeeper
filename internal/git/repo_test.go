@@ -47,6 +47,12 @@ func TestRemoteOperationsAllowLongerThanDefaultRunnerTimeout(t *testing.T) {
 	if _, err := repo.Push(context.Background(), "main", false, false); err != nil {
 		t.Fatalf("Push should use the remote-operation timeout, got %v", err)
 	}
+	if err := repo.FetchTags(context.Background()); err != nil {
+		t.Fatalf("FetchTags should use the remote-operation timeout, got %v", err)
+	}
+	if _, err := repo.OriginTagSet(context.Background()); err != nil {
+		t.Fatalf("OriginTagSet should use the remote-operation timeout, got %v", err)
+	}
 }
 
 func TestIsNoCommits(t *testing.T) {

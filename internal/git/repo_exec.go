@@ -73,7 +73,7 @@ func (r *Repo) CreateTag(ctx context.Context, name, target string) error {
 }
 
 func (r *Repo) FetchTags(ctx context.Context) error {
-	_, err := r.git(ctx, "fetch", "origin", "--tags")
+	_, err := r.runRemote(ctx, "fetch", "origin", "--tags")
 	return err
 }
 
@@ -242,10 +242,11 @@ func (r *Repo) tagMetadata(ctx context.Context, name string) (tagType, taggerNam
 }
 
 func (r *Repo) OriginTagSet(ctx context.Context) (map[string]bool, error) {
-	lines, err := r.gitLines(ctx, "ls-remote", "--tags", "origin")
+	output, err := r.runRemote(ctx, "ls-remote", "--tags", "origin")
 	if err != nil {
 		return nil, err
 	}
+	lines := splitRawLines(output)
 	if len(lines) == 0 {
 		return nil, nil
 	}
