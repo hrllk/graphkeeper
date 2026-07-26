@@ -20,6 +20,7 @@ This README reflects the current `alpha.4` codebase.
 - [Working Model](#working-model)
 - [Keyboard](#keyboard)
 - [AI-Assisted Development](#ai-assisted-development)
+- [Local Diagnostic Logs](#local-diagnostic-logs)
 - [Alpha Note](#alpha-note)
 - [Docs](#docs)
 
@@ -155,6 +156,24 @@ The usual maintainer flow looks like this:
 - `P` push the selected tag
 - `d` delete tag
 
+## AI-Assisted Development
+
+Product direction, requirements, prioritization, and final decisions are handled by the project maintainer. Architecture, implementation, tests, and documentation are developed with AI assistance. The maintainer reviews the changes, verifies the behavior, and is responsible for the final code.
+
+## Local Diagnostic Logs
+
+Graphkeeper does not send telemetry or diagnostic logs to the project author or a third-party service. When an event occurs, it may write local JSON Lines events to `graphkeeper-events.jsonl` in Go's temporary directory: usually `/tmp` on Linux and `$TMPDIR` on macOS.
+
+Events cover repository loading, fetch and pull checks, branch and tag operations, stash loading, action previews and executions, conflicts, and errors. Each event contains a timestamp, source, event name, and optional fields such as repository path, branch, commit, action, target, count, or error text. The repository path and Git error messages may contain local path or repository details.
+
+Graphkeeper may still contact configured Git remotes when you explicitly run Git operations such as fetch, pull, or push. This is separate from local diagnostic logging.
+
+To remove the log on Unix-like systems:
+
+```bash
+rm -f "${TMPDIR:-/tmp}/graphkeeper-events.jsonl"
+```
+
 ## Alpha Note
 
 This is an alpha.4 snapshot. Read it as a concept and workflow preview, not a finished product.
@@ -182,7 +201,3 @@ What is intentionally out of scope:
 - `docs/roadmap.md` - next work order
 - `docs/highlighting-color-map.md` - UI color map
 - `docs/archive/` - older plans and moved docs
-
-## AI-Assisted Development
-
-Product direction, requirements, prioritization, and final decisions are handled by the project maintainer. Architecture, implementation, tests, and documentation are developed with AI assistance. The maintainer reviews the changes, verifies the behavior, and is responsible for the final code.
