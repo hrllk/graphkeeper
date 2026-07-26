@@ -19,6 +19,7 @@ This README reflects the current `alpha.4` codebase.
 - [Quick Start](#quick-start)
 - [Working Model](#working-model)
 - [Keyboard](#keyboard)
+- [AI-Assisted Development](#ai-assisted-development)
 - [Alpha Note](#alpha-note)
 - [Docs](#docs)
 
@@ -181,3 +182,7 @@ What is intentionally out of scope:
 - `docs/roadmap.md` - next work order
 - `docs/highlighting-color-map.md` - UI color map
 - `docs/archive/` - older plans and moved docs
+
+## AI-Assisted Development
+
+Product direction, requirements, prioritization, and final decisions are handled by the project maintainer. Architecture, implementation, tests, and documentation are developed with AI assistance. The maintainer reviews the changes, verifies the behavior, and is responsible for the final code.
