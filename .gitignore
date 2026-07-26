@@ -1,3 +1,4 @@
 *.zip
 .bin/
 .cache/
+/graphkeeper
