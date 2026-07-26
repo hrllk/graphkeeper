@@ -290,14 +290,21 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "d":
+		targets := graphBranchDeleteTargets(m)
+		if len(targets) > 1 {
+			status := state.New().WithTargetPick(state.ActionDeleteBranch, targets)
+			status.Title = "Delete branch"
+			status.Message = "Choose a branch to delete."
+			status.Detail = "Enter confirms. Esc returns."
+			m.status = status
+			return m, nil
+		}
 		selection := deleteBranchSelection(m)
 		if !selection.ok {
 			m.status = selection.blocked
 			return m, nil
 		}
-		m.status = state.New().WithConfirm(state.ActionDeleteBranch, selection.title, selection.detail)
-		m.status.Title = selection.title
-		m.status.Selected = selection.target
+		m.status = deleteBranchConfirmStatus(selection)
 		return m, nil
 	default:
 		return m, nil
@@ -428,7 +435,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = selection.blocked
 				return m, nil
 			}
-			m.status = deleteConfirmStatus(state.ActionDeleteBranch, selection.title, selection.detail, selection.target)
+			m.status = deleteBranchConfirmStatus(selection)
 			return m, nil
 		}
 		return m, nil

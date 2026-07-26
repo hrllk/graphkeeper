@@ -299,6 +299,8 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 	helpText := "enter: preview  •  esc: back"
 	if m.status.Action == state.ActionCheckout {
 		helpText = "enter: checkout  •  esc: back"
+	} else if m.status.Action == state.ActionDeleteBranch {
+		helpText = "enter: delete  •  esc: back"
 	}
 	lines := []string{
 		descStyle.Render(m.status.Message),

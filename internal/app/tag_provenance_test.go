@@ -84,6 +84,33 @@ func TestFetchTagsWritesSnapshotAndMarksProvenance(t *testing.T) {
 	}
 }
 
+func TestFetchTagsDoesNotPruneRemoteBranches(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "checkout", "-b", "feature")
+	makeLocalCommit(t, fixture.root, "feature.txt", "feature\n", "feature commit")
+	runGit(t, fixture.root, "push", "-u", "origin", "feature")
+	runGit(t, fixture.root, "checkout", "main")
+
+	// Simulate a branch deleted on the remote while keeping the local
+	// remote-tracking ref. Refreshing tags must not prune that ref.
+	runGit(t, fixture.remote, "update-ref", "-d", "refs/heads/feature")
+
+	msg := cmdResult(t, fetchTagsRepoState(fixture.repo, 40))
+	fetched, ok := msg.(fetchedMsg)
+	if !ok {
+		t.Fatalf("expected fetchedMsg, got %T", msg)
+	}
+	if fetched.err != nil {
+		t.Fatalf("fetchTagsRepoState err = %v", fetched.err)
+	}
+	for _, branch := range fetched.status.RemoteBranches {
+		if branch == "origin/feature" {
+			return
+		}
+	}
+	t.Fatalf("expected origin/feature to remain after tag refresh, got %v", fetched.status.RemoteBranches)
+}
+
 func TestTagSnapshotPathLivesUnderGitDir(t *testing.T) {
 	got := tagSnapshotPath(filepath.Join("/tmp", "repo"))
 	want := filepath.Join("/tmp", "repo", ".git", "graphkeeper", "tag-provenance.json")

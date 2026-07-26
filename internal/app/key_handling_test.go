@@ -996,6 +996,95 @@ func TestDeleteBranchShortcutOpensConfirmFromGraph(t *testing.T) {
 	}
 }
 
+func TestDeleteRemoteBranchShortcutFromGraphPreservesRemoteIntent(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:           fixture.root,
+		Branch:         "main",
+		Head:           fixture.initialHash,
+		LocalBranches:  []string{"main"},
+		RemoteBranches: []string{"origin/feature"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: fixture.initialHash, Graph: "*", Decorations: []string{"HEAD -> main", "main"}},
+			{Hash: "featurehash", Graph: "|", Decorations: []string{"origin/feature"}},
+		},
+	})
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = 1
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected graph remote delete shortcut to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected confirm mode, got %s", got.status.Mode)
+	}
+	if !got.status.DeleteRemote {
+		t.Fatal("expected graph remote delete intent to be preserved")
+	}
+	if got.status.Selected != "feature" {
+		t.Fatalf("expected remote branch name to be stored, got %q", got.status.Selected)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil {
+		t.Fatal("expected remote delete confirm acceptance to execute")
+	}
+	if got.status.Mode != state.ModeLoading || got.status.Message != "Deleting origin branch..." {
+		t.Fatalf("expected remote delete loading state, got %+v", got.status)
+	}
+}
+
+func TestDeleteBranchShortcutFromGraphPicksAmongMultipleRefs(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:           fixture.root,
+		Branch:         "main",
+		Head:           fixture.initialHash,
+		LocalBranches:  []string{"main", "feature"},
+		RemoteBranches: []string{"origin/feature"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: fixture.initialHash, Graph: "*", Decorations: []string{"HEAD -> main", "main"}},
+			{Hash: "featurehash", Graph: "|", Decorations: []string{"feature", "origin/feature"}},
+		},
+	})
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = 1
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected branch picker to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeTargetPick {
+		t.Fatalf("expected branch target picker, got %s", got.status.Mode)
+	}
+	if len(got.status.Targets) != 2 {
+		t.Fatalf("expected local and remote targets, got %#v", got.status.Targets)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyDown})
+	got = gotModel.(model)
+	if cmd != nil || got.status.Selected != "origin/feature" {
+		t.Fatalf("expected remote target selection, got selected=%q cmd=%v", got.status.Selected, cmd)
+	}
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected delete confirm to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeConfirm || !got.status.DeleteRemote {
+		t.Fatalf("expected remote delete confirmation, got %+v", got.status)
+	}
+	if got.status.Detail != "Remote: origin/feature" {
+		t.Fatalf("expected remote delete detail, got %q", got.status.Detail)
+	}
+}
+
 func TestGraphMergeShortcutChecksDivergenceBeforeConfirm(t *testing.T) {
 	fixture := newCommandRepo(t)
 	runGit(t, fixture.root, "checkout", "-b", "feature")

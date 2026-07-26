@@ -11,8 +11,16 @@ import (
 	"time"
 )
 
+const remoteOperationTimeout = 30 * time.Second
+
+func (r *Repo) runRemote(ctx context.Context, args ...string) (string, error) {
+	runner := r.runner
+	runner.Timeout = remoteOperationTimeout
+	return runner.RunContext(ctx, args...)
+}
+
 func (r *Repo) Fetch(ctx context.Context) error {
-	_, err := r.runner.Run("fetch", "--all", "--prune", "--tags")
+	_, err := r.runRemote(ctx, "fetch", "--all", "--prune", "--tags")
 	return err
 }
 
@@ -24,7 +32,7 @@ func (r *Repo) Push(ctx context.Context, branch string, force bool, setUpstream 
 	if setUpstream {
 		args = append(args, "-u", "origin", branch)
 	}
-	return r.Run(args...)
+	return r.runRemote(ctx, args...)
 }
 
 func (r *Repo) PushTag(ctx context.Context, tag string) (string, error) {
@@ -32,7 +40,7 @@ func (r *Repo) PushTag(ctx context.Context, tag string) (string, error) {
 	if tag == "" {
 		return "", fmt.Errorf("tag is empty")
 	}
-	return r.Run("push", "origin", tag)
+	return r.runRemote(ctx, "push", "origin", tag)
 }
 
 func (r *Repo) DeleteBranch(ctx context.Context, branch string) (string, error) {
@@ -44,11 +52,11 @@ func (r *Repo) DeleteTag(ctx context.Context, name string) (string, error) {
 }
 
 func (r *Repo) DeleteRemoteTag(ctx context.Context, remote, name string) (string, error) {
-	return r.Run("push", remote, "--delete", name)
+	return r.runRemote(ctx, "push", remote, "--delete", name)
 }
 
 func (r *Repo) DeleteRemoteBranch(ctx context.Context, remote, branch string) (string, error) {
-	return r.Run("push", remote, "--delete", branch)
+	return r.runRemote(ctx, "push", remote, "--delete", branch)
 }
 
 func (r *Repo) CreateTag(ctx context.Context, name, target string) error {
@@ -65,7 +73,7 @@ func (r *Repo) CreateTag(ctx context.Context, name, target string) error {
 }
 
 func (r *Repo) FetchTags(ctx context.Context) error {
-	_, err := r.git(ctx, "fetch", "origin", "--tags", "--prune")
+	_, err := r.git(ctx, "fetch", "origin", "--tags")
 	return err
 }
 
@@ -416,10 +424,14 @@ func splitDecorations(v string) []string {
 }
 
 func (r *Runner) Run(args ...string) (string, error) {
+	return r.RunContext(context.Background(), args...)
+}
+
+func (r *Runner) RunContext(ctx context.Context, args ...string) (string, error) {
 	if r.Timeout <= 0 {
 		r.Timeout = 3 * time.Second
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, r.Timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	if r.Dir != "" {

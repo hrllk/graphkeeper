@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestOpenReturnsAbsoluteRoot(t *testing.T) {
@@ -28,6 +29,23 @@ func TestRunnerRejectsUnknownCommand(t *testing.T) {
 	_, err := r.Run("not-a-real-git-command")
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestRemoteOperationsAllowLongerThanDefaultRunnerTimeout(t *testing.T) {
+	binDir := t.TempDir()
+	fakeGit := filepath.Join(binDir, "git")
+	if err := os.WriteFile(fakeGit, []byte("#!/bin/sh\nsleep 3.2\n"), 0o755); err != nil {
+		t.Fatalf("write fake git failed: %v", err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	repo := &Repo{runner: Runner{Timeout: 3 * time.Second}}
+	if err := repo.Fetch(context.Background()); err != nil {
+		t.Fatalf("Fetch should use the remote-operation timeout, got %v", err)
+	}
+	if _, err := repo.Push(context.Background(), "main", false, false); err != nil {
+		t.Fatalf("Push should use the remote-operation timeout, got %v", err)
 	}
 }
 

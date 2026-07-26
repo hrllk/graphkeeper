@@ -115,6 +115,7 @@ type Status struct {
 	SelectedQueue []string
 	TargetIdx     int
 	Selected      string
+	DeleteRemote  bool
 	CanExecute    bool
 }
 

@@ -42,6 +42,20 @@ func (m model) handleTargetPickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status.Selected = target
 			return m, nil
 		}
+		if action == state.ActionDeleteBranch {
+			idx := m.status.TargetIdx
+			if idx < 0 || idx >= len(m.status.Targets) {
+				m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No branch selected.", "Choose a branch to delete.")
+				return m, nil
+			}
+			selection := deleteBranchSelectionFromTarget(m.status.Targets[idx])
+			if !selection.ok {
+				m.status = selection.blocked
+				return m, nil
+			}
+			m.status = deleteBranchConfirmStatus(selection)
+			return m, nil
+		}
 		m.status = loadingToast("Previewing...")
 		return m, previewSelection(m.repo, m.repoStatus, action, target)
 	case "esc":

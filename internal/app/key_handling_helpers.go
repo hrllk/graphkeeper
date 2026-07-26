@@ -24,3 +24,9 @@ func deleteConfirmStatus(action state.Action, title, detail, target string) stat
 	status.Selected = target
 	return status
 }
+
+func deleteBranchConfirmStatus(selection branchDeleteSelection) state.Status {
+	status := deleteConfirmStatus(state.ActionDeleteBranch, selection.title, selection.detail, selection.target)
+	status.DeleteRemote = selection.remote
+	return status
+}

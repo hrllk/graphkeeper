@@ -15,6 +15,89 @@ type branchDeleteSelection struct {
 	ok      bool
 }
 
+func graphBranchDeleteTargets(m model) []state.TargetItem {
+	focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+	localBranches := make(map[string]struct{}, len(m.repoStatus.LocalBranches))
+	for _, name := range m.repoStatus.LocalBranches {
+		localBranches[name] = struct{}{}
+	}
+	remoteBranches := make(map[string]struct{}, len(m.repoStatus.RemoteBranches))
+	for _, name := range m.repoStatus.RemoteBranches {
+		remoteBranches[name] = struct{}{}
+	}
+
+	targets := make([]state.TargetItem, 0, len(focus.Decorations))
+	seen := make(map[string]struct{}, len(focus.Decorations))
+	for _, decoration := range focus.Decorations {
+		decoration = strings.TrimSpace(decoration)
+		if strings.HasPrefix(decoration, "HEAD -> ") {
+			decoration = strings.TrimPrefix(decoration, "HEAD -> ")
+		}
+		if decoration == "" || strings.HasPrefix(decoration, "tag: ") {
+			continue
+		}
+
+		kind := state.TargetKindLocal
+		if strings.HasPrefix(decoration, "origin/") {
+			if _, ok := remoteBranches[decoration]; !ok && len(remoteBranches) > 0 {
+				continue
+			}
+			if isRemoteHeadRef(decoration) {
+				continue
+			}
+			kind = state.TargetKindRemote
+		} else {
+			if _, ok := localBranches[decoration]; !ok && len(localBranches) > 0 {
+				continue
+			}
+			if !m.repoStatus.Detached && decoration == m.repoStatus.Branch {
+				continue
+			}
+		}
+
+		if _, ok := seen[decoration]; ok {
+			continue
+		}
+		seen[decoration] = struct{}{}
+		targets = append(targets, state.TargetItem{
+			Kind:    kind,
+			Name:    decoration,
+			Ref:     decoration,
+			Current: kind == state.TargetKindLocal && decoration == m.repoStatus.Branch,
+		})
+	}
+	return targets
+}
+
+func deleteBranchSelectionFromTarget(item state.TargetItem) branchDeleteSelection {
+	if item.Kind == state.TargetKindRemote {
+		name := strings.TrimPrefix(item.Ref, "origin/")
+		if name == "" {
+			return branchDeleteSelection{
+				blocked: state.New().WithBlocked(state.BlockUnknown, "Delete unavailable.", "Choose an origin branch."),
+			}
+		}
+		return branchDeleteSelection{
+			target: name,
+			remote: true,
+			title:  "Delete branch?",
+			detail: "Remote: origin/" + name,
+			ok:     true,
+		}
+	}
+	if item.Current {
+		return branchDeleteSelection{
+			blocked: state.New().WithBlocked(state.BlockUnknown, "Current branch cannot be deleted.", "Select a different local branch."),
+		}
+	}
+	return branchDeleteSelection{
+		target: item.Ref,
+		title:  "Delete branch?",
+		detail: "Local: " + item.Ref,
+		ok:     item.Ref != "",
+	}
+}
+
 func activeSectionTargetItem(m model) (state.TargetItem, bool) {
 	items := sectionTargets(m.repoStatus, m.activeSection)
 	cursor := m.sectionCursor[m.activeSection]
@@ -26,34 +109,13 @@ func activeSectionTargetItem(m model) (state.TargetItem, bool) {
 
 func deleteBranchSelection(m model) branchDeleteSelection {
 	if m.activeSection == sectionGraph {
-		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
-		target := checkoutTargetFromFocus(focus)
-		if target == "" {
+		targets := graphBranchDeleteTargets(m)
+		if len(targets) == 0 {
 			return branchDeleteSelection{
 				blocked: state.New().WithBlocked(state.BlockUnknown, "Delete unavailable.", "Move to a branch line."),
 			}
 		}
-		if !m.repoStatus.Detached && target == m.repoStatus.Branch {
-			return branchDeleteSelection{
-				blocked: state.New().WithBlocked(state.BlockUnknown, "Current branch cannot be deleted.", "Select a different local branch."),
-			}
-		}
-		if strings.HasPrefix(target, "origin/") {
-			name := strings.TrimPrefix(target, "origin/")
-			return branchDeleteSelection{
-				target: name,
-				remote: true,
-				title:  "Delete branch?",
-				detail: "Remote: origin/" + name,
-				ok:     true,
-			}
-		}
-		return branchDeleteSelection{
-			target: target,
-			title:  "Delete branch?",
-			detail: "Local: " + target,
-			ok:     true,
-		}
+		return deleteBranchSelectionFromTarget(targets[0])
 	}
 
 	item, ok := activeSectionTargetItem(m)
