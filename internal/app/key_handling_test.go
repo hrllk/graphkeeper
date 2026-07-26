@@ -1085,6 +1085,45 @@ func TestDeleteBranchShortcutFromGraphPicksAmongMultipleRefs(t *testing.T) {
 	}
 }
 
+func TestDeleteBranchShortcutFromGraphPicksWhenCurrentBranchSharesPointer(t *testing.T) {
+	fixture := newCommandRepo(t)
+	m := testKeyHandlingModel(fixture.repo, git.Status{
+		Root:          fixture.root,
+		Branch:        "main",
+		Head:          fixture.initialHash,
+		LocalBranches: []string{"main", "feature"},
+		GraphCommits: []git.GraphCommit{
+			{Hash: fixture.initialHash, Graph: "*", Decorations: []string{"HEAD -> main", "main", "feature"}},
+		},
+	})
+	m.activeSection = sectionGraph
+	m.sectionCursor[sectionGraph] = 0
+	m.graphLaneCursor = 0
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected branch picker to stay synchronous, got %v", cmd)
+	}
+	if got.status.Mode != state.ModeTargetPick {
+		t.Fatalf("expected branch target picker, got %s", got.status.Mode)
+	}
+	if len(got.status.Targets) != 2 || !got.status.Targets[0].Current {
+		t.Fatalf("expected current and deletable branches, got %#v", got.status.Targets)
+	}
+
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyDown})
+	got = gotModel.(model)
+	if cmd != nil || got.status.Selected != "feature" {
+		t.Fatalf("expected feature selection, got selected=%q cmd=%v", got.status.Selected, cmd)
+	}
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd != nil || got.status.Mode != state.ModeConfirm || got.status.Selected != "feature" {
+		t.Fatalf("expected local branch confirmation, got status=%+v cmd=%v", got.status, cmd)
+	}
+}
+
 func TestGraphMergeShortcutChecksDivergenceBeforeConfirm(t *testing.T) {
 	fixture := newCommandRepo(t)
 	runGit(t, fixture.root, "checkout", "-b", "feature")

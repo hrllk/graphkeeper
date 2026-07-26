@@ -50,9 +50,6 @@ func graphBranchDeleteTargets(m model) []state.TargetItem {
 			if _, ok := localBranches[decoration]; !ok && len(localBranches) > 0 {
 				continue
 			}
-			if !m.repoStatus.Detached && decoration == m.repoStatus.Branch {
-				continue
-			}
 		}
 
 		if _, ok := seen[decoration]; ok {
