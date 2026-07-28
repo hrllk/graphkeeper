@@ -7,7 +7,11 @@ This README reflects the current `alpha.4` codebase.
 
 ## Demo
 
-<img width="400" height="279" alt="Graphkeeper demo screenshot" src="https://github.com/user-attachments/assets/a84d1926-9bcc-46df-b0af-a3d760adce1e" />
+
+
+https://github.com/user-attachments/assets/dbbb3cf1-e336-4046-9d3d-eb02066930bd
+
+
 
 ## TOC
 

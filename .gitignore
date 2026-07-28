@@ -1,4 +1,7 @@
 *.zip
+.DS_Store
+/graphkeeper
+test*.txt
 .bin/
 .cache/
 /graphkeeper
