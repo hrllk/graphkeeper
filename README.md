@@ -3,7 +3,7 @@
 `graphkeeper` is a graph-based Git TUI for people who manage repositories.
 It keeps branch topology, remote state, tags, and stash state visible at the same time so you can make maintenance decisions from the graph instead of guessing from command output.
 
-This README reflects the current `alpha.4` codebase.
+This README reflects the current version in [`VERSION`](VERSION).
 
 ## Demo
 
@@ -17,6 +17,7 @@ https://github.com/user-attachments/assets/dbbb3cf1-e336-4046-9d3d-eb02066930bd
 
 - [Demo](#demo)
 - [Overview](#overview)
+- [Why It Exists](#why-it-exists)
 - [Who It Is For](#who-it-is-for)
 - [What It Helps You Do](#what-it-helps-you-do)
 - [What It Is Not](#what-it-is-not)
@@ -41,6 +42,25 @@ It is for the person who needs to answer questions like:
 
 The UI is graph-first on purpose.
 The commit graph is the main surface, while Current, Remote, and Tags provide supporting context.
+
+## Why It Exists
+
+Inspired by Owen's `HIPHOP`, `graphkeeper` asks the same kind of questions from a
+maintainer's point of view: who owns the current state, where the repository is,
+and what needs to happen next.
+
+```text
+who am I (develop)
+when am I (Tue Jul 28)
+where am I (a34bb6eb)
+what am I (have to merge)
+
+how am I (rebase or merge)
+why am I (for apply)
+```
+
+The answer is the graph. It keeps the repository's shape visible while you make
+the next Git decision.
 
 ## Who It Is For
 
@@ -76,16 +96,29 @@ When an operation conflicts, you finish the resolution in another Git-capable to
 
 ## Quick Start
 
-Build the binary:
+Set the application version in `VERSION`, then build the binary:
 
 ```bash
-go build ./cmd/graphkeeper
+./scripts/build
 ```
 
 Run it:
 
 ```bash
 ./graphkeeper
+```
+
+Show the configured build version:
+
+```bash
+./graphkeeper --version
+```
+
+The build script reads `VERSION` and injects it into the binary. You can pass a
+different output path as its first argument:
+
+```bash
+./scripts/build /tmp/graphkeeper
 ```
 
 Or run it directly:
@@ -180,7 +213,7 @@ rm -f "${TMPDIR:-/tmp}/graphkeeper-events.jsonl"
 
 ## Alpha Note
 
-This is an alpha.4 snapshot. Read it as a concept and workflow preview, not a finished product.
+Read the version in `VERSION` as a concept and workflow preview, not a finished product.
 
 This README describes the current shape of the product, not a promise of final polish.
 
