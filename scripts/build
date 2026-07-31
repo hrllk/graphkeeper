@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VERSION_FILE="${GRAPHKEEPER_VERSION_FILE:-${ROOT}/VERSION}"
+OUTPUT="${1:-${ROOT}/graphkeeper}"
+GO_CACHE_DIR="${GOCACHE:-${ROOT}/.cache/go-build}"
+GO_TMP_DIR="${GOTMPDIR:-${ROOT}/.cache/tmp}"
+
+if [[ ! -f "${VERSION_FILE}" ]]; then
+  echo "version file not found: ${VERSION_FILE}" >&2
+  exit 1
+fi
+
+VERSION="$(tr -d '[:space:]' < "${VERSION_FILE}")"
+if [[ -z "${VERSION}" ]]; then
+  echo "version file is empty: ${VERSION_FILE}" >&2
+  exit 1
+fi
+
+mkdir -p "${GO_CACHE_DIR}" "${GO_TMP_DIR}"
+
+cd "${ROOT}"
+GOCACHE="${GO_CACHE_DIR}" GOTMPDIR="${GO_TMP_DIR}" \
+  go build -trimpath -ldflags "-X main.version=${VERSION}" -o "${OUTPUT}" ./cmd/graphkeeper
+
+echo "built graphkeeper ${VERSION}: ${OUTPUT}"

@@ -22,6 +22,7 @@ https://github.com/user-attachments/assets/dbbb3cf1-e336-4046-9d3d-eb02066930bd
 - [What It Helps You Do](#what-it-helps-you-do)
 - [What It Is Not](#what-it-is-not)
 - [Quick Start](#quick-start)
+- [CLI](#cli)
 - [Working Model](#working-model)
 - [Keyboard](#keyboard)
 - [AI-Assisted Development](#ai-assisted-development)
@@ -126,6 +127,20 @@ Or run it directly:
 ```bash
 go run ./cmd/graphkeeper
 ```
+
+## CLI
+
+Use `--help` or `--version` before starting the TUI:
+
+```bash
+./graphkeeper --help
+./graphkeeper --version
+```
+
+These two options work without a Git repository. Unknown options and
+positional arguments return exit code `2` with usage text. See the [CLI
+reference](docs/cli-reference.md) for the complete behavior and
+[build-and-run guide](docs/howto-build-and-run.md) for troubleshooting.
 
 ## Working Model
 
@@ -237,4 +252,6 @@ What is intentionally out of scope:
 - `docs/structure.md` - current code map
 - `docs/roadmap.md` - next work order
 - `docs/highlighting-color-map.md` - UI color map
+- `docs/cli-reference.md` - CLI options, exit codes, and version resolution
+- `docs/howto-build-and-run.md` - build, verify, and run the CLI
 - `docs/archive/` - older plans and moved docs
