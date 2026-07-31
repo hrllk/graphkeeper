@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-
 	"hrllk/graphkeeper/internal/graph"
 )
 
@@ -48,8 +46,7 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		graphCell = strings.ReplaceAll(graphCell, "/", conflictColor.Render("/"))
 		graphCell = strings.ReplaceAll(graphCell, "\\", conflictColor.Render("\\"))
 	} else if isHandshake {
-		pinkBg := lipgloss.NewStyle().Background(lipgloss.Color("162")).Foreground(lipgloss.Color("255")).Bold(true)
-		graphCell = strings.ReplaceAll(graphCell, "*", pinkBg.Render("*"))
+		graphCell = strings.ReplaceAll(graphCell, "*", handshakeMark.Render("*"))
 	}
 	var when, title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
@@ -71,8 +68,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
 		graphCell := padRight(row.Graph, graphColWidth)
 		if isHandshake {
-			pinkBg := lipgloss.NewStyle().Background(lipgloss.Color("162")).Foreground(lipgloss.Color("255")).Bold(true)
-			graphCell = strings.ReplaceAll(graphCell, "*", pinkBg.Render("*"))
+			graphCell = strings.ReplaceAll(graphCell, "*", handshakeMark.Render("*"))
 		}
 		line := fmt.Sprintf("%-8s %-14s %s  %-7s %-*s", "", "", graphCell, "", graphBranchFieldWidth, "")
 		return fitVisibleWidth(line, rowWidth)
@@ -124,8 +120,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 	}
 	graphCell = padRight(graphCell, graphColWidth)
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" && isHandshake {
-		pinkBg := lipgloss.NewStyle().Background(lipgloss.Color("162")).Foreground(lipgloss.Color("255")).Bold(true)
-		graphCell = strings.ReplaceAll(graphCell, "*", pinkBg.Render("*"))
+		graphCell = strings.ReplaceAll(graphCell, "*", handshakeMark.Render("*"))
 	}
 	var when, title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {

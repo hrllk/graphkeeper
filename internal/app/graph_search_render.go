@@ -7,11 +7,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	searchMatchMark = lipgloss.NewStyle().Background(lipgloss.Color("226")).Foreground(lipgloss.Color("232")).Bold(true)
-	searchFocusMark = lipgloss.NewStyle().Background(lipgloss.Color("205")).Foreground(lipgloss.Color("232")).Bold(true)
-)
-
 func highlightSearchText(value, query string, focused bool) string {
 	query = strings.TrimSpace(query)
 	if query == "" || value == "" {

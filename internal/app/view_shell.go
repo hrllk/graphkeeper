@@ -9,40 +9,6 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
-var (
-	border          = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
-	baseBox         = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
-	activeBox       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("205")).Padding(0, 1)
-	title           = lipgloss.NewStyle().Bold(true)
-	sectionTitle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00b7eb")).Bold(true)
-	contextValue    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00b7eb"))
-	hotkey          = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5ca8")).Bold(true)
-	muted           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	accent          = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-	warn            = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-	ok              = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-	disabled        = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	headMark        = lipgloss.NewStyle().Foreground(lipgloss.Color("118")).Bold(true)
-	branchMark      = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
-	pointerMark     = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
-	dirtyMark       = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
-	stashMark       = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true)
-	remoteColor     = lipgloss.NewStyle().Foreground(lipgloss.Color("81"))
-	tagColor        = lipgloss.NewStyle().Foreground(lipgloss.Color("#9D00FF"))
-	tagOverlapColor = lipgloss.NewStyle().Foreground(lipgloss.Color("#A14743")).Bold(true)
-	highlight       = lipgloss.NewStyle().Reverse(true).Bold(true)
-	conflictColor   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	conflictMark    = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
-	reviewCurrent   = headMark
-	reviewTarget    = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
-	reviewBase      = lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Bold(true)
-	reviewHash      = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
-	reviewBranch    = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
-	reviewMark      = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	reviewCount     = lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
-	reviewFooter    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-)
-
 func renderHotkey(key string) string {
 	return hotkey.Render(key)
 }
@@ -157,13 +123,11 @@ func popupWidthForBody(bodyWidth, minWidth, maxWidth int) int {
 }
 
 func renderConfirmPopup(m model, bodyWidth int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	descStyle := popupBody
+	helpStyle := popupHelp
 	width := popupWidthForBody(bodyWidth, 28, 42)
 	align := lipgloss.Center
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(width).
 		Align(align)
@@ -198,9 +162,7 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 
 func renderReviewPopup(m model, bodyWidth int) string {
 	width := popupWidthForBody(bodyWidth, 26, 40)
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(width).
 		Align(lipgloss.Center)
@@ -248,11 +210,9 @@ func centerReviewLineInWidth(line string, width int) string {
 }
 
 func renderResetModePopup(bodyWidth int) string {
-	bodyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	bodyStyle := popupBody
+	helpStyle := popupHelp
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 32, 50)).
 		Align(lipgloss.Center)
@@ -269,10 +229,8 @@ func renderResetModePopup(bodyWidth int) string {
 }
 
 func renderLoadingPopup(m model, bodyWidth int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	descStyle := popupBody
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 28, 44)).
 		Align(lipgloss.Center)
@@ -288,11 +246,9 @@ func renderLoadingPopup(m model, bodyWidth int) string {
 }
 
 func renderTargetPickPopup(m model, bodyWidth int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	descStyle := popupBody
+	helpStyle := popupHelp
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 28, 40)).
 		Align(lipgloss.Center)
@@ -318,11 +274,9 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 }
 
 func renderBranchInputPopup(m model, bodyWidth int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	descStyle := popupBody
+	helpStyle := popupHelp
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 36, 56)).
 		Align(lipgloss.Center)
@@ -342,7 +296,7 @@ func renderBranchInputPopup(m model, bodyWidth int) string {
 	}
 	if m.branchError != "" {
 		lines = append(lines, "")
-		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true).Render(m.branchError))
+		lines = append(lines, errorStyle.Render(m.branchError))
 	}
 	lines = append(lines, "")
 	lines = append(lines, helpStyle.Render("esc: back"))
@@ -355,12 +309,10 @@ func renderBranchInputPopup(m model, bodyWidth int) string {
 }
 
 func renderGraphSearchPopup(m model, bodyWidth int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	descStyle := popupBody
+	helpStyle := popupHelp
+	errStyle := errorStyle
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 38, 58)).
 		Align(lipgloss.Center)

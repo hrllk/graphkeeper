@@ -43,9 +43,20 @@
             "parentTaskId": 2,
             "updatedAt": "2026-07-28T10:56:08.352Z",
             "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "섹션별 간략 hotkey 목록 노출",
+            "description": "사용자가 현재 어떤 섹션에서 ? 키를 눌렀는지에 따라 해당 섹션에 필요한 hotkey 항목만 세션별로 간략히 보여주는 hidden hotkey 목록을 제공한다.",
+            "details": "현재 active section을 기준으로 표시 항목을 선택하고, Graph·Local·Remote·Tags 등 섹션별 목록을 분리한다. ? 입력 시 현재 섹션의 핵심 hotkey만 노출하며 섹션 이동 후에는 새 섹션 기준으로 목록이 갱신되도록 한다. 기존 ? 진입 동작과 overlay 종료 동작을 유지하고 섹션별 표시 항목을 검증하는 테스트를 추가한다.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 2,
+            "parentId": "undefined",
+            "updatedAt": "2026-07-31T08:56:09.503Z"
           }
         ],
-        "updatedAt": "2026-07-28T10:56:08.352Z"
+        "updatedAt": "2026-07-31T08:56:09.503Z"
       },
       {
         "id": "3",
@@ -75,7 +86,7 @@
         "description": "터미널 색상 호환성과 밝은 배경 가독성을 수정한다.",
         "details": "3-bit·256색·truecolor 혼용 문제를 정리하고 밝은 배경에서도 상태가 읽히도록 한다.",
         "testStrategy": "",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "subtasks": [
@@ -84,12 +95,14 @@
             "title": "터미널 색상 호환성",
             "description": "3-bit·256색·truecolor 혼용을 정리하고 밝은 배경에서 읽을 수 있는 색상 정책과 검증 추가",
             "details": "",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 4,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-07-31T08:42:11.256Z"
           }
-        ]
+        ],
+        "updatedAt": "2026-07-31T08:42:11.256Z"
       },
       {
         "id": "5",
@@ -126,7 +139,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-07-28T10:56:08.352Z",
+      "lastModified": "2026-07-31T08:56:09.503Z",
       "taskCount": 5,
       "completedCount": 1,
       "tags": [

@@ -187,3 +187,13 @@
 - Keep graph merge/rebase fast-forward cases on the execution path instead of the blocked-alert path so `enter` performs the action and `esc` dismisses it.
 - Keep the fast-forward modal concise: title plus a single `HEAD can move to ...` sentence, without `Current` or `Target` counts.
 - Leave the diverged merge/rebase review modal unchanged so the richer comparison still applies when the histories have both sides.
+
+## 2026-07-31: Core terminal UI uses ANSI-first semantic colors
+
+- Use `lipgloss.ANSIColor(0..15)` for the in-scope shell, graph, and search semantic styles.
+- Delegate the final color to the user's terminal palette instead of forcing RGB or ANSI 256-color values.
+- Use ANSI yellow for warning/loading/stash accents and ANSI red for error/conflict states. ANSI has no fixed orange slot.
+- Use ANSI yellow + bold foreground for section/graph hover. Keep reverse/bold only for search focus and popup selection; preserve visible labels and markers for dirty, conflict, provenance, stash, and current/target states.
+- Use the terminal default foreground for muted/help/disabled/footer text because bright black can be low contrast on white or beige backgrounds.
+- Validate Ascii, ANSI, ANSI256, TrueColor, and `NO_COLOR=1` smoke conditions without changing layout, key bindings, or state transitions.
+- Limit this task to `theme.go`, shell, graph, graph search, related tests, and color policy docs. Defer direct color migration in individual popup files.

@@ -62,13 +62,163 @@ func TestNavigationClampHelpers(t *testing.T) {
 	}
 }
 
-func forceTrueColorProfile(t *testing.T) {
+func withColorProfile(t *testing.T, profile termenv.Profile) {
 	t.Helper()
 	previous := lipgloss.ColorProfile()
-	lipgloss.SetColorProfile(termenv.TrueColor)
+	lipgloss.SetColorProfile(profile)
 	t.Cleanup(func() {
 		lipgloss.SetColorProfile(previous)
 	})
+}
+
+func forceTrueColorProfile(t *testing.T) {
+	withColorProfile(t, termenv.TrueColor)
+}
+
+func allColorProfiles() []struct {
+	name    string
+	profile termenv.Profile
+} {
+	return []struct {
+		name    string
+		profile termenv.Profile
+	}{
+		{"ascii", termenv.Ascii},
+		{"ansi", termenv.ANSI},
+		{"ansi256", termenv.ANSI256},
+		{"truecolor", termenv.TrueColor},
+	}
+}
+
+func TestSemanticWarningUsesANSIColorAcrossProfiles(t *testing.T) {
+	for _, profileCase := range allColorProfiles() {
+		t.Run(profileCase.name, func(t *testing.T) {
+			withColorProfile(t, profileCase.profile)
+			got := warn.Render("warning")
+			if ansi.Strip(got) != "warning" {
+				t.Fatalf("visible text changed: %q", got)
+			}
+			if profileCase.profile == termenv.Ascii {
+				if got != "warning" {
+					t.Fatalf("ascii profile emitted style: %q", got)
+				}
+				return
+			}
+			if strings.Contains(got, "38;2;") || strings.Contains(got, "48;2;") {
+				t.Fatalf("semantic warning must not become RGB: %q", got)
+			}
+			if !strings.Contains(got, "33") {
+				t.Fatalf("warning must use ANSI yellow: %q", got)
+			}
+		})
+	}
+}
+
+func TestHotkeyUsesANSIColorWithoutUnderline(t *testing.T) {
+	withColorProfile(t, termenv.TrueColor)
+	got := renderHotkey("k")
+	if ansi.Strip(got) != "k" {
+		t.Fatalf("visible hotkey changed: %q", got)
+	}
+	if !strings.Contains(got, "35") {
+		t.Fatalf("hotkey must use ANSI magenta: %q", got)
+	}
+	if strings.Contains(got, "\x1b[4") {
+		t.Fatalf("hotkey must not use underline: %q", got)
+	}
+}
+
+func TestTagSelectionUsesForegroundWithoutReverse(t *testing.T) {
+	withColorProfile(t, termenv.TrueColor)
+	label := formatSectionTargetItem(state.TargetItem{
+		Kind:       state.TargetKindTag,
+		Name:       "v1.0.0",
+		CommitHash: "abc1234",
+	}, 80)
+	got := renderSelectableSectionItem(label, true, 80)
+	if ansi.Strip(got) == "" {
+		t.Fatalf("expected visible selected tag row: %q", got)
+	}
+	if strings.Contains(got, "\x1b[7") {
+		t.Fatalf("tag hover must not use reverse/background: %q", got)
+	}
+	if !strings.Contains(got, "33") || !strings.Contains(got, "35") {
+		t.Fatalf("tag hover must preserve yellow selection and magenta tag foreground: %q", got)
+	}
+}
+
+func TestSearchHighlightUsesTerminalAttributes(t *testing.T) {
+	for _, profileCase := range allColorProfiles() {
+		t.Run(profileCase.name, func(t *testing.T) {
+			withColorProfile(t, profileCase.profile)
+			match := highlightSearchText("Add branch", "branch", false)
+			focus := highlightSearchText("Add branch", "branch", true)
+			for name, got := range map[string]string{"match": match, "focus": focus} {
+				if ansi.Strip(got) != "Add branch" {
+					t.Fatalf("%s changed visible text: %q", name, got)
+				}
+				if strings.Contains(got, "38;2;") || strings.Contains(got, "48;2;") {
+					t.Fatalf("%s uses RGB: %q", name, got)
+				}
+			}
+			if profileCase.profile == termenv.Ascii {
+				if match != "Add branch" || focus != "Add branch" {
+					t.Fatalf("ascii profile emitted style: %q / %q", match, focus)
+				}
+				return
+			}
+			if match == "Add branch" || focus == "Add branch" || match == focus {
+				t.Fatalf("search attributes are not distinguishable: %q / %q", match, focus)
+			}
+		})
+	}
+}
+
+func TestHandshakeUsesTerminalAttributes(t *testing.T) {
+	for _, profileCase := range allColorProfiles() {
+		t.Run(profileCase.name, func(t *testing.T) {
+			withColorProfile(t, profileCase.profile)
+			got := handshakeMark.Render("*")
+			if ansi.Strip(got) != "*" {
+				t.Fatalf("visible marker changed: %q", got)
+			}
+			if strings.Contains(got, "38;2;") || strings.Contains(got, "48;2;") {
+				t.Fatalf("handshake uses RGB: %q", got)
+			}
+			if profileCase.profile != termenv.Ascii && got == "*" {
+				t.Fatalf("handshake lost terminal attributes: %q", got)
+			}
+		})
+	}
+}
+
+func TestSecondaryStylesUseTerminalForeground(t *testing.T) {
+	styles := []struct {
+		name  string
+		style lipgloss.Style
+	}{
+		{"muted", muted},
+		{"popup-help", popupHelp},
+		{"disabled", disabled},
+		{"review-footer", reviewFooter},
+	}
+
+	for _, profileCase := range allColorProfiles() {
+		t.Run(profileCase.name, func(t *testing.T) {
+			withColorProfile(t, profileCase.profile)
+			for _, styleCase := range styles {
+				t.Run(styleCase.name, func(t *testing.T) {
+					got := styleCase.style.Render("help text")
+					if ansi.Strip(got) != "help text" {
+						t.Fatalf("visible text changed: %q", got)
+					}
+					if strings.Contains(got, "38;") || strings.Contains(got, "48;") {
+						t.Fatalf("secondary style must use terminal foreground: %q", got)
+					}
+				})
+			}
+		})
+	}
 }
 
 func TestMoveSelectableGraphPointerSkipsConnectors(t *testing.T) {
@@ -208,9 +358,7 @@ func TestRenderTitleStripFitsVisibleWidth(t *testing.T) {
 }
 
 func TestRenderFloatingTitlePopupPlacesTitleOnBorder(t *testing.T) {
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(40).
 		Align(lipgloss.Center)
@@ -2481,8 +2629,8 @@ func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
 	if withStash == withoutStash {
 		t.Fatalf("expected stash highlight to change focused graph row rendering\nwithout: %q\nwith:    %q", withoutStash, withStash)
 	}
-	if !strings.Contains(withStash, "38;5;208") {
-		t.Fatalf("expected focused graph row to use stash color on the graph pointer, got %q", withStash)
+	if !strings.Contains(withStash, stashMark.Render("*")) {
+		t.Fatalf("expected focused graph row to use stash marker style on the graph pointer, got %q", withStash)
 	}
 }
 
@@ -2566,8 +2714,8 @@ func TestRenderGraphContentShowsTagPointerForTaggedCommit(t *testing.T) {
 func TestFormatSectionTargetItemUsesTagHashColor(t *testing.T) {
 	forceTrueColorProfile(t)
 	got := formatSectionTargetItem(state.TargetItem{Kind: state.TargetKindTag, Name: "v1.0.0", Ref: "v1.0.0", CommitHash: "abc1234", Subject: "initial release", RelativeAge: "2 days ago"}, 80)
-	if !strings.Contains(got, "38;2;157;0;255") {
-		t.Fatalf("expected tag hash to use #9D00FF, got %q", got)
+	if !strings.Contains(got, "35") {
+		t.Fatalf("expected tag hash to use ANSI magenta foreground, got %q", got)
 	}
 }
 
@@ -2576,11 +2724,11 @@ func TestTagProvenanceStateLabel(t *testing.T) {
 	if got := ansi.Strip(tagProvenanceStateLabel(false, false, false)); got != "(unknown)" {
 		t.Fatalf("expected unknown provenance label, got %q", got)
 	}
-	if got := tagProvenanceStateLabel(true, true, false); !strings.Contains(got, "38;2;157;0;255") || !strings.Contains(ansi.Strip(got), "(local)") {
-		t.Fatalf("expected local provenance label to use tag color, got %q", got)
+	if got := tagProvenanceStateLabel(true, true, false); !strings.Contains(got, "35") || !strings.Contains(ansi.Strip(got), "(local)") {
+		t.Fatalf("expected local provenance label to use ANSI magenta, got %q", got)
 	}
-	if got := tagProvenanceStateLabel(true, true, true); !strings.Contains(got, "38;5;81") || !strings.Contains(ansi.Strip(got), "(origin)") {
-		t.Fatalf("expected origin provenance label to use remote color, got %q", got)
+	if got := tagProvenanceStateLabel(true, true, true); !strings.Contains(got, "34") || !strings.Contains(ansi.Strip(got), "(origin)") {
+		t.Fatalf("expected origin provenance label to use ANSI blue, got %q", got)
 	}
 }
 
