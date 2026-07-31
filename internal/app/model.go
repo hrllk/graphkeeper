@@ -54,6 +54,7 @@ type model struct {
 	graphStashPopCursor  int
 	graphStashPopEntries []git.StashEntry
 	hiddenHotkeysOpen    bool
+	hiddenHotkeysScroll  int
 
 	// Viewport and transient errors.
 	width       int

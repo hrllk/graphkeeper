@@ -73,7 +73,7 @@ func shellOverlayStack(m model, bodyWidth, bodyHeight int) []shellOverlay {
 		{
 			name:   "hidden-hotkeys",
 			active: m.hiddenHotkeysOpen,
-			popup:  renderHiddenHotkeysPopup(m, bodyWidth),
+			popup:  renderHiddenHotkeysPopup(m, bodyWidth, bodyHeight),
 		},
 		{
 			name:   "graph-search",

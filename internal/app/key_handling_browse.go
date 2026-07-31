@@ -101,6 +101,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		return true, m, nil
 	case "?":
 		m.hiddenHotkeysOpen = true
+		m.hiddenHotkeysScroll = 0
 		return true, m, nil
 	case "tab":
 		m.activeSection = nextGraphSection(m.activeSection)

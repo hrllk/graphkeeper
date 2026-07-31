@@ -1516,25 +1516,21 @@ func TestHiddenHotkeysPopupShowsMovedAndConditionalActions(t *testing.T) {
 	got := ansi.Strip(renderHiddenHotkeysPopup(model{
 		status:        state.New().WithBrowse(),
 		activeSection: sectionGraph,
-	}, 90))
+	}, 90, 0))
 	for _, want := range []string{
 		"Hidden hotkeys by section",
 		"focus: Graph",
 		"Global",
 		"Graph",
-		"Local",
-		"Remote",
-		"Tags",
 		"Common:",
 		"Moved out:",
 		"Visible:",
 		"m: merge",
 		"Conditional:",
-		"s: stash changes",
 		"s: reset",
 		"tab: next section",
 		"?: hidden hotkeys",
-		"enter: jump to graph",
+		hiddenHotkeyPopupFooter,
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected hidden hotkeys popup to contain %q, got %q", want, got)
@@ -1546,7 +1542,7 @@ func TestHiddenHotkeysPopupCentersHeaderAndFooter(t *testing.T) {
 	got := ansi.Strip(renderHiddenHotkeysPopup(model{
 		status:        state.New().WithBrowse(),
 		activeSection: sectionGraph,
-	}, 90))
+	}, 90, 0))
 	lines := strings.Split(got, "\n")
 	findLine := func(want string) string {
 		for _, line := range lines {
