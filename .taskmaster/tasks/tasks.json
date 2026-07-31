@@ -1,0 +1,137 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": "1",
+        "title": "feature",
+        "description": "Graph에서 커밋 전체 메시지와 diff를 빠르게 inspect하는 흐름을 추가한다.",
+        "details": "Reddit 피드백 중 커밋 상세 정보 부족 문제를 해결한다.",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "커밋 전체 메시지와 diff inspect",
+            "description": "선택한 커밋에서 전체 commit message와 diff를 빠르게 확인할 수 있는 Graph detail/preview 흐름 추가",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 1,
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "2",
+        "title": "refactor",
+        "description": "CLI 진입점에 표준 인자 처리 구조를 도입한다.",
+        "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리할 수 있도록 구조를 정리한다.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "CLI --help와 --version",
+            "description": "cmd/graphkeeper가 인자를 처리하고 --help/--version을 제공하도록 구현",
+            "details": "",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 2,
+            "updatedAt": "2026-07-28T10:56:08.352Z",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-07-28T10:56:08.352Z"
+      },
+      {
+        "id": "3",
+        "title": "security",
+        "description": "로컬 로그의 개인정보·권한·비활성화 정책을 정비한다.",
+        "details": "현재 0644 로그 파일 생성, 로그 비활성화 부재, 전용 테스트 부재를 해결한다.",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "로컬 로그 권한·비활성화·테스트",
+            "description": "0644 로그 파일 생성을 수정하고 로그 비활성화 옵션 및 전용 테스트 추가",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 3,
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "4",
+        "title": "fix",
+        "description": "터미널 색상 호환성과 밝은 배경 가독성을 수정한다.",
+        "details": "3-bit·256색·truecolor 혼용 문제를 정리하고 밝은 배경에서도 상태가 읽히도록 한다.",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "터미널 색상 호환성",
+            "description": "3-bit·256색·truecolor 혼용을 정리하고 밝은 배경에서 읽을 수 있는 색상 정책과 검증 추가",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 4,
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "5",
+        "title": "chore",
+        "description": "GitHub Release와 Linux 배포 검증을 정비한다.",
+        "details": "Release 자동화, Linux 실제 실행 검증, scripts/eval·doctor·hooks 지침 정합성을 처리한다.",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 2,
+            "title": "표준 스크립트 정합성",
+            "description": "AGENTS에 언급된 scripts/eval·scripts/doctor·scripts/hooks를 추가할지 지침을 정정할지 결정",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 5,
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "GitHub Release와 Linux 실행 검증",
+            "description": "GitHub Release 자동화와 Linux 실제 실행 검증 추가. Linux cross-build만 가능한 현재 상태를 해소",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 5,
+            "parentId": "undefined"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2026-07-28T10:56:08.352Z",
+      "taskCount": 5,
+      "completedCount": 1,
+      "tags": [
+        "master"
+      ]
+    }
+  }
+}
