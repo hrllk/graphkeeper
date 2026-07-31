@@ -28,6 +28,7 @@ https://github.com/user-attachments/assets/dbbb3cf1-e336-4046-9d3d-eb02066930bd
 - [AI-Assisted Development](#ai-assisted-development)
 - [Local Diagnostic Logs](#local-diagnostic-logs)
 - [Alpha Note](#alpha-note)
+- [Release Notes](#release-notes)
 - [Docs](#docs)
 
 ## Overview
@@ -246,6 +247,10 @@ What is intentionally out of scope:
 
 - conflict resolution inside the app
 - a full file-level Git workflow
+
+## Release Notes
+
+- [CHANGELOG](CHANGELOG.md) - release history and notes
 
 ## Docs
 

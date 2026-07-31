@@ -14,7 +14,7 @@ TUI inside a Git repository.
 1. Set the application version in [`VERSION`](../VERSION).
 
    ```bash
-   printf 'alpha.4\n' > VERSION
+   printf 'alpha.5\n' > VERSION
    ```
 
    Use the release version you want users to see. The build script removes
@@ -41,7 +41,7 @@ TUI inside a Git repository.
 
    Help and version output should succeed even when the current directory is
    not a Git repository. A release build reports the value from `VERSION`, for
-   example `graphkeeper alpha.4`.
+   example `graphkeeper alpha.5`.
 
 4. Change to a Git repository and start the TUI.
 

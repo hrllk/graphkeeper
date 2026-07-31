@@ -64,7 +64,7 @@ When using `go build` directly, pass the linker flag yourself if the binary
 must report a release version:
 
 ```bash
-go build -ldflags "-X main.version=alpha.4" -o graphkeeper ./cmd/graphkeeper
+go build -ldflags "-X main.version=alpha.5" -o graphkeeper ./cmd/graphkeeper
 ```
 
 ## Implementation surface
