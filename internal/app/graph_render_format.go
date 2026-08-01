@@ -13,7 +13,34 @@ const (
 	graphBranchTokenWidth    = 10
 	graphBranchOverflowWidth = 4
 	graphBranchFieldWidth    = graphBranchTokenWidth + graphBranchOverflowWidth
+	graphStatusWidth         = 5
+	graphTitleMinimumWidth   = 8
 )
+
+func graphRowFixedWidth(graphColWidth int) int {
+	return 8 + 1 + graphBranchFieldWidth + 1 + graphStatusWidth + 1 + graphColWidth + 1 + graphDateWidth + 1
+}
+
+func graphStatusText(stashCount, tagCount int) string {
+	switch {
+	case stashCount > 0 && tagCount > 0:
+		return "S·T"
+	case stashCount > 0:
+		return "S"
+	case tagCount > 0:
+		return "T"
+	default:
+		return ""
+	}
+}
+
+func renderGraphStatus(stashCount, tagCount int) string {
+	status := graphStatusText(stashCount, tagCount)
+	if status == "" {
+		return strings.Repeat(" ", graphStatusWidth)
+	}
+	return padRight(status, graphStatusWidth)
+}
 
 func hasHeadDecoration(decorations []string) bool {
 	for _, decoration := range decorations {
@@ -237,6 +264,19 @@ func compactTitleText(subject string) string {
 		return subject
 	}
 	return string(runes[:17]) + "..."
+}
+
+func fitGraphTitle(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(value) > width {
+		if width <= 3 {
+			return fitVisibleWidth(value, width)
+		}
+		return fitVisibleWidth(value, width-3) + "..."
+	}
+	return padRight(value, width)
 }
 
 func compactAuthorText(author string) string {

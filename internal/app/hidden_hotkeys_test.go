@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 
 	"hrllk/graphkeeper/internal/state"
 )
@@ -77,6 +78,37 @@ func TestHiddenHotkeysPopupShowsGlobalAndActiveSection(t *testing.T) {
 				t.Fatalf("expected popup footer, got %q", got)
 			}
 		})
+	}
+}
+
+func TestHiddenHotkeysGlobalOmitsSectionSpecificDuplicates(t *testing.T) {
+	got := ansi.Strip(renderHiddenHotkeysPopup(model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionCurrent,
+	}, 90, 0))
+	for _, want := range []string{"tab: next section", "q: quit", "?: hidden hotkeys"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected global hotkeys to contain %q, got %q", want, got)
+		}
+	}
+	for _, duplicate := range []string{"f: fetch", "F: fetch tags", "S: stash list"} {
+		if strings.Contains(got, duplicate) {
+			t.Fatalf("expected global hotkeys to omit section-specific duplicate %q, got %q", duplicate, got)
+		}
+	}
+}
+
+func TestHiddenHotkeysPopupUsesANSISemanticColors(t *testing.T) {
+	withColorProfile(t, termenv.TrueColor)
+	got := renderHiddenHotkeysPopup(model{
+		status:        state.New().WithBrowse(),
+		activeSection: sectionGraph,
+	}, 90, 0)
+	if strings.Contains(got, "38;5;205") {
+		t.Fatalf("hidden hotkeys popup must not use pink 256-color border: %q", got)
+	}
+	if !strings.Contains(got, "35") {
+		t.Fatalf("hidden hotkeys popup must use ANSI semantic popup color: %q", got)
 	}
 }
 

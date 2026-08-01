@@ -141,17 +141,16 @@ func renderTagPopup(m model, bodyWidth, bodyHeight int) string {
 		Padding(1, 2).
 		Width(width).
 		Align(lipgloss.Center)
-	lines := []string{
+	content := []string{
 		fmt.Sprintf("target: %s", shorten(m.tagPopupTarget, 8)),
 		fmt.Sprintf("name: %s", m.tagPopupDraft),
 	}
+	sections := []string{strings.Join(content, "\n")}
 	if m.tagPopupError != "" {
-		lines = append(lines, "")
-		lines = append(lines, warn.Render(m.tagPopupError))
+		sections = append(sections, warn.Render(m.tagPopupError))
 	}
-	lines = append(lines, "")
-	lines = append(lines, "enter: create  •  esc: cancel")
-	return renderFloatingTitlePopup(popupBox, "Create tag", strings.Join(lines, "\n"), width)
+	sections = append(sections, "enter: create  •  esc: cancel")
+	return renderFloatingTitlePopup(popupBox, "Create tag", joinLayoutSections(sections...), width)
 }
 
 func handleTagUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {

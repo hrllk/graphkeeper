@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -39,13 +40,18 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 		}
 		return ""
 	}
-	if m.activeSection == section && height > 0 && len(items) > height {
-		start = cursor - height + 1
+	visibleHeight := height
+	hasOverflow := len(items) > height
+	if hasOverflow {
+		visibleHeight = max(height-1, 0)
+	}
+	if m.activeSection == section && visibleHeight > 0 && len(items) > visibleHeight {
+		start = cursor - visibleHeight + 1
 		if start < 0 {
 			start = 0
 		}
-		if start > len(items)-height {
-			start = len(items) - height
+		if start > len(items)-visibleHeight {
+			start = len(items) - visibleHeight
 		}
 	}
 	lines := make([]string, 0, height+1)
@@ -54,7 +60,7 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 	}
 	rendered := 0
 	for i := start; i < len(items); i++ {
-		if rendered >= height {
+		if rendered >= visibleHeight {
 			break
 		}
 		item := items[i]
@@ -64,6 +70,12 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 		}
 		lines = append(lines, renderSelectableSectionItem(label, i == cursor && m.activeSection == section, width))
 		rendered++
+	}
+	if hasOverflow {
+		hidden := len(items) - rendered
+		if hidden > 0 {
+			lines = append(lines, fitVisibleWidth(muted.Render(fmt.Sprintf("… +%d", hidden)), width))
+		}
 	}
 	return strings.Join(lines, "\n")
 }

@@ -170,6 +170,8 @@
 
 ## 2026-07-10: Graph tag markers should stay compact and use a single overlap color on stash collision
 
+Superseded on 2026-08-01 by the topology/status-column decision above.
+
 - Keep tag presence in the Graph row as a compact marker, not a separate column.
 - Keep commit hash styling neutral so the identifier never competes with status coloring.
 - When stash and tag land on the same commit point, render a single `#A14743` overlap badge instead of split or dual markers.
@@ -197,3 +199,20 @@
 - Use the terminal default foreground for muted/help/disabled/footer text because bright black can be low contrast on white or beige backgrounds.
 - Validate Ascii, ANSI, ANSI256, TrueColor, and `NO_COLOR=1` smoke conditions without changing layout, key bindings, or state transitions.
 - Limit this task to `theme.go`, shell, graph, graph search, related tests, and color policy docs. Defer direct color migration in individual popup files.
+## 2026-08-01: Graph topology와 stash/tag 상태 컬럼을 분리한다
+
+- Graph topology의 `*`는 stash/tag 여부와 관계없이 항상 유지한다.
+- stash/tag 상태는 branches와 topology 사이의 고정 `state` 컬럼에 `S`, `T`, `S·T`로 표시한다.
+- Graph page 정보 줄 오른쪽에 `S stash · T tag` 축약 범례를 표시한다. `S·T`는
+  두 상태의 조합으로 읽을 수 있으므로 범례에서 반복하지 않는다.
+- 과거의 색상 기반 단일 overlap marker는 보조 표현으로만 남기고, 상태 식별은
+  visible text marker를 기준으로 한다.
+
+## 2026-08-01: Hidden Hotkeys 오버레이 색상과 Global 항목
+
+- Hidden Hotkeys 오버레이는 개별 256색을 직접 지정하지 않고 공통 popup
+  semantic style을 사용한다. ANSI profile과 `NO_COLOR` 정책이 다른 팝업과
+  동일하게 적용되어야 한다.
+- Global 목록에는 섹션별로 반복되는 `f/F/S` 항목을 넣지 않는다. 섹션 이동,
+  이동·스크롤, 종료, 오버레이 호출처럼 공통으로 필요한 항목과 별도 이동 그룹만
+  유지한다.

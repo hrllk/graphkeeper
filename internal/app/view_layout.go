@@ -8,6 +8,19 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+const layoutSectionGap = 1
+
+func joinLayoutSections(sections ...string) string {
+	nonEmpty := make([]string, 0, len(sections))
+	for _, section := range sections {
+		section = strings.TrimSpace(section)
+		if section != "" {
+			nonEmpty = append(nonEmpty, section)
+		}
+	}
+	return strings.Join(nonEmpty, strings.Repeat("\n", layoutSectionGap+1))
+}
+
 func layoutShellMargins(m model) (hMargin, topMargin, bottomMargin int) {
 	hMargin = int(float64(m.width) * 0.10)
 	topMargin = int(float64(m.height) * 0.12)
@@ -308,12 +321,12 @@ func renderFloatingTitleFrame(style lipgloss.Style, title, body string, width, h
 
 	titleLine := renderTitleStrip(style, title, width)
 	bodyStyle := style.BorderTop(false)
-	bodyHeight := height
+	bodyHeight := height - 2
 	if bodyHeight < 1 {
 		bodyHeight = 1
 	}
 	bodyBlock := bodyStyle.Width(width).Height(bodyHeight).Render(body)
-	return titleLine + "\n" + bodyBlock
+	return fitBlockLines(strings.Split(titleLine+"\n"+bodyBlock, "\n"), height)
 }
 
 func renderFloatingTitlePopup(style lipgloss.Style, title, body string, width int) string {

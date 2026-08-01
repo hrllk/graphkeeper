@@ -48,6 +48,10 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 	} else if isHandshake {
 		graphCell = strings.ReplaceAll(graphCell, "*", handshakeMark.Render("*"))
 	}
+	status := strings.Repeat(" ", graphStatusWidth)
+	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
+		status = renderGraphStatus(stashCount, len(row.Commit.Tags))
+	}
 	var when, title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
 		when = "       "
@@ -56,7 +60,7 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
 		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, graphColWidth, selected && graphActive)
 	}
-	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
+	line := hash + " " + refs + " " + status + " " + graphCell + " " + when + " " + title
 	return fitVisibleWidth(line, rowWidth)
 }
 
@@ -70,7 +74,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		if isHandshake {
 			graphCell = strings.ReplaceAll(graphCell, "*", handshakeMark.Render("*"))
 		}
-		line := fmt.Sprintf("%-8s %-14s %s  %-7s %-*s", "", "", graphCell, "", graphBranchFieldWidth, "")
+		line := fmt.Sprintf("%-8s %-14s %-5s %-*s %-7s %s", "", "", "", graphColWidth, graphCell, "", "")
 		return fitVisibleWidth(line, rowWidth)
 	}
 	var hash, refs string
@@ -130,35 +134,32 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
 		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, graphColWidth, selected && graphActive)
 	}
-	line := hash + " " + refs + " " + graphCell + "  " + when + " " + title
+	status := "   "
+	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
+		status = renderGraphStatus(stashCount, len(row.Commit.Tags))
+	}
+	line := hash + " " + refs + " " + status + " " + graphCell + " " + when + " " + title
 	return fitVisibleWidth(line, rowWidth)
 }
 
 func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth, graphColWidth int, focused bool) string {
 	author = compactAuthorText(author)
-	subject = compactTitleText(subject)
-	available := rowWidth - (8 + 1 + graphBranchFieldWidth + 1 + graphColWidth + 2 + graphDateWidth + 1)
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		subject = "-"
+	}
+	available := rowWidth - graphRowFixedWidth(graphColWidth)
 	if available <= 0 {
 		return ""
 	}
-	if available <= graphTitleWidthTarget {
-		return renderSearchField(subject, searchQuery, available, focused)
-	}
-
-	titleWidth := graphTitleWidthTarget
-	if available < graphTitleWidthTarget+graphAuthorWidthTarget {
-		return renderSearchField(subject, searchQuery, titleWidth, focused)
+	if available < graphAuthorWidthTarget+graphTitleMinimumWidth {
+		return fitGraphTitle(renderSearchField(subject, searchQuery, available, focused), available)
 	}
 
 	authorWidth := graphAuthorWidthTarget
-	renderedAuthor := renderSearchField(author, searchQuery, authorWidth, focused)
-	if renderedAuthor == "" {
-		return renderSearchField(subject, searchQuery, titleWidth, focused)
-	}
-	renderedTitle := renderSearchField(subject, searchQuery, titleWidth, focused)
-	if renderedTitle == "" {
-		return renderedAuthor
-	}
+	titleWidth := available - authorWidth
+	renderedAuthor := fitGraphTitle(renderSearchField(author, searchQuery, authorWidth, focused), authorWidth)
+	renderedTitle := fitGraphTitle(renderSearchField(subject, searchQuery, titleWidth, focused), titleWidth)
 	return renderedAuthor + renderedTitle
 }
 

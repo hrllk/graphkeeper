@@ -178,12 +178,17 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 			m = pageBrowseGraph(m, -1)
 			return true, m, nil
 		}
+		m.contextScroll -= 4
+		if m.contextScroll < 0 {
+			m.contextScroll = 0
+		}
 		return true, m, nil
 	case "ctrl+d":
 		if m.activeSection == sectionGraph {
 			m = pageBrowseGraph(m, 1)
 			return true, m, nil
 		}
+		m.contextScroll += 4
 		return true, m, nil
 	default:
 		return false, m, nil

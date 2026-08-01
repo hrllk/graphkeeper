@@ -232,18 +232,15 @@ func renderStashMessagePopup(m model, bodyWidth int) string {
 	if draft == "" {
 		draft = " "
 	}
-	lines := []string{
+	sections := []string{strings.Join([]string{
 		descStyle.Render("Enter a message for this stash."),
-		"",
 		descStyle.Render("message: " + draft),
-	}
+	}, "\n")}
 	if m.stashMessageError != "" {
-		lines = append(lines, "")
-		lines = append(lines, errStyle.Render(m.stashMessageError))
+		sections = append(sections, errStyle.Render(m.stashMessageError))
 	}
-	lines = append(lines, "")
-	lines = append(lines, helpStyle.Render("enter: stash  •  esc: cancel"))
-	return renderFloatingTitlePopup(popupBox, "Stash changes", strings.Join(lines, "\n"), popupWidth)
+	sections = append(sections, helpStyle.Render("enter: stash  •  esc: cancel"))
+	return renderFloatingTitlePopup(popupBox, "Stash changes", joinLayoutSections(sections...), popupWidth)
 }
 
 func renderGraphStashPopPopup(m model, bodyWidth, bodyHeight int) string {

@@ -7,41 +7,45 @@ import (
 )
 
 func renderGraphConnectorLines(current, next graphRow, isHandshake bool) []string {
+	return renderGraphConnectorLinesWithWidth(current, next, isHandshake, 16)
+}
+
+func renderGraphConnectorLinesWithWidth(current, next graphRow, isHandshake bool, graphColWidth int) []string {
 	if shouldCollapseRowDisplay(next) {
-		return collapseConnectorLines(current, isHandshake)
+		return collapseConnectorLines(current, isHandshake, graphColWidth)
 	}
-	if lines := parentShiftConnectorLines(current, next, isHandshake); len(lines) > 0 {
+	if lines := parentShiftConnectorLines(current, next, isHandshake, graphColWidth); len(lines) > 0 {
 		return lines
 	}
 	return nil
 }
 
-func collapseConnectorLines(current graphRow, isHandshake bool) []string {
+func collapseConnectorLines(current graphRow, isHandshake bool, graphColWidth int) []string {
 	width := len(current.After)
 	if width <= 1 {
 		return nil
 	}
 	if width == 2 {
-		return []string{renderGraphSpacer([]string{"|", "/"}, isHandshake)}
+		return []string{renderGraphSpacer([]string{"|", "/"}, isHandshake, graphColWidth)}
 	}
 	lines := make([]string, 0, width)
 	full := make([]string, width)
 	for i := range full {
 		full[i] = "|"
 	}
-	lines = append(lines, renderGraphSpacer(full, isHandshake))
+	lines = append(lines, renderGraphSpacer(full, isHandshake, graphColWidth))
 	for w := width; w >= 2; w-- {
 		cells := make([]string, w)
 		for i := range cells {
 			cells[i] = "|"
 		}
 		cells[w-1] = "/"
-		lines = append(lines, renderGraphSpacer(cells, isHandshake))
+		lines = append(lines, renderGraphSpacer(cells, isHandshake, graphColWidth))
 	}
 	return lines
 }
 
-func parentShiftConnectorLines(current, next graphRow, isHandshake bool) []string {
+func parentShiftConnectorLines(current, next graphRow, isHandshake bool, graphColWidth int) []string {
 	width := max(len(current.After), graph.RowWidth(next))
 	if width <= 1 {
 		return nil
@@ -72,7 +76,7 @@ func parentShiftConnectorLines(current, next graphRow, isHandshake bool) []strin
 				full[i] = " "
 			}
 		}
-		return []string{renderGraphSpacer(full, isHandshake), renderGraphSpacer(cells, isHandshake)}
+		return []string{renderGraphSpacer(full, isHandshake, graphColWidth), renderGraphSpacer(cells, isHandshake, graphColWidth)}
 	}
 	return nil
 }
@@ -90,9 +94,10 @@ func shouldHideConvergedDuplicateLane(row graphRow, idx, displayLane int) bool {
 	return true
 }
 
-func renderGraphSpacer(cells []string, isHandshake bool) string {
-	prefix := strings.Repeat(" ", 8) + " " + strings.Repeat(" ", 16) + " "
-	return "  " + prefix + strings.Join(cells, " ")
+func renderGraphSpacer(cells []string, isHandshake bool, graphColWidth int) string {
+	prefix := strings.Repeat(" ", 8) + " " + strings.Repeat(" ", graphBranchFieldWidth) + " "
+	graph := padRight(strings.Join(cells, " "), graphColWidth)
+	return prefix + strings.Repeat(" ", graphStatusWidth) + " " + graph + " "
 }
 
 func shouldCollapseRowDisplay(row graphRow) bool {

@@ -25,6 +25,7 @@ type model struct {
 	sectionCursor   map[graphSection]int
 	graphLaneCursor int
 	graphScroll     int
+	contextScroll   int
 	awaitingGoTop   bool
 
 	// Graph search state.

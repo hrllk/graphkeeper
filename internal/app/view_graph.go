@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m model) renderGraphContent(width, height int) string {
@@ -20,7 +22,13 @@ func (m model) renderGraphContent(width, height int) string {
 		end = len(rows)
 	}
 	lines := make([]string, 0, height)
-	lines = append(lines, fitVisibleWidth(muted.Render(fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))), width))
+	pageLabel := fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))
+	legend := "S stash · T tag"
+	pageLine := pageLabel
+	if available := width - lipgloss.Width(pageLabel) - lipgloss.Width(legend); available >= 2 {
+		pageLine += strings.Repeat(" ", available) + legend
+	}
+	lines = append(lines, fitVisibleWidth(muted.Render(pageLine), width))
 	graphActive := m.activeSection == sectionGraph
 	graphColWidth := max(18, int(float64(width)*0.30))
 	rawGraph := len(rows) > 0 && rows[0].Graph != ""
@@ -37,7 +45,7 @@ func (m model) renderGraphContent(width, height int) string {
 		lines = append(lines, lineStr)
 		if !rawGraph && i+1 < len(rows) {
 			isConnectorHandshake := rows[i].Commit.Hash != "" && m.handshakeCommits[rows[i].Commit.Hash] && rows[i+1].Commit.Hash != "" && m.handshakeCommits[rows[i+1].Commit.Hash]
-			for _, line := range renderGraphConnectorLines(rows[i], rows[i+1], isConnectorHandshake) {
+			for _, line := range renderGraphConnectorLinesWithWidth(rows[i], rows[i+1], isConnectorHandshake, graphColWidth) {
 				if len(lines) >= height {
 					break
 				}
@@ -54,15 +62,14 @@ func (m model) renderGraphContent(width, height int) string {
 }
 
 func renderGraphHeader(width, graphColWidth int) string {
-	available := width - (8 + 1 + graphBranchFieldWidth + 1 + graphColWidth + 2 + graphDateWidth + 1)
+	available := width - graphRowFixedWidth(graphColWidth)
 	if available <= 0 {
 		return ""
 	}
-	if available <= graphTitleWidthTarget {
-		return fmt.Sprintf("%-8s %-14s %-*s %-*s %-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphTitleWidthTarget, "title")
+	prefix := fmt.Sprintf("%-8s %-14s %-*s %-*s %-*s ", "commit", "branches", graphStatusWidth, "state", graphColWidth, "graph", graphDateWidth, "date")
+	if available < graphAuthorWidthTarget+graphTitleMinimumWidth {
+		return prefix + fmt.Sprintf("%-*s", available, "title")
 	}
-	if available < graphTitleWidthTarget+graphAuthorWidthTarget {
-		return fmt.Sprintf("%-8s %-14s %-*s %-*s %-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphTitleWidthTarget, "title")
-	}
-	return fmt.Sprintf("%-8s %-14s %-*s %-*s %-*s%-*s", "commit", "branches", graphColWidth, "graph", graphDateWidth, "date", graphAuthorWidthTarget, "author", graphTitleWidthTarget, "title")
+	titleWidth := available - graphAuthorWidthTarget
+	return prefix + fmt.Sprintf("%-*s%-*s", graphAuthorWidthTarget, "author", titleWidth, "title")
 }

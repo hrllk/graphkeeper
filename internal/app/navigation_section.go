@@ -46,6 +46,7 @@ func prevGraphSection(current graphSection) graphSection {
 
 func switchBrowseSection(m model, section graphSection) model {
 	m.activeSection = section
+	m.contextScroll = 0
 	m.awaitingGoTop = false
 	return m
 }
@@ -90,5 +91,6 @@ func moveSectionBrowseCursor(m model, delta int) model {
 		next = 0
 	}
 	m.sectionCursor[m.activeSection] = next
+	m.contextScroll = 0
 	return m
 }

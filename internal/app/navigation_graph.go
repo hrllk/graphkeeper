@@ -187,6 +187,7 @@ func focusGraphCommit(m *model, rs git.Status, hash string) bool {
 		return false
 	}
 	m.sectionCursor[sectionGraph] = row
+	m.contextScroll = 0
 	page := graphPageSizeForRows(m, rows, row, graphContentHeightForModel(m))
 	m.graphScroll = clampScroll(row, len(rows), page)
 	m.graphLaneCursor = graph.PointerLane(rows[row])
@@ -197,6 +198,7 @@ func moveGraphBrowseCursor(m model, delta int) model {
 	rows := graph.Rows(m.repoStatus)
 	cursor := graph.MoveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)
 	m.sectionCursor[sectionGraph] = cursor
+	m.contextScroll = 0
 	page := graphPageSize(&m)
 	if cursor < m.graphScroll {
 		m.graphScroll = cursor
@@ -229,6 +231,7 @@ func pageBrowseGraph(m model, pages int) model {
 	rows := graph.Rows(m.repoStatus)
 	cursor := graph.MoveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)
 	m.sectionCursor[sectionGraph] = cursor
+	m.contextScroll = 0
 	m.graphScroll = clampScroll(cursor, total, page)
 	if cursor >= 0 && cursor < len(rows) {
 		m.graphLaneCursor = graph.PointerLane(rows[cursor])

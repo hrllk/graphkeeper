@@ -152,10 +152,10 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 	return renderFloatingTitlePopup(
 		popupBox,
 		popupTitle,
-		centerReviewFooterLine(strings.Join([]string{
+		centerReviewFooterLine(joinLayoutSections(
 			descStyle.Render(m.status.Detail),
 			helpStyle.Render(helpText),
-		}, "\n\n"), width-4),
+		), width-4),
 		width,
 	)
 }
@@ -349,29 +349,26 @@ func (m model) renderRightRail(width, height int) string {
 	if cardWidth < 1 {
 		cardWidth = 1
 	}
-	sectionHeight := height - 3
-	if sectionHeight < 1 {
-		sectionHeight = 1
-	}
+	sectionHeight := height
 	localHeight, remoteHeight, tagsHeight := splitThreeHeights(sectionHeight)
 	localBox := renderFloatingTitleFrame(
 		m.getBoxStyle(sectionCurrent).Width(cardWidth).Height(localHeight),
 		"[2] Local",
-		m.renderSectionContent(sectionCurrent, max(cardWidth-4, 0), localHeight),
+		m.renderSectionContent(sectionCurrent, max(cardWidth-4, 0), max(localHeight-2, 0)),
 		cardWidth,
 		localHeight,
 	)
 	remoteBox := renderFloatingTitleFrame(
 		m.getBoxStyle(sectionRemote).Width(cardWidth).Height(remoteHeight),
 		"[3] Remote",
-		m.renderSectionContent(sectionRemote, max(cardWidth-4, 0), remoteHeight),
+		m.renderSectionContent(sectionRemote, max(cardWidth-4, 0), max(remoteHeight-2, 0)),
 		cardWidth,
 		remoteHeight,
 	)
 	tagsBox := renderFloatingTitleFrame(
 		m.getBoxStyle(sectionTags).Width(cardWidth).Height(tagsHeight),
 		"[4] Tags",
-		m.renderSectionContent(sectionTags, max(cardWidth-4, 0), tagsHeight),
+		m.renderSectionContent(sectionTags, max(cardWidth-4, 0), max(tagsHeight-2, 0)),
 		cardWidth,
 		tagsHeight,
 	)

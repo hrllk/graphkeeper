@@ -84,9 +84,7 @@ func clampHiddenHotkeyScroll(offset, totalLines, viewportHeight int) int {
 }
 
 func hiddenHotkeyPopupStyle(width int) lipgloss.Style {
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	return popupBorder.
 		Padding(1, 2).
 		Width(width).
 		Align(lipgloss.Left)
@@ -119,19 +117,17 @@ func visibleHiddenHotkeySections(m model) []hiddenHotkeySection {
 }
 
 func hiddenHotkeyPopupBody(m model, width int, content []string, showFocus bool, offset, viewport int) string {
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Bold(true)
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	lines := []string{
-		renderCenteredPopupLine(headerStyle.Render("Hidden hotkeys by section"), width),
+		renderCenteredPopupLine(popupHeader.Render("Hidden hotkeys by section"), width),
 	}
 	if showFocus {
-		lines = append(lines, renderCenteredPopupLine(helpStyle.Render("focus: "+sectionName(m.activeSection)), width), "")
+		lines = append(lines, renderCenteredPopupLine(popupHelp.Render("focus: "+sectionName(m.activeSection)), width), "")
 	}
 	if viewport > 0 && offset < len(content) {
 		end := min(offset+viewport, len(content))
 		lines = append(lines, content[offset:end]...)
 	}
-	lines = append(lines, "", renderCenteredPopupLine(helpStyle.Render(hiddenHotkeyPopupFooter), width))
+	lines = append(lines, "", renderCenteredPopupLine(popupHelp.Render(hiddenHotkeyPopupFooter), width))
 	return strings.Join(lines, "\n")
 }
 
@@ -188,9 +184,6 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 						{key: "tab", desc: "next section"},
 						{key: "shift+tab", desc: "previous section"},
 						{key: "j/k", desc: "move"},
-						{key: "f", desc: "fetch"},
-						{key: "F", desc: "fetch tags"},
-						{key: "S", desc: "stash list"},
 						{key: "q", desc: "quit"},
 						{key: "?", desc: "hidden hotkeys"},
 					},

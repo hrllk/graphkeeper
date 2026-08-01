@@ -152,7 +152,8 @@ The graph is the primary mental model.
 - branch labels show where refs point
 - remote labels show what still lives on origin
 - tag labels show release points
-- stash markers show local work that has been parked
+- Graph rows keep the topology `*` and show stash/tag state in a visible `S`, `T`, or `S·T` column
+- the Graph page line explains the state markers as `S stash · T tag`; `S·T` means both markers together
 
 The usual maintainer flow looks like this:
 
