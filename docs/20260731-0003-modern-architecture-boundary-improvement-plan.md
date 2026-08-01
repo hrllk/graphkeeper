@@ -2,7 +2,7 @@
 
 # Graphkeeper 점진적 구조개선 계획
 
-상태: 1차 구현 완료(T1~T3), T4~T6 후속 구현 대기
+상태: T4~T6 1차 구현 완료, 최종 리뷰 대기
 브랜치: `develop`
 작성일: 2026-07-31
 선택한 방향: A. 점진적 경계 개선
@@ -234,7 +234,321 @@ view → state/graph/app의 render input
 
 완료 기준: renderer가 Git adapter나 mutation 함수를 참조하지 않고, 동일한 projection 입력은 동일한 visible output을 만든다.
 
-### Phase 5. 테스트와 문서 구조 정리
+### Phase 4 상세 구현 계획: T4 renderer projection
+
+T4의 목적은 `model`을 작게 보이게 만드는 것이 아니라, 렌더러가 저장소 DTO와 실행 정책을 알지 못하도록 입력 경계를 고정하는 것이다. 기존 Graph-first industrial TUI의 출력과 단축키 의미는 유지한다.
+
+#### T4.1 projection 타입과 소유 경계
+
+새 파일은 실제 중복이 확인된 뒤 추가한다. 최초 구현에서는 `internal/app/view_projection.go`에 app 전용 projection 타입을 둔다. projection은 renderer가 필요한 값만 가진다.
+
+```go
+// view_projection.go
+type ScreenProjection struct {
+	Width       int
+	Height      int
+	Graph       GraphProjection
+	Sections    SectionProjection
+	Context     ContextProjection
+	Overlay     OverlayProjection
+	Global      GlobalProjection
+}
+
+type GraphProjection struct {
+	Rows          []GraphRowProjection
+	SelectedIndex int
+	Scroll        int
+	Search        SearchProjection
+	Handshake     map[string]bool
+}
+
+type GraphRowProjection struct {
+	Hash       string
+	Decorations []string
+	Graph      string
+	Author     string
+	Subject    string
+	RelativeAge string
+	StashCount int
+	TagCount   int
+	Virtual    bool
+}
+
+type SectionProjection struct {
+	Current SectionListProjection
+	Remote  SectionListProjection
+	Tags    SectionListProjection
+}
+
+type SectionListProjection struct {
+	Title       string
+	Items       []SelectableItemProjection
+	Cursor      int
+	Overflow    int
+	Active      bool
+}
+
+type SelectableItemProjection struct {
+	Label       string
+	Ref         string
+	State       string
+	Disabled    bool
+	RecoveryHint string
+}
+```
+
+`projectScreen(m model) ScreenProjection`만 `model`, `git.Status`, `state.Status`를 읽는다. `renderAppView`와 하위 `renderGraph*`, `renderSection*`, popup renderer는 projection만 인자로 받는다.
+
+```go
+func (m model) screenProjection() ScreenProjection {
+	return ScreenProjection{
+		Width:  m.width,
+		Height: m.height,
+		Graph: projectGraph(m.repoStatus, m.sectionCursor[sectionGraph], m.graphScroll, m.handshakeCommits, m.graphSearchQuery),
+		Sections: projectSections(m.repoStatus, m.activeSection, m.sectionCursor),
+		Context: projectContext(m.status, m.contextScroll),
+		Overlay: projectOverlay(m),
+		Global:  projectGlobal(m.status),
+	}
+}
+
+func renderAppView(p ScreenProjection) string {
+	// 이 함수와 하위 renderer는 git.Repo, git.Status, state.Action을 import하지 않는다.
+	return renderShell(p)
+}
+```
+
+초기 이행 중에는 `renderAppViewFromModel(m model)` compatibility shim을 둔다. shim은 `m.screenProjection()`을 한 번 호출한 뒤 새 renderer로 전달한다. 모든 호출자가 projection을 직접 사용하고 나면 shim 제거가 T4 완료 조건이다.
+
+#### T4.2 상태와 오류 표현 계약
+
+projection은 정상 상태만 표현하지 않는다. 다음 상태를 각각 명시적으로 표현한다.
+
+| 상태 | projection 표현 | renderer 규칙 | 검증 |
+|---|---|---|---|
+| loading | `Loading=true`, 기존 snapshot 선택 | 현재 값과 loading 문구를 혼동하지 않음 | width/height별 출력 |
+| empty | `Empty=true`, 빈 items | 빈 화면과 오류를 같은 문구로 표시하지 않음 | empty repo fixture |
+| partial | `Degraded=true`, `RecoveryHint` | 유효한 필드는 유지하고 누락 필드를 `-` 또는 안내로 표시 | optional field 실패 |
+| stale 폐기 | 화면 입력으로 전달하지 않음 | 이전 refresh 결과가 현재 projection을 변경하지 않음 | epoch 전환 테스트 |
+| blocked/error | `ErrorMessage`, `RecoveryHint` | 문제·원인·복구 키를 함께 표시 | non-zero/timeout 테스트 |
+| 좁은 터미널 | 폭 예산으로 축약 | hash, topology, 선택 상태, recovery hint 우선 보존 | 40/60/80열 |
+
+`RecoveryHint`는 단순한 색상이나 아이콘으로 대체하지 않는다. 색상은 보조 수단이고 ANSI/NO_COLOR 환경에서도 문자열 의미가 남아야 한다.
+
+#### T4.3 폭·색상·순수성 계약
+
+```go
+func renderProjection(p ScreenProjection) string
+func graphRowFixedWidth(graphWidth int) int
+func fitProjectionText(value string, width int) string
+```
+
+- `lipgloss.Width` 기준 visible width를 사용한다.
+- 한 row의 폭 계산은 `graphRowFixedWidth`와 동일한 함수를 header/row/connector가 공유한다.
+- 40열에서는 author를 생략할 수 있지만 hash, graph, 날짜 또는 상태, title의 최소 식별자는 보존한다.
+- ANSI, ANSI256, TrueColor, `NO_COLOR`에서 semantic marker의 문자열과 visible width가 동일해야 한다.
+- projection builder는 Git 명령, 파일 접근, telemetry side effect를 수행하지 않는다.
+- 동일한 `ScreenProjection` 입력은 동일한 visible output을 반환해야 한다.
+
+#### T4.4 T4 완료 게이트
+
+1. `rg "git\\.Status|\\*git\\.Repo|repo\\.Run" internal/app/view_*.go internal/app/graph_render*.go` 결과가 0건이다.
+2. renderer test가 `model`을 직접 생성하지 않고 projection fixture를 사용한다.
+3. Graph/Context/Local/Remote/Tags/popup의 normal, empty, partial, error, narrow 출력이 고정된다.
+4. 기존 `model_test.go`의 관련 테스트가 새 projection test로 이동한 뒤 compatibility shim을 제거한다.
+
+### Phase 5 상세 구현 계획: T5 workflow adapter cleanup
+
+T5는 T4 projection과 독립적인 Git 재작성 작업이 아니다. T2/T3에서 확정한 snapshot epoch·target validation 계약을 workflow 결과와 adapter 경계로 확장한다. `commands.go`를 먼저 파일로 쪼개지 않고, 한 workflow를 수직으로 이동한 뒤 반복을 제거한다.
+
+#### T5.1 app 소유 최소 repository contract
+
+`internal/app`의 workflow consumer가 필요한 최소 계약을 정의한다. 이 interface는 `git.Repo` 전체를 복제하지 않는다.
+
+```go
+// internal/app/repository_contract.go
+type Repository interface {
+	Snapshot(ctx context.Context, limit int) (RepositorySnapshot, error)
+	ValidateTarget(ctx context.Context, target TargetRef) error
+	Execute(ctx context.Context, operation Operation) (CommandResult, error)
+	Reload(ctx context.Context, limit int) (RepositorySnapshot, error)
+}
+
+type TargetRef struct {
+	Kind state.TargetKind
+	Name string
+	Hash string
+}
+
+type RepositorySnapshot struct {
+	Epoch       uint64
+	CapturedAt  time.Time
+	Branch      string
+	Head        string
+	Graph       []GraphSnapshotRow
+	Branches    []BranchSnapshot
+	Tags        []TagSnapshot
+	Worktree    WorktreeSnapshot
+	Validity    SnapshotValidity
+}
+
+type SnapshotValidity struct {
+	Graph    FieldValidity
+	Branches FieldValidity
+	Tags     FieldValidity
+	Worktree FieldValidity
+}
+
+type FieldValidity struct {
+	Available bool
+	Degraded  bool
+	Cause     string
+}
+```
+
+`gitRepositoryAdapter`만 `*git.Repo`와 `git.Status`를 알고 app contract로 변환한다. `update_*`, renderer, state transition helper는 `RepositorySnapshot`과 `OperationResult`만 사용한다.
+
+#### T5.2 workflow와 결과 계약
+
+각 workflow는 아래 순서를 지키며, 단계 누락을 허용하지 않는다.
+
+```text
+intent
+  → snapshot(epoch=current)
+  → validate(target + current state)
+  → execute(operation)
+  → reload(snapshot)
+  → OperationResult 생성
+  → message 전달
+  → state transition + projection
+```
+
+```go
+type OperationResult struct {
+	Operation    state.Action
+	Target       TargetRef
+	StartedEpoch uint64
+	ResultEpoch  uint64
+	Snapshot     RepositorySnapshot
+	Command      CommandResult
+	Phase        OperationPhase
+	Err          error
+	RecoveryHint string
+}
+
+type OperationPhase string
+
+const (
+	PhaseValidated OperationPhase = "validated"
+	PhaseExecuted  OperationPhase = "executed"
+	PhaseReloaded  OperationPhase = "reloaded"
+	PhasePartial   OperationPhase = "partial"
+)
+```
+
+- `StartedEpoch != ResultEpoch`이면 결과를 화면 상태에 적용하지 않고 최신 snapshot을 요청한다.
+- Git command가 성공했지만 reload가 실패하면 `PhasePartial`을 유지하고 “작업은 실행됐지만 최신 상태를 읽지 못했다”를 표시한다.
+- command non-zero/timeout은 `CommandResult`의 exit code와 stderr를 보존하되 사용자 문구에는 action, target, recovery hint를 포함한다.
+- force-push, clean, hard reset, branch/tag/remote delete는 `ValidateTarget` 후 `Execute` 사이에 target을 다시 만들거나 바꿀 수 없다는 Git의 한계를 문서화한다. 확인 가능한 target ref/hash를 함께 전달하고, hash mismatch면 execute하지 않는다.
+
+#### T5.3 수직 이행 순서
+
+1. merge/rebase를 첫 workflow로 adapter에 연결한다.
+2. reset/branch delete/tag delete/remote delete를 동일한 `TargetRef` 검증으로 이동한다.
+3. stash/clean/pull/push/cherry-pick을 `OperationResult`에 연결한다.
+4. tag snapshot attach, reload, error mapping 중복을 adapter/workflow helper로 이동한다.
+5. 기존 `load*`, `execute*` 함수는 compatibility shim으로 유지하고 모든 호출자가 새 workflow를 사용하면 제거한다.
+
+#### T5.4 fake repository 계약
+
+```go
+type FakeRepository struct {
+	Snapshots  []RepositorySnapshot
+	Validations []TargetRef
+	Operations []Operation
+	Results    []FakeResult
+}
+
+func (f *FakeRepository) Snapshot(context.Context, int) (RepositorySnapshot, error)
+func (f *FakeRepository) ValidateTarget(context.Context, TargetRef) error
+func (f *FakeRepository) Execute(context.Context, Operation) (CommandResult, error)
+func (f *FakeRepository) Reload(context.Context, int) (RepositorySnapshot, error)
+```
+
+fixture는 호출 순서와 epoch을 검사한다. `Execute` 전에 `ValidateTarget`이 없으면 테스트가 실패해야 한다. filesystem/subprocess 없는 app workflow test와 실제 temporary Git repository를 사용하는 `internal/git` integration test를 분리한다.
+
+#### T5.5 T5 완료 게이트
+
+1. `internal/app` workflow test가 `exec.Command`, temporary Git repository, 실제 remote 없이 실행된다.
+2. workflow별 happy/error/timeout/partial/stale target 결과가 `OperationResult`로 검증된다.
+3. `commands.go`에는 새 workflow를 추가하지 않으며, 남은 함수는 compatibility shim 목록에 기록된다.
+4. `internal/git` adapter test는 실제 Git command parsing과 timeout만 검증한다.
+5. shim 제거 전 `rg`로 기존 함수 호출자가 0건인지 확인한다.
+
+### Phase 6 상세 구현 계획: T6 테스트·문서 동기화
+
+T6는 단순 파일 이동이 아니라 신규 기여자가 변경 위치와 검증 명령을 찾는 비용을 줄이는 마무리 slice다.
+
+#### T6.1 테스트 분리 규칙
+
+| 대상 | 새 파일 | fixture/검증 |
+|---|---|---|
+| runtime/epoch | `internal/app/runtime_state_test.go` | message transition, stale load/refresh |
+| navigation/intent | `internal/app/navigation_test.go`, `intent_test.go` | pure model, no Git subprocess |
+| projection/Graph | `internal/app/view_projection_test.go`, `graph_render_test.go` | projection fixture, visible width |
+| sections/popup | `internal/app/section_render_test.go`, `popup_render_test.go` | normal/empty/error/overflow |
+| workflow | `internal/app/workflow_test.go` | `FakeRepository`, operation order |
+| Git adapter | `internal/git/adapter_test.go` 또는 기존 integration test | temporary Git fixture |
+
+기존 대형 파일은 한 번에 삭제하지 않는다. 테스트를 새 파일로 복사하고 새 테스트를 먼저 통과시킨 뒤, 기존 중복 테스트를 단계적으로 제거한다. 테스트 이름은 `Test<Boundary>_<Scenario>` 형식으로 통일한다.
+
+#### T6.2 contributor 문서
+
+`docs/contributor-workflow.md`에 merge workflow 한 개를 다음 형식으로 기록한다.
+
+```text
+key: m
+  → intent: ActionMerge(target)
+  → workflow: Snapshot → ValidateTarget → Execute → Reload
+  → result: OperationResult{Phase, Epoch, Err, RecoveryHint}
+  → message: actionCompletedMsg
+  → state: state.Status
+  → projection: ScreenProjection
+  → view: renderGraph/renderOverlay
+  → tests: workflow_test + update_test + view_projection_test
+```
+
+문서에는 새 workflow를 추가할 때 수정할 파일, fake 사용법, focused test 명령, shim 제거 조건을 copy-paste 가능한 예제로 포함한다.
+
+#### T6.3 문서 일관성 검사
+
+- `docs/structure.md`: 실제 tree, 책임 map, import 방향을 갱신한다.
+- migration ledger: current → target, owner, shim, removal gate, 상태를 갱신한다.
+- `README.md`: 사용자 Quick Start를 오염시키지 않는 짧은 contributor 링크만 추가한다.
+- plan 문서: 완료한 slice의 체크박스, commit, 검증 명령, 남은 risk를 갱신한다.
+
+#### T6.4 T6 완료 게이트
+
+1. 신규 기여자가 README → structure → contributor workflow 순서로 30분 안에 merge 흐름을 추적할 수 있다.
+2. `go test ./internal/app -run 'Test(Workflow|Projection|Epoch)'`가 빠른 회귀 경로로 동작한다.
+3. `go test ./internal/git`, `scripts/check`, `scripts/build /tmp/graphkeeper-architecture`가 통과한다.
+4. migration ledger의 모든 `진행` 항목이 실제 파일·테스트·제거 조건과 연결된다.
+5. 문서에 존재하지 않는 package/file을 목표 구조로 제시하지 않는다.
+
+### T4~T6 의존성 및 롤백 순서
+
+```text
+T4 projection 계약
+  ├─ T5 workflow result/adapter 계약
+  └─ T6 projection/workflow fixture와 contributor trace
+```
+
+- T4 실패 시 renderer projection과 fixture만 revert한다. workflow adapter는 시작하지 않는다.
+- T5 실패 시 adapter shim과 fake를 revert하고 T4 projection은 유지한다.
+- T6 실패 시 테스트 파일 이동과 문서만 revert한다. production behavior는 변경하지 않는다.
+- 각 단계는 독립 커밋하며, commit message에 `T4`, `T5`, `T6`와 검증 명령을 기록한다.
+
+### Phase 6. 테스트와 문서 구조 정리
 
 - `model_test.go`를 runtime, navigation, graph render, section render, workflow transition 테스트로 분리
 - `key_handling_test.go`를 browse/global/popup/action intent 테스트로 분리
@@ -295,11 +609,11 @@ CLI bootstrap            → cmd/graphkeeper tests
 
 ## 11. 구현 작업
 
-- [ ] T1. baseline 및 현재 책임/의존성 지도 고정
-- [ ] T2. runtime model, screen state, message 계약 분리
-- [ ] T3. workflow orchestration과 Git reload/error mapping 정리
-- [ ] T4. repository adapter와 deterministic fake 경계 도입
-- [ ] T5. rendering projection 및 layout 계약 연결
+- [x] T1. baseline 및 migration ledger 고정
+- [x] T2. snapshot/operation epoch과 stale 결과 폐기
+- [x] T3. destructive action 실행 직전 target 재검증
+- [ ] T4. rendering projection 및 layout 계약 연결
+- [ ] T5. workflow adapter와 deterministic fake 경계 도입
 - [ ] T6. 테스트 파일과 구조 문서 동기화
 
 ## 12. 리뷰 기록
@@ -606,4 +920,126 @@ DX 결정:
 - T3 이후 단계는 T2 계약과 테스트 결과에 의존하므로, T1/T2 검증 전 package 이동이나 대규모 테스트 분리를 시작하지 않는다.
 - 구현 전 추가로 필요한 사용자 결정은 없다. 기존 승인 범위와 현재 Taskmaster 상태가 일치한다.
 
-NO UNRESOLVED DECISIONS
+T1~T3 범위에서 NO UNRESOLVED DECISIONS
+
+## 24. 2026-08-01 T4~T6 autoplan 상세 리뷰
+
+### 24.1 리뷰 범위와 결론
+
+이번 autoplan은 이미 구현된 T1~T3을 다시 구현하지 않고, 후속 T4~T6의 구현 가능성을 검토했다.
+
+| 항목 | 결과 |
+|---|---|
+| UI scope | 있음. Graph, Context, section, popup renderer의 projection·width·상태 계약을 검토함 |
+| DX scope | 있음. Graphkeeper는 기여자가 구조와 workflow를 추적해야 하는 개발자 도구임 |
+| 기존 문서 상태 | 방향·완료 기준은 있음. 구체적인 소유 타입, adapter 결과, fake 호출 계약이 부족함 |
+| 핵심 수정 | T4/T5 명칭과 순서를 정렬하고 T4 projection, T5 adapter/workflow, T6 fixture/document gate를 상세화함 |
+| 구현 상태 | T4~T6 미구현. 이번 변경은 계획 문서만 갱신함 |
+
+결론은 **상세화 필요**다. 기존 문서만으로도 방향은 이해할 수 있지만, 구현자는 projection 타입을 어디에 둘지, `git.Status`를 어떤 경계에서 변환할지, partial reload를 어떤 결과로 표현할지 임의로 결정해야 했다. 이 결정들을 본 문서의 T4~T6 상세 계약으로 고정했다.
+
+### 24.2 CEO 리뷰
+
+검토한 문제는 “구조를 나누는 것”이 사용자에게 실제로 어떤 안전성과 속도 개선을 주는지, T4~T6이 장기 rewrite로 변질되지 않는지였다.
+
+- 이미 T1~T3에서 refresh stale overwrite와 destructive target 위험을 줄였으므로, T4~T6은 그 계약을 사용자가 체감하는 출력·기여자 경로·테스트 속도로 연결해야 한다.
+- T4를 단순 파일 이동으로 진행하면 사용자 가치가 없다. projection은 좁은 terminal, partial/error 상태, ANSI/NO_COLOR에서 identity와 recovery hint를 보존해야 한다.
+- T5를 `Repo` 전체 interface 복제로 시작하면 결합이 이름만 바뀐다. workflow consumer가 실제 사용하는 최소 snapshot/validate/execute/reload 계약만 둔다.
+- T6에서 전체 대형 테스트 파일을 한 번에 분리하면 회귀 추적이 어려워진다. 각 slice의 fixture와 문서를 먼저 만들고, 중복 테스트 제거는 shim 제거 게이트 뒤로 미룬다.
+
+선택: 기존 점진적 전략을 유지하고 T4→T5→T6 순서를 명시한다. 전면 package rewrite와 테스트 일괄 이동은 범위 밖으로 유지한다.
+
+### 24.3 디자인 리뷰
+
+| 차원 | 점수 | 판단 |
+|---|---:|---|
+| 정보 계층 | 8/10 | Graph-first hierarchy를 유지하고 projection에 identity/state/recovery 우선순위를 명시함 |
+| 상태 완전성 | 8/10 | loading, empty, partial, stale, blocked/error를 별도 계약으로 추가함 |
+| 좁은 terminal | 8/10 | 40/60/80열과 visible width 규칙, 최소 식별자 보존을 고정함 |
+| 색상·접근성 | 8/10 | 색상을 보조 수단으로 제한하고 ANSI/NO_COLOR 문자열 의미를 유지함 |
+| 일관성 | 7/10 | projection 이후 section/popup까지 동일 계약을 적용해야 함 |
+| 구현 명확성 | 8/10 | 타입과 함수 예시를 추가했으나 실제 field mapping은 구현 slice에서 검증 필요 |
+| 회귀 위험 | 7/10 | compatibility shim과 projection fixture로 낮추되 기존 golden 범위를 확인해야 함 |
+
+디자인 결정은 새 UI를 만드는 것이 아니라 현재 industrial TUI의 의미를 보존하는 것이다. `S`, `T`, `S·T`, 선택 상태, 오류 복구 문구는 색상 없이도 읽혀야 하며, projection은 이 규칙을 테스트 가능한 입력으로 만든다.
+
+### 24.4 엔지니어링 리뷰
+
+목표 의존성은 다음과 같다.
+
+```text
+model + git.Status + state.Status
+              │
+              ▼
+      projectScreen(model)
+              │  ScreenProjection
+              ▼
+      renderGraph / renderSection / renderPopup
+
+intent ─▶ workflow ─▶ Repository adapter ─▶ git.Repo
+  │          │              │
+  │          └─ OperationResult ──▶ message/update
+  └─ TargetRef + epoch validation
+```
+
+핵심 엔지니어링 결정:
+
+1. T4 projection은 `internal/app`이 소유하되 renderer가 `git.Status`를 import하지 않도록 한다.
+2. T5 adapter는 app consumer가 필요한 최소 계약만 정의하고 `gitRepositoryAdapter`에서 `git.Status`를 변환한다.
+3. operation 결과는 실행 전 epoch, 실행 후 epoch, phase, partial snapshot, recovery hint를 보유한다.
+4. fake repository는 호출 순서와 target validation 선행을 검사한다.
+5. T4 projection이 먼저 고정되어야 T5 workflow 결과를 화면에 연결할 수 있고, T6는 두 계약의 fixture를 기준으로 진행한다.
+
+#### 테스트 흐름 지도
+
+| 코드 경로 | 정상 | 오류/partial | stale/경계 | 테스트 위치 |
+|---|---|---|---|---|
+| model → projection | normal browse | loading/empty/error | stale snapshot 미적용 | `view_projection_test.go` |
+| projection → Graph | graph row/header | narrow width | ANSI/NO_COLOR | `graph_render_test.go` |
+| intent → workflow | merge/reset/delete | non-zero/timeout/reload failure | target mismatch/epoch mismatch | `workflow_test.go` |
+| adapter → snapshot | complete fields | optional field degraded | required field invalid | `internal/git` integration |
+| message → state | action complete | partial recovery | stale result discard | `update_*_test.go` |
+| docs → contributor | merge trace | troubleshooting | shim removal | `docs/contributor-workflow.md` + focused commands |
+
+### 24.5 DX 리뷰
+
+현재 신규 기여자는 README와 structure를 읽은 뒤 `key_handling_* → update_* → commands.go → git.Repo → view_*`를 수동으로 따라가야 한다. T6의 contributor trace는 이 경로를 `intent → workflow → adapter → result → projection → renderer → tests` 한 줄로 제공한다.
+
+| DX 항목 | 현재 | T4~T6 목표 |
+|---|---:|---:|
+| 특정 workflow 추적 시간 | 약 30분 이상 | 30분 이내 |
+| focused test 발견 | 불명확 | `Test(Workflow|Projection|Epoch)` 명령 제공 |
+| 실패 원인 파악 | TUI 문구와 Git stderr 분리 | operation/target/cause/recovery 계약 |
+| 새 workflow 추가 위치 | commands.go 중심 추측 | contract/adapter/result/projection 목록 |
+| shim 제거 판단 | 암묵적 | ledger의 호출자 0건 + 테스트 게이트 |
+
+### 24.6 자동 결정과 남은 승인
+
+| # | 영역 | 결정 | 분류 | 적용 원칙 |
+|---:|---|---|---|---|
+| 8 | T4 | projection은 app 소유, renderer는 projection만 소비 | 자동 결정 | 명시성 |
+| 9 | T4 | loading/empty/partial/error/stale를 별도 상태로 테스트 | 자동 결정 | 완전성 |
+| 10 | T5 | 전체 Repo interface 복제 대신 최소 snapshot/operation contract | 자동 결정 | 실용성 + DRY |
+| 11 | T5 | merge/rebase부터 수직 이행 후 나머지 workflow 확장 | 자동 결정 | 실행 편향 |
+| 12 | T6 | 대형 테스트 파일 일괄 이동 금지, fixture 우선 분리 | 자동 결정 | 회귀 최소화 |
+| 13 | 범위 | T4~T6 구현은 별도 독립 커밋으로 진행 | 자동 결정 | rollback 가능성 |
+
+남은 사람의 승인 지점은 하나다. 위의 projection/app contract/fake repository 방향을 T4~T6의 구현 기준으로 채택할지 확인해야 한다. 이 승인이 끝나면 T4 구현을 시작할 수 있고, 승인 전에는 production code를 변경하지 않는다.
+
+## 25. T4~T6 상세화 최종 상태
+
+- T4는 projection 타입, 상태 표현, 폭·색상·순수성, 완료 게이트를 정의했다.
+- T5는 최소 repository contract, `OperationResult`, target/epoch 규칙, fake repository, 수직 이행 순서를 정의했다.
+- T6는 테스트 파일 분리 규칙, contributor workflow 문서 형식, 문서 동기화, focused verification, shim 제거 게이트를 정의했다.
+- T4~T6의 1차 구현이 반영되었다. Graph/Section/Context projection, 최소 repository adapter/fake 계약, projection 테스트와 contributor 문서가 추가되었다.
+- 전체 popup projection 전환, 모든 workflow의 `OperationResult` 통합, 대형 테스트 파일의 기능별 이동은 후속 호환 shim 제거 slice로 남아 있다.
+
+상태: **사용자 승인 완료, T4~T6 1차 구현 완료, 최종 리뷰 대기**
+
+## 26. T4~T6 사용자 승인
+
+- 승인: A. 상세 계획 승인
+- 승인일: 2026-08-01
+- 승인 범위: T4 renderer projection, T5 workflow/adapter contract, T6 테스트·문서 동기화
+- 구현 순서: T4 → T5 → T6
+- 구현 전제: production code는 승인된 contract와 완료 게이트를 기준으로 변경하며, 각 단계는 독립 커밋·검증·rollback을 갖는다.

@@ -14,7 +14,8 @@ const (
 	graphBranchOverflowWidth = 4
 	graphBranchFieldWidth    = graphBranchTokenWidth + graphBranchOverflowWidth
 	graphStatusWidth         = 5
-	graphTitleMinimumWidth   = 8
+	graphTitleMinimumWidth   = 12
+	graphTitlePreferredWidth = 24
 )
 
 func graphRowFixedWidth(graphColWidth int) int {

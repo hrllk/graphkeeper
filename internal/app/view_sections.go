@@ -16,18 +16,23 @@ const (
 )
 
 func (m model) renderSectionContent(section graphSection, width, height int) string {
-	items := sectionTargets(m.repoStatus, section)
+	p := m.screenProjection(width, height).Sections[section]
+	return renderSectionProjection(p, section, m.tagSyncAttempted, width, height)
+}
+
+func renderSectionProjection(p SectionProjection, section graphSection, tagSyncAttempted bool, width, height int) string {
+	items := p.Items
 	if len(items) == 0 {
 		if section == sectionTags {
 			lines := []string{fitVisibleWidth(muted.Render("No local tags found."), width)}
-			if !m.tagSyncAttempted {
+			if !tagSyncAttempted {
 				lines = append(lines, fitVisibleWidth(muted.Render("Press F to sync tag provenance."), width))
 			}
 			return fitBlockLines(lines, height)
 		}
 		return fitVisibleWidth(muted.Render("(empty)"), width)
 	}
-	cursor := m.sectionCursor[section]
+	cursor := p.Cursor
 	start := 0
 	header := ""
 	if section == sectionTags {
@@ -45,8 +50,8 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 	if hasOverflow {
 		visibleHeight = max(height-1, 0)
 	}
-	if m.activeSection == section && visibleHeight > 0 && len(items) > visibleHeight {
-		start = cursor - visibleHeight + 1
+	if p.Active && visibleHeight > 0 && len(items) > visibleHeight {
+		start = p.Cursor - visibleHeight + 1
 		if start < 0 {
 			start = 0
 		}
@@ -68,7 +73,7 @@ func (m model) renderSectionContent(section graphSection, width, height int) str
 		if label == "" {
 			continue
 		}
-		lines = append(lines, renderSelectableSectionItem(label, i == cursor && m.activeSection == section, width))
+		lines = append(lines, renderSelectableSectionItem(label, i == cursor && p.Active, width))
 		rendered++
 	}
 	if hasOverflow {

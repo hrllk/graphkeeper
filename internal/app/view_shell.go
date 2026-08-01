@@ -47,29 +47,6 @@ func (m model) View() string {
 func renderAppView(m model) string {
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	bodyWidth, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
-	headerHeight := layoutHeaderHeight(bodyHeight)
-	graphRailHeight := layoutGraphRailHeight(bodyHeight)
-
-	headerPaneWidth := bodyWidth - 4
-	if headerPaneWidth < 0 {
-		headerPaneWidth = 0
-	}
-	globalWidth, contextWidth := splitPaneWidths(headerPaneWidth)
-	globalBox := renderFloatingTitleFrame(
-		baseBox.Width(globalWidth).Height(headerHeight),
-		"Global",
-		m.renderGlobalContent(max(globalWidth-4, 0), max(headerHeight-2, 0)),
-		globalWidth,
-		headerHeight,
-	)
-	contextBox := renderFloatingTitleFrame(
-		baseBox.Width(contextWidth).Height(headerHeight),
-		"Context",
-		m.renderContextContent(max(contextWidth-4, 0), max(headerHeight-2, 0)),
-		contextWidth,
-		headerHeight,
-	)
-	headerRow := lipgloss.JoinHorizontal(lipgloss.Top, globalBox, contextBox)
 
 	graphBudget := bodyWidth - 4
 	if graphBudget < 0 {
@@ -88,16 +65,16 @@ func renderAppView(m model) string {
 	rightWidth := graphBudget - graphWidth
 	graphContentHeight := graphContentHeightForModel(&m)
 	graphBox := renderFloatingTitleFrame(
-		m.getBoxStyle(sectionGraph).Width(graphWidth).Height(graphRailHeight),
+		m.getBoxStyle(sectionGraph).Width(graphWidth).Height(bodyHeight),
 		"[1] Graph",
 		m.renderGraphContent(max(graphWidth-4, 0), graphContentHeight),
 		graphWidth,
-		graphRailHeight,
+		bodyHeight,
 	)
-	rightRail := m.renderRightRail(rightWidth, graphRailHeight)
+	rightRail := m.renderRightRail(rightWidth, bodyHeight)
 	graphRow := lipgloss.JoinHorizontal(lipgloss.Top, graphBox, rightRail)
 
-	body := lipgloss.JoinVertical(lipgloss.Left, headerRow, graphRow)
+	body := graphRow
 	centeredBody := applyOuterMargins(body, bodyWidth, bodyHeight, hMargin, topMargin, max(bottomMargin-1, 0))
 	centeredBody = applyShellOverlays(m, centeredBody, bodyWidth, bodyHeight)
 
@@ -349,8 +326,14 @@ func (m model) renderRightRail(width, height int) string {
 	if cardWidth < 1 {
 		cardWidth = 1
 	}
-	sectionHeight := height
-	localHeight, remoteHeight, tagsHeight := splitThreeHeights(sectionHeight)
+	detailsHeight, localHeight, remoteHeight, tagsHeight := splitFourHeights(height)
+	detailsBox := renderFloatingTitleFrame(
+		baseBox.Width(cardWidth).Height(detailsHeight),
+		sectionName(m.activeSection)+" Details",
+		m.renderDetailsContent(max(cardWidth-4, 0), max(detailsHeight-2, 0)),
+		cardWidth,
+		detailsHeight,
+	)
 	localBox := renderFloatingTitleFrame(
 		m.getBoxStyle(sectionCurrent).Width(cardWidth).Height(localHeight),
 		"[2] Local",
@@ -372,7 +355,7 @@ func (m model) renderRightRail(width, height int) string {
 		cardWidth,
 		tagsHeight,
 	)
-	return lipgloss.JoinVertical(lipgloss.Left, localBox, remoteBox, tagsBox)
+	return lipgloss.JoinVertical(lipgloss.Left, detailsBox, localBox, remoteBox, tagsBox)
 }
 
 func applyOuterMargins(content string, totalWidth, totalHeight, hMargin, topMargin, bottomMargin int) string {

@@ -164,19 +164,15 @@ The usual maintainer flow looks like this:
 
 ## Keyboard
 
-### Global
+### Main screen
 
-- `1` graph
-- `2` current
-- `3` remote
-- `4` tags
-- `tab` / `shift+tab` switch sections
-- `j` / `k` or `up` / `down` move
-- `enter` inspect or execute the current action
-- `f` fetch repository state
-- `F` fetch tags
-- `?` show hidden hotkeys
-- `q` quit
+- Graph occupies the full-height left surface.
+- Details, Local, Remote, and Tags are stacked in the right rail.
+- Global and Context Actions are available through the section-aware `?` overlay,
+  not as persistent panels.
+- `tab` / `shift+tab` switch sections, `j` / `k` or `up` / `down` move, and `q`
+  quits.
+- `?` shows the hidden hotkeys for the active section.
 
 ### Graph
 

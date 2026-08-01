@@ -1,5 +1,22 @@
 # Decisions
 
+## 2026-08-01: Graph is the primary full-height surface and Details heads the right rail
+
+- Render the main body as a two-column layout: full-height `Graph` on the left and
+  `Details`, `Local`, `Remote`, `Tags` stacked on the right.
+- Remove the always-visible `Global` and `Context Actions` panels from the main
+  body. Keep their useful commands discoverable through the section-aware `?`
+  hidden-hotkey overlay.
+- Keep the `Graph` topology `*` unchanged and render stash/tag state in the
+  fixed state column. Use the `S·T` overlap state when both apply, including
+  handshake and raw-graph rendering paths.
+- Give the graph title/subject the remaining width before author metadata and
+  show `?: hotkeys` only when the available width can accommodate it.
+- Treat Graph and the four right-rail panels as one shared outer-height grid so
+  the bottom borders align after resizing. The Details panel renders the same
+  projection as Context Details without rendering action commands a second
+  time.
+
 ## 2026-07-11: Shell overlay precedence and shared status labels are centralized
 
 - Keep the shell overlay order in one helper so confirm/review/reset, popups, hidden hotkeys, search, loading, and blocked states stay in a single readable stack.

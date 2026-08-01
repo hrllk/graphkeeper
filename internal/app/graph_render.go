@@ -46,7 +46,7 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		graphCell = strings.ReplaceAll(graphCell, "/", conflictColor.Render("/"))
 		graphCell = strings.ReplaceAll(graphCell, "\\", conflictColor.Render("\\"))
 	} else if isHandshake {
-		graphCell = strings.ReplaceAll(graphCell, "*", handshakeMark.Render("*"))
+		graphCell = applyHandshakePoint(graphCell, stashCount, len(row.Commit.Tags))
 	}
 	status := strings.Repeat(" ", graphStatusWidth)
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
@@ -72,7 +72,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
 		graphCell := padRight(row.Graph, graphColWidth)
 		if isHandshake {
-			graphCell = strings.ReplaceAll(graphCell, "*", handshakeMark.Render("*"))
+			graphCell = applyHandshakePoint(graphCell, stashCount, 0)
 		}
 		line := fmt.Sprintf("%-8s %-14s %-5s %-*s %-7s %s", "", "", "", graphColWidth, graphCell, "", "")
 		return fitVisibleWidth(line, rowWidth)
@@ -124,7 +124,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 	}
 	graphCell = padRight(graphCell, graphColWidth)
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" && isHandshake {
-		graphCell = strings.ReplaceAll(graphCell, "*", handshakeMark.Render("*"))
+		graphCell = applyHandshakePoint(graphCell, stashCount, len(row.Commit.Tags))
 	}
 	var when, title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
@@ -142,6 +142,19 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 	return fitVisibleWidth(line, rowWidth)
 }
 
+func applyHandshakePoint(graphCell string, stashCount, tagCount int) string {
+	point := "*"
+	switch {
+	case stashCount > 0 && tagCount > 0:
+		point = tagOverlapColor.Render(point)
+	case stashCount > 0:
+		point = stashMark.Render(point)
+	case tagCount > 0:
+		point = tagColor.Render(point)
+	}
+	return strings.Replace(graphCell, point, handshakeMark.Render(point), 1)
+}
+
 func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth, graphColWidth int, focused bool) string {
 	author = compactAuthorText(author)
 	subject = strings.TrimSpace(subject)
@@ -152,7 +165,7 @@ func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth, g
 	if available <= 0 {
 		return ""
 	}
-	if available < graphAuthorWidthTarget+graphTitleMinimumWidth {
+	if available < graphAuthorWidthTarget+graphTitlePreferredWidth {
 		return fitGraphTitle(renderSearchField(subject, searchQuery, available, focused), available)
 	}
 

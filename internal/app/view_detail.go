@@ -35,40 +35,13 @@ func (m model) renderGlobalContent(width, height int) string {
 	return fitBlockLines(lines, height)
 }
 
-func (m model) renderContextContent(width, height int) string {
+func (m model) renderDetailsContent(width, height int) string {
 	if height <= 0 {
 		return ""
 	}
-	sectionTitle := sectionName(m.activeSection)
-	infoLines := renderContextViewport(m.renderContextInfoLines(width), max(height-1, 0), m.contextScroll, width)
-	leftLines := append([]string{renderSectionTitle(sectionTitle + " Details")}, infoLines...)
-	rightLines := append([]string{renderSectionTitle(sectionTitle + " Actions")}, renderActionHelpLines(m)...)
-	rightLines = indentLines(rightLines, 1)
-	return renderSplitColumns(leftLines, rightLines, width, height)
-}
-
-func renderContextViewport(lines []string, height, offset, width int) []string {
-	if height <= 0 || len(lines) <= height {
-		return lines
-	}
-	if height == 1 {
-		return []string{fitVisibleWidth(muted.Render(fmt.Sprintf("… +%d hidden", len(lines)-1)), width)}
-	}
-	visible := height - 1
-	maxOffset := len(lines) - visible
-	if offset < 0 {
-		offset = 0
-	}
-	if offset > maxOffset {
-		offset = maxOffset
-	}
-	view := append([]string(nil), lines[offset:offset+visible]...)
-	hidden := len(lines) - visible
-	indicator := fitVisibleWidth(muted.Render(fmt.Sprintf("… +%d hidden", hidden)), width)
-	if offset > 0 {
-		return append([]string{indicator}, view[len(view)-(visible-1):]...)
-	}
-	return append(view, indicator)
+	p := m.contextProjection(width)
+	infoLines := renderContextViewport(p.InfoLines, height, p.Scroll, width)
+	return fitBlockLines(fitBlockWidth(infoLines, width), height)
 }
 
 func (m model) renderContextInfoLines(width int) []string {

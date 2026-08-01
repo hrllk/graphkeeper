@@ -180,6 +180,20 @@ func TestHotkeyUsesANSIColorWithoutUnderline(t *testing.T) {
 	}
 }
 
+func TestHandshakePreservesStashAndTagPointColors(t *testing.T) {
+	forceTrueColorProfile(t)
+	row := graphRow{Commit: graphNode{Hash: "abc1234", Tags: []string{"v1.0.0"}}, Graph: "*"}
+	got := renderGraphLine(row, false, false, 0, nil, 12, 80, true, 1)
+	if !strings.Contains(got, handshakeMark.Render(tagOverlapColor.Render("*"))) {
+		t.Fatalf("expected handshake marker to preserve stash/tag point color, got %q", got)
+	}
+	raw := graphRow{Commit: graphNode{Hash: "abc1234", Tags: []string{"v1.0.0"}}, Graph: "*   "}
+	got = renderGraphLine(raw, false, false, 0, nil, 12, 80, true, 1)
+	if !strings.Contains(got, handshakeMark.Render(tagOverlapColor.Render("*"))) {
+		t.Fatalf("expected raw handshake marker to preserve stash/tag point color, got %q", got)
+	}
+}
+
 func TestTagSelectionUsesForegroundWithoutReverse(t *testing.T) {
 	withColorProfile(t, termenv.TrueColor)
 	label := formatSectionTargetItem(state.TargetItem{
@@ -353,35 +367,43 @@ func TestSplitThreeHeightsUseStackedLayout(t *testing.T) {
 	}
 }
 
-func TestShellLayoutAllocatesSmallHeaderAndLargeGraphRail(t *testing.T) {
+func TestShellLayoutUsesFullHeightForGraphAndRightRail(t *testing.T) {
 	m := model{width: 140, height: 60}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	bodyWidth, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
-	headerHeight := layoutHeaderHeight(bodyHeight)
-	graphRailHeight := layoutGraphRailHeight(bodyHeight)
+	graphHeight := graphBoxHeightForModel(&m)
 
 	if bodyWidth != m.width-2*hMargin {
 		t.Fatalf("expected body width to respect horizontal margin, got %d", bodyWidth)
 	}
-	if headerHeight <= 0 {
-		t.Fatalf("expected positive header height, got %d", headerHeight)
-	}
-	if graphRailHeight <= headerHeight {
-		t.Fatalf("expected graph rail to dominate header, got header=%d rail=%d", headerHeight, graphRailHeight)
-	}
-	if graphRailHeight < 12 {
-		t.Fatalf("expected graph rail to keep minimum height, got %d", graphRailHeight)
+	if graphHeight != bodyHeight {
+		t.Fatalf("expected Graph to use full body height, got %d vs %d", graphHeight, bodyHeight)
 	}
 }
 
-func TestGraphRailMatchesStackedSideRailHeight(t *testing.T) {
+func TestGraphRailMatchesFourStackedPanelHeight(t *testing.T) {
 	m := model{width: 140, height: 60}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	_, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
-	graphRailHeight := layoutGraphRailHeight(bodyHeight)
-	localHeight, remoteHeight, tagsHeight := splitThreeHeights(graphRailHeight)
-	if graphRailHeight != localHeight+remoteHeight+tagsHeight {
-		t.Fatalf("expected graph rail height to match stacked side rail height, got %d vs %d", graphRailHeight, localHeight+remoteHeight+tagsHeight)
+	detailsHeight, localHeight, remoteHeight, tagsHeight := splitFourHeights(bodyHeight)
+	if bodyHeight != detailsHeight+localHeight+remoteHeight+tagsHeight {
+		t.Fatalf("expected four right rail panels to consume body height, got %d vs %d", bodyHeight, detailsHeight+localHeight+remoteHeight+tagsHeight)
+	}
+}
+
+func TestSplitFourHeightsDistributesSmallRemainders(t *testing.T) {
+	for total, want := range map[int][4]int{
+		0: {0, 0, 0, 0},
+		1: {1, 0, 0, 0},
+		2: {1, 1, 0, 0},
+		3: {1, 1, 1, 0},
+		5: {2, 1, 1, 1},
+	} {
+		got := [4]int{}
+		got[0], got[1], got[2], got[3] = splitFourHeights(total)
+		if got != want {
+			t.Fatalf("splitFourHeights(%d) = %v, want %v", total, got, want)
+		}
 	}
 }
 
@@ -389,8 +411,7 @@ func TestGraphContentMatchesStackedSideRailContent(t *testing.T) {
 	m := model{width: 140, height: 60}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	_, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
-	graphRailHeight := layoutGraphRailHeight(bodyHeight)
-	want := graphRailHeight - 2
+	want := bodyHeight - 2
 	if got := graphContentHeightForModel(&m); got != want {
 		t.Fatalf("expected graph content height %d, got %d", want, got)
 	}
@@ -498,8 +519,8 @@ func TestGraphPageSizeAccountsForConnectorBudget(t *testing.T) {
 	if got <= 0 {
 		t.Fatalf("expected positive graph page size, got %d", got)
 	}
-	if got != 6 {
-		t.Fatalf("expected connector-aware page size to account for two connector lines, got %d", got)
+	if got != 10 {
+		t.Fatalf("expected full-height graph page size to account for connector lines, got %d", got)
 	}
 }
 
@@ -510,7 +531,7 @@ func TestRenderAppViewKeepsShellPlacementFullWidth(t *testing.T) {
 		status: state.New().WithBrowse(),
 	}
 	got := ansi.Strip(renderAppView(m))
-	for _, want := range []string{"Global", "Browse", "Actions", "tab: next section", "f: fetch"} {
+	for _, want := range []string{"Graph Details", "?: hotkeys"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected render to contain %q, got %q", want, got)
 		}
@@ -520,7 +541,7 @@ func TestRenderAppViewKeepsShellPlacementFullWidth(t *testing.T) {
 			t.Fatalf("expected render to contain %q, got %q", want, got)
 		}
 	}
-	for _, bad := range []string{"\nGlobal\n", "\nContext\n", "\n[1] Graph\n", "\n[2] Local\n", "\n[3] Remote\n", "\n[4] Tags\n"} {
+	for _, bad := range []string{"\nGlobal\n", "\nContext\n", "\nContext Actions\n"} {
 		if strings.Contains(got, bad) {
 			t.Fatalf("expected title %q to move out of body, got %q", bad, got)
 		}
@@ -690,6 +711,9 @@ func TestRenderGraphContentShowsStatusLegendWhenItFits(t *testing.T) {
 	if !strings.Contains(got, "S stash · T tag") {
 		t.Fatalf("expected graph page line to include status legend, got %q", got)
 	}
+	if !strings.Contains(got, "?: hotkeys") {
+		t.Fatalf("expected graph page line to expose the hotkey overlay entrypoint, got %q", got)
+	}
 	pageLine := strings.Split(got, "\n")[0]
 	if !strings.HasSuffix(pageLine, "S stash · T tag") {
 		t.Fatalf("expected status legend to be right-aligned, got %q", pageLine)
@@ -709,6 +733,18 @@ func TestRenderGraphContentHidesLegendBeforeGraphDataOnNarrowWidth(t *testing.T)
 	}
 	if !strings.Contains(got, "graph page 1-1/1") {
 		t.Fatalf("expected page indicator to remain visible, got %q", got)
+	}
+}
+
+func TestRenderGraphProjectionShowsHotkeyHintOnlyWhenItFits(t *testing.T) {
+	projection := GraphProjection{}
+	wide := ansi.Strip(renderGraphProjection(projection, 40, 2))
+	if !strings.Contains(wide, "?: hotkeys") {
+		t.Fatalf("expected empty graph to show hotkey hint when it fits, got %q", wide)
+	}
+	narrow := ansi.Strip(renderGraphProjection(projection, 24, 2))
+	if strings.Contains(narrow, "?: hotkeys") {
+		t.Fatalf("expected empty graph to omit hotkey hint when it does not fit, got %q", narrow)
 	}
 }
 
@@ -738,13 +774,13 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 	if strings.Index(header, "state") > strings.Index(header, "graph") {
 		t.Fatalf("expected state column between branches and graph, got %q", header)
 	}
-	if !strings.Contains(got, "author") {
-		t.Fatalf("expected graph header to use author label, got %q", got)
+	if strings.Contains(got, "author") {
+		t.Fatalf("expected medium graph width to prioritize title over author, got %q", got)
 	}
-	if !strings.Contains(got, "alexa..") {
-		t.Fatalf("expected graph row to include author name, got %q", got)
+	if !strings.Contains(got, "Merge branch") {
+		t.Fatalf("expected graph row to prioritize the subject, got %q", got)
 	}
-	if !strings.Contains(got, "Merge branch ...") {
+	if !strings.Contains(got, "Merge branch") || !strings.Contains(got, "...") {
 		t.Fatalf("expected graph title to use the available width with ellipsis, got %q", got)
 	}
 }
@@ -1342,7 +1378,7 @@ func TestRenderAppViewUsesCenteredHeaderAndMainLayout(t *testing.T) {
 	}
 
 	got := renderAppView(m)
-	for _, want := range []string{"Global", "Context", "Graph", "Local", "Remote", "Tags"} {
+	for _, want := range []string{"Graph Details", "Graph", "Local", "Remote", "Tags"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected view to contain %q, got %q", want, got)
 		}
@@ -1713,8 +1749,8 @@ func TestRenderAppViewKeepsHeaderVisibleOnCompactScreens(t *testing.T) {
 	}
 
 	got := renderAppView(m)
-	if !strings.Contains(got, "Global") || !strings.Contains(got, "Context") {
-		t.Fatalf("expected compact render to keep the top header visible, got %q", got)
+	if !strings.Contains(got, "Graph") || !strings.Contains(got, "Graph Details") {
+		t.Fatalf("expected compact render to keep Graph and Details visible, got %q", got)
 	}
 }
 
@@ -2683,8 +2719,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
 	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 88, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "alexa..") < 0 || strings.Index(line, "Merge branch") < 0 {
-		t.Fatalf("expected graph line to include hash, branches, date, author, title and graph, got %q", line)
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "Merge branch") < 0 {
+		t.Fatalf("expected graph line to include hash, branches, date, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
 		t.Fatalf("expected HEAD pointer to be highlighted, got %q", line)
@@ -2695,8 +2731,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5m") || strings.Index(line, "5m") > strings.Index(line, "Merge branch") {
 		t.Fatalf("expected commit columns to stay ordered, got %q", line)
 	}
-	if strings.Index(line, "5m") > strings.Index(line, "alexa..") || strings.Index(line, "alexa..") > strings.Index(line, "Merge branch") {
-		t.Fatalf("expected author to sit between date and title, got %q", line)
+	if strings.Index(line, "5m") > strings.Index(line, "Merge branch") {
+		t.Fatalf("expected date to remain before title, got %q", line)
 	}
 	if strings.Contains(line, "Merge branch 'main' into develop") || strings.Contains(line, "origin/") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
@@ -3390,6 +3426,12 @@ func TestRenderRightRailRendersStackedCards(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected right rail to contain %q, got %q", want, got)
 		}
+	}
+	if detailsIdx := strings.Index(got, "Details"); detailsIdx < 0 || detailsIdx > strings.Index(got, "Local") {
+		t.Fatalf("expected Details panel to precede Local in the right rail, got %q", got)
+	}
+	if strings.Contains(got, "Actions") {
+		t.Fatalf("expected right rail to omit Context Actions, got %q", got)
 	}
 	for i, line := range lines {
 		if width := lipgloss.Width(ansi.Strip(line)); width > 42 {

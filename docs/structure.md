@@ -17,6 +17,8 @@ cmd/
 internal/
   app/
     model.go
+    view_projection.go
+    repository_contract.go
     update.go
     commands.go
     navigation.go
@@ -63,6 +65,8 @@ internal/
 - `graph_render.go` holds the render helpers that still depend on app state
 - `view_overlays.go` keeps the shell overlay priority in one place
 - `status_labels.go` keeps shared status label rendering in one place
+- `view_projection.go` converts runtime/repository state into renderer-only input.
+- `repository_contract.go` defines the minimum workflow repository boundary and Git adapter.
 
 #### `internal/graph`
 - owns graph rules, lane order, row width, and focus helpers

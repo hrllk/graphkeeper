@@ -21,8 +21,8 @@
             "parentTaskId": 1,
             "parentId": "undefined"
           },
-          {
-            "id": 2,
+        {
+          "id": 2,
             "title": "메인 화면 가독성·레이아웃 개선",
             "description": "Graph 중심 메인 화면의 제목 폭, stash/tag 상태 표시, Graph와 Local/Remote/Tags rail 높이, 공통 여백, overflow를 개선해 저장소 관리자와 릴리즈 담당자가 topology를 빠르게 스캔할 수 있도록 한다.",
             "details": "계획 문서: docs/20260731-0002-project-ui-readability-improvement-plan.md. Graph topology의 `*`는 유지하고 branches와 topology 사이의 `state` 컬럼에 `S`, `T`, `S·T`를 표시한다. Graph page 정보 줄 오른쪽에 축약 범례를 노출한다. Graph 제목은 남은 폭 기반으로 계산하고, Graph와 Local/Remote/Tags의 outer height를 일치시킨다. Context·rail·popup의 공통 spacing과 overflow를 정리하며, 항목은 paging·scroll·`… +N`으로 마지막까지 접근할 수 있어야 한다. 구현 전 계획의 사용자 성공 기준, 단계별 게이트, 터미널 폭·색상 profile QA를 따른다.",
@@ -30,8 +30,19 @@
             "dependencies": [],
             "parentTaskId": 1,
             "updatedAt": "2026-08-01T01:00:00.000Z",
-            "parentId": "undefined"
-          }
+          "parentId": "undefined"
+        },
+        {
+          "id": 3,
+          "title": "메인 화면 레이아웃 재조정",
+          "description": "Global과 Context Actions를 제거하고 Context Details를 우측 상단 rail로 이동하며 Graph를 전체 높이로 확장한다. Hidden Hotkeys overlay, Graph 제목 폭 우선순위, stash/tag point 색상 누락 경로를 함께 정리한다.",
+          "details": "계획 문서: docs/20260801-0002-main-layout-redesign-plan.md. 최종 레이아웃은 GGGGCC / GGGGLL / GGGGRR / GGGGTT다. Graph와 우측 4개 패널의 outer height를 맞추고, ? overlay와 폭 허용 시 ?: hotkeys hint로 단축키를 안내한다. ANSI/NO_COLOR, low-height, overflow, normal/raw graph point 색상 회귀 테스트를 포함한다.",
+          "dependencies": [],
+          "parentTaskId": 1,
+          "status": "done",
+          "updatedAt": "2026-08-01T03:00:00.000Z",
+          "parentId": "undefined"
+        }
         ],
         "updatedAt": "2026-08-01T00:00:00.000Z"
       },
@@ -41,7 +52,7 @@
         "description": "CLI 진입점과 애플리케이션 내부 구조를 현대적인 경계로 점진 개선한다.",
         "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리한 기반 위에 runtime state, screen state, workflow orchestration, Git adapter, renderer projection 경계를 단계적으로 정리한다. 구조개선 계획은 docs/20260731-0003-modern-architecture-boundary-improvement-plan.md를 따른다. T1 baseline과 T2 snapshot/operation epoch 계약을 먼저 완료하고, refresh 순서 역전과 파괴적 Git 작업의 stale target을 방지한다.",
         "testStrategy": "",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -71,15 +82,15 @@
             "id": 3,
             "title": "점진적 아키텍처 경계 개선",
             "description": "runtime state, screen state, workflow, Git adapter, renderer projection을 단계적으로 분리하고 기존 동작·키 바인딩·Git 상태 전이를 보존한다.",
-            "details": "계획 문서: docs/20260731-0003-modern-architecture-boundary-improvement-plan.md. T1 baseline 및 migration ledger, T2 initial/load·refresh snapshot의 operation epoch과 stale 결과 폐기, T3 destructive action 실행 직전 branch/tag/remote/commit target 재검증까지 구현했다. T4 renderer projection, T5 workflow adapter 정리, T6 테스트·문서 동기화는 후속 slice로 남아 있다.",
-            "status": "in-progress",
+            "details": "계획 문서: docs/20260731-0003-modern-architecture-boundary-improvement-plan.md. T1~T3 기반 위에 T4 Graph/Section/Context renderer projection, T5 최소 repository adapter/fake contract, T6 projection 테스트·contributor 문서·migration ledger 동기화를 1차 구현했다. 전체 popup projection, 모든 workflow의 OperationResult 통합, 대형 테스트 파일 분리는 후속 slice다.",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 2,
             "parentId": "undefined",
-            "updatedAt": "2026-08-01T02:00:00.000Z"
+          "updatedAt": "2026-08-01T12:45:00.000Z"
           }
         ],
-        "updatedAt": "2026-08-01T02:00:00.000Z"
+        "updatedAt": "2026-08-01T12:45:00.000Z"
       },
       {
         "id": "3",

@@ -92,7 +92,7 @@ func layoutGraphRailHeight(bodyHeight int) int {
 func graphBoxHeightForModel(m *model) int {
 	hMargin, topMargin, bottomMargin := layoutShellMargins(*m)
 	_, bodyHeight := layoutShellBodySize(*m, hMargin, topMargin, bottomMargin)
-	return layoutGraphRailHeight(bodyHeight)
+	return bodyHeight
 }
 
 func graphContentHeightForModel(m *model) int {
@@ -207,6 +207,17 @@ func splitThreeHeights(total int) (int, int, int) {
 		third += rem
 	}
 	return first, second, third
+}
+
+func splitFourHeights(total int) (int, int, int, int) {
+	if total <= 0 {
+		return 0, 0, 0, 0
+	}
+	heights := [4]int{total / 4, total / 4, total / 4, total / 4}
+	for i := 0; i < total%4; i++ {
+		heights[i]++
+	}
+	return heights[0], heights[1], heights[2], heights[3]
 }
 
 func fitBlockLines(lines []string, height int) string {

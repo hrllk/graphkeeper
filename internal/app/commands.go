@@ -476,19 +476,25 @@ func executeAction(repo *git.Repo, action state.Action, target string, limit int
 		if target == "" {
 			return executedMsg{action: action, err: fmt.Errorf("target is empty")}
 		}
-		if _, err := repo.Run("rev-parse", "--verify", target+"^{commit}"); err != nil {
+		adapter := newGitRepositoryAdapter(repo)
+		targetRef := targetRef{Kind: state.TargetKindCommit, Name: target}
+		if err := adapter.ValidateTarget(context.Background(), targetRef); err != nil {
 			return executedMsg{action: action, target: target, err: fmt.Errorf("target %q is no longer available: %w", target, err)}
 		}
 		var err error
+		args := []string{}
 		switch action {
 		case state.ActionMerge:
-			_, err = repo.Run("merge", "--no-edit", target)
+			args = []string{"merge", "--no-edit", target}
 		case state.ActionRebase:
-			_, err = repo.Run("rebase", target)
+			args = []string{"rebase", target}
 		case state.ActionReset:
-			_, err = repo.Run("reset", "--hard", target)
+			args = []string{"reset", "--hard", target}
 		default:
 			err = fmt.Errorf("unsupported action %q", action)
+		}
+		if err == nil {
+			_, err = adapter.Execute(context.Background(), operation{Action: action, Target: targetRef, Args: args})
 		}
 		if err != nil {
 			return executedMsg{action: action, target: target, err: err}
@@ -503,7 +509,9 @@ func executeReset(repo *git.Repo, target string, mode state.ResetMode, limit int
 		if target == "" {
 			return executedMsg{action: state.ActionReset, err: fmt.Errorf("target is empty"), resetMode: mode}
 		}
-		if _, err := repo.Run("rev-parse", "--verify", target+"^{commit}"); err != nil {
+		adapter := newGitRepositoryAdapter(repo)
+		targetRef := targetRef{Kind: state.TargetKindCommit, Name: target}
+		if err := adapter.ValidateTarget(context.Background(), targetRef); err != nil {
 			return executedMsg{action: state.ActionReset, target: target, err: fmt.Errorf("target %q is no longer available: %w", target, err), resetMode: mode}
 		}
 		if mode == "" {
@@ -520,7 +528,7 @@ func executeReset(repo *git.Repo, target string, mode state.ResetMode, limit int
 		default:
 			return executedMsg{action: state.ActionReset, target: target, err: fmt.Errorf("unsupported reset mode %q", mode), resetMode: mode}
 		}
-		_, err := repo.Run(args...)
+		_, err := adapter.Execute(context.Background(), operation{Action: state.ActionReset, Target: targetRef, Args: args})
 		status, statusErr := repo.Status(context.Background(), limit)
 		if statusErr != nil {
 			return executedMsg{action: state.ActionReset, target: target, status: status, err: statusErr, resetMode: mode}
