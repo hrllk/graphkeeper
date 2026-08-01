@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/state"
@@ -16,6 +18,13 @@ func handleWindowSize(m model, msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case loadedMsg:
+		if msg.epochSet && msg.epoch != m.repositoryEpoch {
+			telemetry.Log("app", "discard_stale_load", map[string]string{
+				"expected_epoch": fmt.Sprintf("%d", m.repositoryEpoch),
+				"received_epoch": fmt.Sprintf("%d", msg.epoch),
+			})
+			return m, nil
+		}
 		if msg.err != nil {
 			m.err = msg.err
 			m.status = m.status.WithError(msg.err.Error())
@@ -37,8 +46,15 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		return m, loadStashState(m.repo)
 	case tickMsg:
-		return m, tea.Batch(scheduleRefresh(), refreshRepoState(m.repo, m.commitLimit))
+		return m, tea.Batch(scheduleRefresh(), refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch))
 	case refreshedMsg:
+		if msg.epochSet && msg.epoch != m.repositoryEpoch {
+			telemetry.Log("app", "discard_stale_refresh", map[string]string{
+				"expected_epoch": fmt.Sprintf("%d", m.repositoryEpoch),
+				"received_epoch": fmt.Sprintf("%d", msg.epoch),
+			})
+			return m, nil
+		}
 		if msg.err != nil {
 			return m, nil
 		}

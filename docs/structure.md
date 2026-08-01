@@ -79,6 +79,8 @@ internal/
 - holds logging and diagnostic helpers
 
 ### Notes
+
+- 아키텍처 경계 개선의 단계별 현재→목표 매핑과 shim 제거 조건은 [마이그레이션 원장](20260801-0001-architecture-migration-ledger.md)에 기록한다.
 - `internal/ui` does not exist yet.
 - The current split keeps render helpers in `internal/app` because they still depend on app state.
 - Target selection policy is shared between browse and action flows to avoid drift.

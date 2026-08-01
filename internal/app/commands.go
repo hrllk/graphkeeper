@@ -12,17 +12,21 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
-func loadRepoState(repo *git.Repo, limit int) tea.Cmd {
+func loadRepoState(repo *git.Repo, limit int, epochs ...uint64) tea.Cmd {
+	var epoch uint64
+	if len(epochs) > 0 {
+		epoch = epochs[0]
+	}
 	return func() tea.Msg {
 		status, err := repo.Status(context.Background(), limit)
 		if err != nil {
-			return loadedMsg{status: status, err: err}
+			return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0}
 		}
 		status, err = loadLocalTagStatus(repo, status)
 		if err != nil {
-			return loadedMsg{status: status, err: err}
+			return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0}
 		}
-		return loadedMsg{status: status, err: err}
+		return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0}
 	}
 }
 
@@ -32,10 +36,14 @@ func scheduleRefresh() tea.Cmd {
 	})
 }
 
-func refreshRepoState(repo *git.Repo, limit int) tea.Cmd {
+func refreshRepoState(repo *git.Repo, limit int, epochs ...uint64) tea.Cmd {
+	var epoch uint64
+	if len(epochs) > 0 {
+		epoch = epochs[0]
+	}
 	return func() tea.Msg {
 		status, err := repo.Status(context.Background(), limit)
-		return refreshedMsg{status: status, err: err}
+		return refreshedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0}
 	}
 }
 
@@ -320,6 +328,9 @@ func executeDeleteBranch(repo *git.Repo, target string, remote bool, limit int) 
 			if branch == "" {
 				return executedMsg{action: state.ActionDeleteBranch, target: target, err: fmt.Errorf("remote branch is empty")}
 			}
+			if _, err := repo.Run("ls-remote", "--exit-code", "--heads", "origin", "refs/heads/"+branch); err != nil {
+				return executedMsg{action: state.ActionDeleteBranch, target: target, err: fmt.Errorf("remote branch %q no longer exists: %w", target, err)}
+			}
 			_, err := repo.DeleteRemoteBranch(context.Background(), "origin", branch)
 			refreshed, refreshErr := repo.Status(context.Background(), limit)
 			if refreshErr != nil {
@@ -329,6 +340,9 @@ func executeDeleteBranch(repo *git.Repo, target string, remote bool, limit int) 
 		}
 		if !status.Detached && status.Branch == target {
 			return executedMsg{action: state.ActionDeleteBranch, target: target, err: fmt.Errorf("current branch cannot be deleted")}
+		}
+		if !containsString(status.LocalBranches, target) && !containsString(status.Branches, target) {
+			return executedMsg{action: state.ActionDeleteBranch, target: target, err: fmt.Errorf("branch %q no longer exists", target)}
 		}
 		_, err := repo.DeleteBranch(context.Background(), target)
 		refreshed, refreshErr := repo.Status(context.Background(), limit)
@@ -343,6 +357,9 @@ func executeDeleteTag(repo *git.Repo, target string, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if target == "" {
 			return executedMsg{action: state.ActionDeleteTag, err: fmt.Errorf("target is empty")}
+		}
+		if _, err := repo.Run("show-ref", "--verify", "refs/tags/"+target); err != nil {
+			return executedMsg{action: state.ActionDeleteTag, target: target, err: fmt.Errorf("tag %q no longer exists: %w", target, err)}
 		}
 		_, err := repo.DeleteTag(context.Background(), target)
 		status, statusErr := repo.Status(context.Background(), limit)
@@ -361,6 +378,9 @@ func executeDeleteRemoteTag(repo *git.Repo, target string, limit int) tea.Cmd {
 	return func() tea.Msg {
 		if target == "" {
 			return executedMsg{action: state.ActionDeleteRemoteTag, err: fmt.Errorf("target is empty")}
+		}
+		if _, err := repo.Run("ls-remote", "--exit-code", "--tags", "origin", "refs/tags/"+target); err != nil {
+			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, err: fmt.Errorf("remote tag %q no longer exists: %w", target, err)}
 		}
 		_, err := repo.DeleteRemoteTag(context.Background(), "origin", target)
 		status, statusErr := repo.Status(context.Background(), limit)
@@ -456,6 +476,9 @@ func executeAction(repo *git.Repo, action state.Action, target string, limit int
 		if target == "" {
 			return executedMsg{action: action, err: fmt.Errorf("target is empty")}
 		}
+		if _, err := repo.Run("rev-parse", "--verify", target+"^{commit}"); err != nil {
+			return executedMsg{action: action, target: target, err: fmt.Errorf("target %q is no longer available: %w", target, err)}
+		}
 		var err error
 		switch action {
 		case state.ActionMerge:
@@ -480,6 +503,9 @@ func executeReset(repo *git.Repo, target string, mode state.ResetMode, limit int
 		if target == "" {
 			return executedMsg{action: state.ActionReset, err: fmt.Errorf("target is empty"), resetMode: mode}
 		}
+		if _, err := repo.Run("rev-parse", "--verify", target+"^{commit}"); err != nil {
+			return executedMsg{action: state.ActionReset, target: target, err: fmt.Errorf("target %q is no longer available: %w", target, err), resetMode: mode}
+		}
 		if mode == "" {
 			mode = state.ResetModeHard
 		}
@@ -501,6 +527,15 @@ func executeReset(repo *git.Repo, target string, mode state.ResetMode, limit int
 		}
 		return executedMsg{action: state.ActionReset, target: target, status: status, err: err, resetMode: mode}
 	}
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func createBranch(repo *git.Repo, name, base string, limit int) tea.Cmd {

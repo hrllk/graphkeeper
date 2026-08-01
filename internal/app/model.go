@@ -61,6 +61,11 @@ type model struct {
 	height      int
 	commitLimit int
 	err         error
+
+	// repositoryEpoch invalidates repository reads that started before a user
+	// operation. Bubble Tea commands run concurrently, so an older refresh
+	// must not overwrite a mutation's result when it completes later.
+	repositoryEpoch uint64
 }
 
 type graphSection int
@@ -100,5 +105,5 @@ func New(repo *git.Repo) (tea.Model, error) {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(loadRepoState(m.repo, m.commitLimit), scheduleRefresh())
+	return tea.Batch(loadRepoState(m.repo, m.commitLimit, m.repositoryEpoch), scheduleRefresh())
 }

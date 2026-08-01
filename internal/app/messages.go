@@ -8,8 +8,10 @@ import (
 )
 
 type loadedMsg struct {
-	status git.Status
-	err    error
+	status   git.Status
+	err      error
+	epoch    uint64
+	epochSet bool
 }
 
 type tickMsg time.Time
@@ -20,8 +22,10 @@ type stashLoadedMsg struct {
 }
 
 type refreshedMsg struct {
-	status git.Status
-	err    error
+	status   git.Status
+	err      error
+	epoch    uint64
+	epochSet bool
 }
 
 type fetchedMsg struct {

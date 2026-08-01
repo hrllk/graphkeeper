@@ -19,7 +19,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case createdBranchMsg:
 		return handleBranchUpdate(m, msg)
 	case tea.KeyMsg:
-		return m.handleKeyMsg(msg)
+		next, cmd := m.handleKeyMsg(msg)
+		if cmd == nil {
+			return next, nil
+		}
+		nextModel, ok := next.(model)
+		if !ok {
+			return next, cmd
+		}
+		// A user operation starts a new repository epoch. Scheduled refreshes
+		// use this value to reject reads started before the operation.
+		nextModel.repositoryEpoch++
+		return nextModel, cmd
 	default:
 		return m, nil
 	}

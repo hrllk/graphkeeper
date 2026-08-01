@@ -26,10 +26,10 @@
       {
         "id": "2",
         "title": "refactor",
-        "description": "CLI 진입점에 표준 인자 처리 구조를 도입한다.",
-        "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리할 수 있도록 구조를 정리한다.",
+        "description": "CLI 진입점과 애플리케이션 내부 구조를 현대적인 경계로 점진 개선한다.",
+        "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리한 기반 위에 runtime state, screen state, workflow orchestration, Git adapter, renderer projection 경계를 단계적으로 정리한다. 구조개선 계획은 docs/20260731-0003-modern-architecture-boundary-improvement-plan.md를 따른다. T1 baseline과 T2 snapshot/operation epoch 계약을 먼저 완료하고, refresh 순서 역전과 파괴적 Git 작업의 stale target을 방지한다.",
         "testStrategy": "",
-        "status": "done",
+        "status": "in-progress",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -54,9 +54,20 @@
             "parentTaskId": 2,
             "parentId": "undefined",
             "updatedAt": "2026-07-31T08:56:09.503Z"
+          },
+          {
+            "id": 3,
+            "title": "점진적 아키텍처 경계 개선",
+            "description": "runtime state, screen state, workflow, Git adapter, renderer projection을 단계적으로 분리하고 기존 동작·키 바인딩·Git 상태 전이를 보존한다.",
+            "details": "계획 문서: docs/20260731-0003-modern-architecture-boundary-improvement-plan.md. T1 baseline 및 migration ledger, T2 initial/load·refresh snapshot의 operation epoch과 stale 결과 폐기, T3 destructive action 실행 직전 branch/tag/remote/commit target 재검증까지 구현했다. T4 renderer projection, T5 workflow adapter 정리, T6 테스트·문서 동기화는 후속 slice로 남아 있다.",
+            "status": "in-progress",
+            "dependencies": [],
+            "parentTaskId": 2,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-01T02:00:00.000Z"
           }
         ],
-        "updatedAt": "2026-07-31T08:56:09.503Z"
+        "updatedAt": "2026-08-01T02:00:00.000Z"
       },
       {
         "id": "3",
