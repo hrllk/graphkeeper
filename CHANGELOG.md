@@ -1,5 +1,23 @@
 # Changelog
 
+## alpha.6 - 2026-08-02
+
+### Added
+
+- Added a read-only commit inspector entry point from the Graph view.
+- Added repository operation guards for stale application state.
+- Added section-aware navigation and hidden hotkey behavior for the redesigned
+  terminal layout.
+
+### Changed
+
+- Redesigned the main terminal layout with a full-height Graph surface and a
+  stacked Details, Local, Remote, and Tags rail.
+- Improved graph, overlay, marker, branch-label, and metadata density while
+  preserving topology and text markers.
+- Expanded tests for layout projection, graph rendering, keyboard handling,
+  repository operations, and update lifecycle epochs.
+
 ## alpha.5 - 2026-07-31
 
 ### Added
