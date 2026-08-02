@@ -12,7 +12,7 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
-func TestVisibleHiddenHotkeySectionsReturnsGlobalAndActiveSection(t *testing.T) {
+func TestVisibleHiddenHotkeySectionsReturnsActiveSectionOnly(t *testing.T) {
 	tests := []struct {
 		name    string
 		section graphSection
@@ -28,34 +28,31 @@ func TestVisibleHiddenHotkeySectionsReturnsGlobalAndActiveSection(t *testing.T) 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sections := visibleHiddenHotkeySections(model{activeSection: tt.section})
-			wantLen := 2
+			wantLen := 1
 			if tt.want == "" {
-				wantLen = 1
+				wantLen = 0
 			}
 			if len(sections) != wantLen {
 				t.Fatalf("expected %d visible sections, got %d", wantLen, len(sections))
 			}
-			if sections[0].title != "Global" {
-				t.Fatalf("expected Global first, got %q", sections[0].title)
-			}
-			if tt.want != "" && sections[1].title != tt.want {
-				t.Fatalf("expected active section %q, got %q", tt.want, sections[1].title)
+			if tt.want != "" && sections[0].title != tt.want {
+				t.Fatalf("expected active section %q, got %q", tt.want, sections[0].title)
 			}
 		})
 	}
 }
 
-func TestHiddenHotkeysPopupShowsGlobalAndActiveSection(t *testing.T) {
+func TestHiddenHotkeysPopupShowsActiveSectionOnly(t *testing.T) {
 	tests := []struct {
 		name   string
 		active graphSection
 		want   []string
 		hide   []string
 	}{
-		{name: "graph", active: sectionGraph, want: []string{"Global", "Moved out:", "Graph", "m: merge"}, hide: []string{"Local", "Remote", "Tags", "s: stash changes", "enter: jump to graph"}},
-		{name: "local", active: sectionCurrent, want: []string{"Global", "Moved out:", "Local", "s: stash changes"}, hide: []string{"Graph", "Remote", "Tags", "m: merge"}},
-		{name: "remote", active: sectionRemote, want: []string{"Global", "Moved out:", "Remote", "space: checkout"}, hide: []string{"Graph", "Local", "Tags", "s: stash changes"}},
-		{name: "tags", active: sectionTags, want: []string{"Global", "Moved out:", "Tags", "enter: jump to graph"}, hide: []string{"Graph", "Local", "Remote", "s: stash changes"}},
+		{name: "graph", active: sectionGraph, want: []string{"Graph", "m: merge"}, hide: []string{"Global", "Moved out:", "Local", "Remote", "Tags", "s: stash changes", "enter: jump to graph"}},
+		{name: "local", active: sectionCurrent, want: []string{"Local", "s: stash changes"}, hide: []string{"Global", "Moved out:", "Graph", "Remote", "Tags", "m: merge"}},
+		{name: "remote", active: sectionRemote, want: []string{"Remote", "space: checkout"}, hide: []string{"Global", "Moved out:", "Graph", "Local", "Tags", "s: stash changes"}},
+		{name: "tags", active: sectionTags, want: []string{"Tags", "enter: jump to graph"}, hide: []string{"Global", "Moved out:", "Graph", "Local", "Remote", "s: stash changes"}},
 	}
 
 	for _, tt := range tests {
@@ -81,20 +78,15 @@ func TestHiddenHotkeysPopupShowsGlobalAndActiveSection(t *testing.T) {
 	}
 }
 
-func TestHiddenHotkeysGlobalOmitsSectionSpecificDuplicates(t *testing.T) {
-	got := ansi.Strip(renderHiddenHotkeysPopup(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionCurrent,
-	}, 90, 0))
-	for _, want := range []string{"tab: next section", "q: quit", "?: hidden hotkeys"} {
+func TestGlobalHotkeyItemsAreMainFooterSource(t *testing.T) {
+	got := ansi.Strip(renderMainHotkeyFooter(120))
+	for _, want := range []string{"tab: switch", "k/j: updown", "q: quit", "?: hotkeys", "ctrl + u/d: scroll"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected global hotkeys to contain %q, got %q", want, got)
 		}
 	}
-	for _, duplicate := range []string{"f: fetch", "F: fetch tags", "S: stash list"} {
-		if strings.Contains(got, duplicate) {
-			t.Fatalf("expected global hotkeys to omit section-specific duplicate %q, got %q", duplicate, got)
-		}
+	if len(globalHotkeyItems()) != 5 {
+		t.Fatalf("expected five global footer items, got %d", len(globalHotkeyItems()))
 	}
 }
 
@@ -132,6 +124,21 @@ func TestClampHiddenHotkeyScroll(t *testing.T) {
 				t.Fatalf("expected offset %d, got %d", tt.want, got)
 			}
 		})
+	}
+}
+
+func TestHiddenHotkeyPopupUsesHotkeyWidthPolicy(t *testing.T) {
+	for _, tt := range []struct {
+		bodyWidth int
+		want      int
+	}{
+		{bodyWidth: 90, want: hiddenHotkeyPopupMaxWidth},
+		{bodyWidth: 50, want: 38},
+		{bodyWidth: 20, want: 20},
+	} {
+		if got := hiddenHotkeyPopupWidth(tt.bodyWidth); got != tt.want {
+			t.Fatalf("hiddenHotkeyPopupWidth(%d) = %d, want %d", tt.bodyWidth, got, tt.want)
+		}
 	}
 }
 
@@ -212,7 +219,7 @@ func TestHiddenHotkeyPopupFitsSmallHeightAndOverlay(t *testing.T) {
 	if got := lipgloss.Height(popup); got > bodyHeight {
 		t.Fatalf("expected popup height <= %d, got %d", bodyHeight, got)
 	}
-	if !strings.Contains(ansi.Strip(popup), "Hidden Hotkeys") || !strings.Contains(ansi.Strip(popup), "esc: close") {
+	if !strings.Contains(ansi.Strip(popup), "Hidden Hotkeys") || !strings.Contains(ansi.Strip(popup), "q: close") {
 		t.Fatalf("expected popup title and footer, got %q", ansi.Strip(popup))
 	}
 
@@ -243,7 +250,7 @@ func TestHiddenHotkeyPopupResizesWithoutBlankContent(t *testing.T) {
 	if strings.Contains(plain, "Hidden hotkeys by section\n\n\n") {
 		t.Fatalf("expected resize to avoid blank popup content, got %q", plain)
 	}
-	if !strings.Contains(plain, "esc: close") {
+	if !strings.Contains(plain, "q: close") {
 		t.Fatalf("expected close footer after resize, got %q", plain)
 	}
 }

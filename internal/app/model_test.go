@@ -370,7 +370,7 @@ func TestSplitThreeHeightsUseStackedLayout(t *testing.T) {
 func TestShellLayoutUsesFullHeightForGraphAndRightRail(t *testing.T) {
 	m := model{width: 140, height: 60}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
-	bodyWidth, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 	graphHeight := graphBoxHeightForModel(&m)
 
 	if bodyWidth != m.width-2*hMargin {
@@ -384,7 +384,7 @@ func TestShellLayoutUsesFullHeightForGraphAndRightRail(t *testing.T) {
 func TestGraphRailMatchesFourStackedPanelHeight(t *testing.T) {
 	m := model{width: 140, height: 60}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
-	_, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	_, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 	detailsHeight, localHeight, remoteHeight, tagsHeight := splitFourHeights(bodyHeight)
 	if bodyHeight != detailsHeight+localHeight+remoteHeight+tagsHeight {
 		t.Fatalf("expected four right rail panels to consume body height, got %d vs %d", bodyHeight, detailsHeight+localHeight+remoteHeight+tagsHeight)
@@ -410,7 +410,7 @@ func TestSplitFourHeightsDistributesSmallRemainders(t *testing.T) {
 func TestGraphContentMatchesStackedSideRailContent(t *testing.T) {
 	m := model{width: 140, height: 60}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
-	_, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	_, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 	want := bodyHeight - 2
 	if got := graphContentHeightForModel(&m); got != want {
 		t.Fatalf("expected graph content height %d, got %d", want, got)
@@ -531,7 +531,7 @@ func TestRenderAppViewKeepsShellPlacementFullWidth(t *testing.T) {
 		status: state.New().WithBrowse(),
 	}
 	got := ansi.Strip(renderAppView(m))
-	for _, want := range []string{"Graph Details", "?: hotkeys"} {
+	for _, want := range []string{"Graph Details", "tab: switch", "k/j: updown", "q: quit", "?: hotkeys", "ctrl + u/d: scroll"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected render to contain %q, got %q", want, got)
 		}
@@ -711,8 +711,8 @@ func TestRenderGraphContentShowsStatusLegendWhenItFits(t *testing.T) {
 	if !strings.Contains(got, "S stash · T tag") {
 		t.Fatalf("expected graph page line to include status legend, got %q", got)
 	}
-	if !strings.Contains(got, "?: hotkeys") {
-		t.Fatalf("expected graph page line to expose the hotkey overlay entrypoint, got %q", got)
+	if strings.Contains(got, "?: hotkeys") {
+		t.Fatalf("expected graph page line not to repeat the hotkey overlay entrypoint, got %q", got)
 	}
 	pageLine := strings.Split(got, "\n")[0]
 	if !strings.HasSuffix(pageLine, "S stash · T tag") {
@@ -736,15 +736,15 @@ func TestRenderGraphContentHidesLegendBeforeGraphDataOnNarrowWidth(t *testing.T)
 	}
 }
 
-func TestRenderGraphProjectionShowsHotkeyHintOnlyWhenItFits(t *testing.T) {
+func TestRenderGraphProjectionDoesNotRepeatHotkeyHint(t *testing.T) {
 	projection := GraphProjection{}
 	wide := ansi.Strip(renderGraphProjection(projection, 40, 2))
-	if !strings.Contains(wide, "?: hotkeys") {
-		t.Fatalf("expected empty graph to show hotkey hint when it fits, got %q", wide)
+	if strings.Contains(wide, "?: hotkeys") {
+		t.Fatalf("expected empty graph not to show hotkey hint, got %q", wide)
 	}
 	narrow := ansi.Strip(renderGraphProjection(projection, 24, 2))
 	if strings.Contains(narrow, "?: hotkeys") {
-		t.Fatalf("expected empty graph to omit hotkey hint when it does not fit, got %q", narrow)
+		t.Fatalf("expected narrow empty graph not to show hotkey hint, got %q", narrow)
 	}
 }
 
@@ -767,15 +767,15 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 		sectionCursor: map[graphSection]int{sectionGraph: 0},
 	}
 	got := m.renderGraphContent(88, 6)
-	if !strings.Contains(got, "date") {
-		t.Fatalf("expected graph header to use date label, got %q", got)
+	if strings.Contains(got, "date") {
+		t.Fatalf("expected graph header to omit date label, got %q", got)
 	}
 	header := strings.Split(got, "\n")[1]
 	if strings.Index(header, "state") > strings.Index(header, "graph") {
 		t.Fatalf("expected state column between branches and graph, got %q", header)
 	}
-	if strings.Contains(got, "author") {
-		t.Fatalf("expected medium graph width to prioritize title over author, got %q", got)
+	if !strings.Contains(got, "author") {
+		t.Fatalf("expected medium graph width to restore author, got %q", got)
 	}
 	if !strings.Contains(got, "Merge branch") {
 		t.Fatalf("expected graph row to prioritize the subject, got %q", got)
@@ -1471,7 +1471,7 @@ func TestRenderBlockedShowsAlertOverlay(t *testing.T) {
 	if !strings.Contains(got, "Alert") || !strings.Contains(got, "Select a local branch.") || !strings.Contains(got, "Move to a branch line.") {
 		t.Fatalf("expected blocked alert overlay, got %q", got)
 	}
-	if !strings.Contains(got, "esc/enter: dismiss") {
+	if !strings.Contains(got, "enter: dismiss") || !strings.Contains(got, "q: close") {
 		t.Fatalf("expected blocked alert dismiss help, got %q", got)
 	}
 }
@@ -1499,7 +1499,7 @@ func TestRenderFastForwardConfirmShowsConciseHelp(t *testing.T) {
 	if strings.Contains(got, "Current:") || strings.Contains(got, "Target:") {
 		t.Fatalf("expected fast-forward popup to omit count detail, got %q", got)
 	}
-	if !strings.Contains(got, "enter: fast-forward") || !strings.Contains(got, "esc: dismiss") {
+	if !strings.Contains(got, "enter: fast-forward") || !strings.Contains(got, "q: close") {
 		t.Fatalf("expected fast-forward confirm help, got %q", got)
 	}
 }
@@ -1587,7 +1587,7 @@ func TestRenderBranchOpenShowsCenteredPopupOverlay(t *testing.T) {
 	if strings.Contains(got, "Mode: Loading") || strings.Contains(got, "Loading | Enter a branch name.") {
 		t.Fatalf("expected branch input to stay out of the Global panel, got %q", got)
 	}
-	for _, want := range []string{"Create branch", "Enter a branch name.", "name: feature/new-flow", "base: abc1234", "Branch name already exists.", "esc: back"} {
+	for _, want := range []string{"Create branch", "Enter a branch name.", "name: feature/new-flow", "base: abc1234", "Branch name already exists.", "q: close"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected branch popup to contain %q, got %q", want, got)
 		}
@@ -1825,16 +1825,11 @@ func TestHiddenHotkeysPopupShowsMovedAndConditionalActions(t *testing.T) {
 	for _, want := range []string{
 		"Hidden hotkeys by section",
 		"focus: Graph",
-		"Global",
 		"Graph",
-		"Common:",
-		"Moved out:",
 		"Visible:",
 		"m: merge",
 		"Conditional:",
 		"s: reset",
-		"tab: next section",
-		"?: hidden hotkeys",
 		hiddenHotkeyPopupFooter,
 	} {
 		if !strings.Contains(got, want) {
@@ -1868,7 +1863,7 @@ func TestHiddenHotkeysPopupCentersHeaderAndFooter(t *testing.T) {
 		t.Fatalf("expected header to be centered, got %q", headerLine)
 	}
 
-	footerLine := findLine("esc: close")
+	footerLine := findLine("q: close")
 	if footerLine == "" {
 		t.Fatal("expected centered footer line to be present")
 	}
@@ -2719,8 +2714,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
 	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 88, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "5m") < 0 || strings.Index(line, "Merge branch") < 0 {
-		t.Fatalf("expected graph line to include hash, branches, date, title and graph, got %q", line)
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "Merge branch") < 0 {
+		t.Fatalf("expected graph line to include hash, branches, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
 		t.Fatalf("expected HEAD pointer to be highlighted, got %q", line)
@@ -2728,11 +2723,8 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Index(line, "head") > strings.Index(line, "o/l->") {
 		t.Fatalf("expected hash to lead branches, got %q", line)
 	}
-	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "5m") || strings.Index(line, "5m") > strings.Index(line, "Merge branch") {
+	if strings.Index(line, "o/l->") > strings.Index(line, "*") || strings.Index(line, "*") > strings.Index(line, "Merge branch") {
 		t.Fatalf("expected commit columns to stay ordered, got %q", line)
-	}
-	if strings.Index(line, "5m") > strings.Index(line, "Merge branch") {
-		t.Fatalf("expected date to remain before title, got %q", line)
 	}
 	if strings.Contains(line, "Merge branch 'main' into develop") || strings.Contains(line, "origin/") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
@@ -2741,7 +2733,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Contains(narrow, "alexa..") {
 		t.Fatalf("expected author to shrink away before title on narrow rows, got %q", narrow)
 	}
-	if !strings.Contains(narrow, "Merg...") {
+	if !strings.Contains(narrow, "Merge branch '") {
 		t.Fatalf("expected title to stay visible with a narrow-width ellipsis, got %q", narrow)
 	}
 	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24, 80, false, 0)
@@ -3013,7 +3005,7 @@ func TestRenderStashPopupListsEntriesFlatAndKeepsOrder(t *testing.T) {
 	if first > second {
 		t.Fatalf("expected newest stash to appear before older stash, got %q", plain)
 	}
-	if !strings.Contains(got, "enter: jump") || !strings.Contains(got, "esc: dismiss") {
+	if !strings.Contains(got, "enter: jump") || !strings.Contains(got, "q: close") {
 		t.Fatalf("expected stash popup help text, got %q", got)
 	}
 	if strings.Contains(got, "up/down: move") {
@@ -3111,7 +3103,7 @@ func TestRenderStashMessagePopupShowsInputAndHelp(t *testing.T) {
 	if !strings.Contains(got, "message: wip: local cleanup") {
 		t.Fatalf("expected stash message draft, got %q", got)
 	}
-	if !strings.Contains(got, "enter: stash  •  esc: cancel") {
+	if !strings.Contains(got, "enter: stash") || !strings.Contains(got, "q: close") {
 		t.Fatalf("expected stash message help, got %q", got)
 	}
 }
@@ -3131,7 +3123,7 @@ func TestRenderTagPopupUsesSingleTitleStrip(t *testing.T) {
 	if !strings.Contains(got, "target: abc1234") || !strings.Contains(got, "name: v1.2.3") {
 		t.Fatalf("expected tag popup fields, got %q", got)
 	}
-	if !strings.Contains(got, "enter: create") || !strings.Contains(got, "esc: cancel") {
+	if !strings.Contains(got, "enter: create") || !strings.Contains(got, "q: close") {
 		t.Fatalf("expected tag popup help, got %q", got)
 	}
 }
@@ -3308,7 +3300,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 		t.Fatalf("expected efb164e immediately after 37f0954, got index=%d rows=%v", parentIdx, rows)
 	}
 	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil, 24, 80, false, 0)
-	if !strings.Contains(parentLine, "efb164e") {
+	if !strings.Contains(parentLine, "efb16") {
 		t.Fatalf("expected efb164e row to render, got %q", parentLine)
 	}
 
@@ -3317,7 +3309,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 		t.Fatalf("expected 5525707 immediately after 4ba1faf, got index=%d rows=%v", rootIdx, rows)
 	}
 	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil, 24, 80, false, 0)
-	if !strings.Contains(rootLine, "5525707") {
+	if !strings.Contains(rootLine, "55257") {
 		t.Fatalf("expected common root row to render, got %q", rootLine)
 	}
 }
@@ -3363,7 +3355,7 @@ func TestRenderGraphLineNeverWraps(t *testing.T) {
 	if width := lipgloss.Width(got); width > 40 {
 		t.Fatalf("expected graph row to stay within width, got width=%d row=%q", width, got)
 	}
-	if !strings.Contains(got, "abcdef1") {
+	if !strings.Contains(got, "abcde") {
 		t.Fatalf("expected hash to remain visible, got %q", got)
 	}
 	if !strings.Contains(got, "*") {
@@ -3771,7 +3763,7 @@ func TestRenderResetModePopupUsesSingleModeList(t *testing.T) {
 	if strings.Count(got, "s: soft") != 1 || strings.Count(got, "m: mixed") != 1 || strings.Count(got, "h: hard") != 1 {
 		t.Fatalf("expected single-line mode list, got %q", got)
 	}
-	if !strings.Contains(got, "Reset mode") || !strings.Contains(got, "Choose a reset mode.") || !strings.Contains(got, "esc: back") {
+	if !strings.Contains(got, "Reset mode") || !strings.Contains(got, "Choose a reset mode.") || !strings.Contains(got, "q: close") {
 		t.Fatalf("expected reset popup to include title, body, and esc help, got %q", got)
 	}
 	if strings.Contains(got, "\nReset mode\n") {

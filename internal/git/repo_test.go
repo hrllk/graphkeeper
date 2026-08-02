@@ -262,6 +262,25 @@ func TestParseGraphCommitLinesPreservesGraphPrefix(t *testing.T) {
 	}
 }
 
+func TestParseCommitDiffFilesUsesNulDelimitedPaths(t *testing.T) {
+	got := parseCommitDiffFiles("M\x00dir/with space.go\x00A\x00new.go\x00D\x00old.go\x00R100\x00old name.go\x00new name.go\x00")
+	if len(got) != 4 {
+		t.Fatalf("expected four changed files, got %#v", got)
+	}
+	if got[0].Path != "dir/with space.go" {
+		t.Fatalf("expected whitespace path to survive parsing, got %#v", got[0])
+	}
+	var renamed CommitDiffFile
+	for _, file := range got {
+		if file.Status == "R" {
+			renamed = file
+		}
+	}
+	if renamed.OldPath != "old name.go" || renamed.Path != "new name.go" {
+		t.Fatalf("expected rename paths, got %#v", renamed)
+	}
+}
+
 func TestParseTrackingInfo(t *testing.T) {
 	tests := []struct {
 		input  string

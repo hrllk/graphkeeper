@@ -21,6 +21,11 @@ func applyShellOverlays(m model, body string, bodyWidth, bodyHeight int) string 
 func shellOverlayStack(m model, bodyWidth, bodyHeight int) []shellOverlay {
 	return []shellOverlay{
 		{
+			name:   "commit-inspector",
+			active: m.commitInspectorOpen,
+			popup:  m.renderCommitInspectorPopup(max(bodyWidth*9/10, 40), max(bodyHeight*85/100, 10)),
+		},
+		{
 			name:   "confirm",
 			active: m.status.Mode == state.ModeConfirm,
 			popup:  renderConfirmPopup(m, bodyWidth),

@@ -2,10 +2,30 @@ package app
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"hrllk/graphkeeper/internal/state"
 )
+
+func TestOverlayLineRestoresBaseSGRForRightFragment(t *testing.T) {
+	base := "\x1b[31mAAAA\x1b[0m"
+	got := overlayLine(base, "\x1b[0mXX", 1, 2)
+	if strings.Count(got, "\x1b[31m") != 2 {
+		t.Fatalf("expected base color to be restored after opaque popup, got %q", got)
+	}
+	if !strings.Contains(got, "XX\x1b[31mA\x1b[0m") {
+		t.Fatalf("expected popup to preserve the right fragment's base color, got %q", got)
+	}
+}
+
+func TestOverlayLineDoesNotSplitWideRune(t *testing.T) {
+	base := "a界b"
+	got := overlayLine(base, "XX", 1, 1)
+	if !strings.Contains(got, "界") {
+		t.Fatalf("expected wide rune to remain intact, got %q", got)
+	}
+}
 
 func TestShellOverlayStackOrder(t *testing.T) {
 	m := model{status: state.New().WithBrowse()}
@@ -15,6 +35,7 @@ func TestShellOverlayStackOrder(t *testing.T) {
 		got = append(got, overlay.name)
 	}
 	want := []string{
+		"commit-inspector",
 		"confirm",
 		"review",
 		"reset-mode",

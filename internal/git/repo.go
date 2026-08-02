@@ -90,6 +90,25 @@ type StashEntry struct {
 	Subject  string
 }
 
+type CommitInspection struct {
+	Hash, Subject, Author string
+	Parents               []string
+	Files                 []CommitDiffFile
+}
+
+type CommitDiffFile struct {
+	ID, Path, OldPath    string
+	Status               string
+	Additions, Deletions int
+	Binary               bool
+}
+
+type CommitDiff struct {
+	FileID  string
+	Lines   []string
+	HasMore bool
+}
+
 type BranchTracking struct {
 	Ahead  int
 	Behind int

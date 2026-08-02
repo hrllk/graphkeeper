@@ -95,7 +95,7 @@ func shouldHideConvergedDuplicateLane(row graphRow, idx, displayLane int) bool {
 }
 
 func renderGraphSpacer(cells []string, isHandshake bool, graphColWidth int) string {
-	prefix := strings.Repeat(" ", 8) + " " + strings.Repeat(" ", graphBranchFieldWidth) + " "
+	prefix := strings.Repeat(" ", graphCommitWidth) + " " + strings.Repeat(" ", graphBranchFieldWidth) + " "
 	graph := padRight(strings.Join(cells, " "), graphColWidth)
 	return prefix + strings.Repeat(" ", graphStatusWidth) + " " + graph + " "
 }

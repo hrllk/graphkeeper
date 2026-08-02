@@ -18,10 +18,6 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 	rows := p.Rows
 	if len(rows) == 0 {
 		emptyLine := muted.Render("  (no graph to show yet)")
-		hotkeyHint := "?: hotkeys"
-		if width >= lipgloss.Width(emptyLine)+3+lipgloss.Width(hotkeyHint) {
-			emptyLine += "   " + hotkey.Render("?") + ": hotkeys"
-		}
 		return fitBlockLines([]string{fitVisibleWidth(emptyLine, width)}, height)
 	}
 	page := p.PageSize
@@ -36,16 +32,13 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 	lines := make([]string, 0, height)
 	pageLabel := fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))
 	legend := "S stash · T tag"
-	hotkeyHint := "?: hotkeys"
 	pageLine := pageLabel
-	if available := width - lipgloss.Width(pageLabel) - lipgloss.Width(hotkeyHint) - lipgloss.Width(legend); available >= 4 {
-		pageLine += strings.Repeat(" ", available/2) + hotkeyHint + strings.Repeat(" ", available-available/2) + legend
-	} else if available := width - lipgloss.Width(pageLabel) - lipgloss.Width(legend); available >= 2 {
+	if available := width - lipgloss.Width(pageLabel) - lipgloss.Width(legend); available >= 2 {
 		pageLine += strings.Repeat(" ", available) + legend
 	}
 	lines = append(lines, fitVisibleWidth(muted.Render(pageLine), width))
 	graphActive := p.Active
-	graphColWidth := max(18, int(float64(width)*0.30))
+	graphColWidth := graphTopologyWidth(width)
 	rawGraph := len(rows) > 0 && rows[0].Graph != ""
 	if len(lines) < height {
 		lines = append(lines, fitVisibleWidth(sectionTitle.Render(renderGraphHeader(width, graphColWidth)), width))
@@ -81,7 +74,7 @@ func renderGraphHeader(width, graphColWidth int) string {
 	if available <= 0 {
 		return ""
 	}
-	prefix := fmt.Sprintf("%-8s %-14s %-*s %-*s %-*s ", "commit", "branches", graphStatusWidth, "state", graphColWidth, "graph", graphDateWidth, "date")
+	prefix := fmt.Sprintf("%-*s %-14s %-*s %-*s ", graphCommitWidth, "commit", "branches", graphStatusWidth, "state", graphColWidth, "graph")
 	if available < graphAuthorWidthTarget+graphTitlePreferredWidth {
 		return prefix + fmt.Sprintf("%-*s", available, "title")
 	}

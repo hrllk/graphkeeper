@@ -16,6 +16,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return handleFetchUpdate(m, msg)
 	case executedMsg:
 		return handleExecutedUpdate(m, msg)
+	case commitInspectorLoadedMsg:
+		m.commitInspectorLoading = false
+		if msg.err != nil {
+			m.commitInspectorError = msg.err.Error()
+			return m, nil
+		}
+		m.commitInspector = msg.inspection
+		m.commitInspectorCursor = 0
+		m.commitInspectorPane = 0
+		m.commitInspectorScroll = 0
+		m.commitInspectorError = ""
+		if len(msg.inspection.Files) > 0 {
+			m.commitInspectorLoading = true
+			return m, loadCommitInspectorDiff(m.repo, msg.inspection, 0)
+		}
+		return m, nil
+	case commitInspectorDiffMsg:
+		m.commitInspectorLoading = false
+		if msg.err != nil {
+			m.commitInspectorError = msg.err.Error()
+			return m, nil
+		}
+		m.commitInspectorLines = msg.diff.Lines
+		m.commitInspectorScroll = 0
+		m.commitInspectorHasMore = msg.diff.HasMore
+		m.commitInspectorError = ""
+		return m, nil
 	case createdBranchMsg:
 		return handleBranchUpdate(m, msg)
 	case tea.KeyMsg:

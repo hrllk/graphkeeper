@@ -30,6 +30,47 @@ func testKeyHandlingModel(repo *git.Repo, status git.Status) model {
 	}
 }
 
+func TestBrowseQQuitsApplication(t *testing.T) {
+	m := model{status: state.New().WithBrowse(), activeSection: sectionGraph}
+	got, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	if got.(model).status.Mode != state.ModeBrowse {
+		t.Fatalf("expected q to leave Browse state unchanged, got %s", got.(model).status.Mode)
+	}
+	if cmd == nil {
+		t.Fatal("expected q in Browse to return tea.Quit")
+	}
+}
+
+func TestOverlayQClosesWithoutQuitting(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(*model)
+		check func(model) bool
+	}{
+		{name: "hidden hotkeys", setup: func(m *model) { m.hiddenHotkeysOpen = true }, check: func(m model) bool { return !m.hiddenHotkeysOpen }},
+		{name: "branch input", setup: func(m *model) {
+			m.branchOpen = true
+			m.branchDraft = "feature"
+			m.repoStatus.Root = "/repo"
+			m.repoStatus.Branch = "main"
+			m.status = loadingToast("Enter a branch name.")
+		}, check: func(m model) bool { return !m.branchOpen && m.branchDraft == "" && m.status.Mode == state.ModeBrowse }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := model{status: state.New().WithBrowse(), activeSection: sectionGraph}
+			tt.setup(&m)
+			gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+			if cmd != nil {
+				t.Fatalf("expected overlay q to close synchronously, got %v", cmd)
+			}
+			if !tt.check(gotModel.(model)) {
+				t.Fatalf("expected overlay q to close %s, got %+v", tt.name, gotModel)
+			}
+		})
+	}
+}
+
 func TestBranchOpenEscCancelsDraft(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root})

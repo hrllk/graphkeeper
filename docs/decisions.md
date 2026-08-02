@@ -1,5 +1,15 @@
 # Decisions
 
+## 2026-08-01: Main and overlay q semantics are context-sensitive
+
+- Keep `q: quit` in the main footer and let `q` quit only from the main Browse view.
+- In an open overlay, use `q: close` and route it through the same close/cancel/back
+  behavior as `esc`; do not insert `q` into text inputs or execute confirmations.
+- Keep only Global core navigation keys in the main footer. Active-section actions
+  remain discoverable through the `?` overlay, which omits the duplicated Global group.
+- Reduce the Graph section's internal `graph`/topology column by 30% of its current
+  calculated width. Keep the Graph pane and right rail proportions unchanged.
+
 ## 2026-08-01: Graph is the primary full-height surface and Details heads the right rail
 
 - Render the main body as a two-column layout: full-height `Graph` on the left and
@@ -10,8 +20,8 @@
 - Keep the `Graph` topology `*` unchanged and render stash/tag state in the
   fixed state column. Use the `S·T` overlap state when both apply, including
   handshake and raw-graph rendering paths.
-- Give the graph title/subject the remaining width before author metadata and
-  show `?: hotkeys` only when the available width can accommodate it.
+- Give the graph title/subject the remaining width after the five-character hash,
+  branches, state, narrower `graph` topology, and restored author metadata.
 - Treat Graph and the four right-rail panels as one shared outer-height grid so
   the bottom borders align after resizing. The Details panel renders the same
   projection as Context Details without rendering action commands a second

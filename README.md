@@ -168,11 +168,14 @@ The usual maintainer flow looks like this:
 
 - Graph occupies the full-height left surface.
 - Details, Local, Remote, and Tags are stacked in the right rail.
-- Global and Context Actions are available through the section-aware `?` overlay,
-  not as persistent panels.
+- Global core keys are shown in the main footer; active-section actions are
+  available through the section-aware `?` overlay, not as persistent panels.
 - `tab` / `shift+tab` switch sections, `j` / `k` or `up` / `down` move, and `q`
   quits.
-- `?` shows the hidden hotkeys for the active section.
+- `?` shows the hidden hotkeys for the active section. In an open overlay, `q`
+  closes it and `esc` keeps its existing close/back behavior.
+- Graph rows show a five-character commit hash, no date column, restored author
+  metadata when space permits, and a narrower internal `graph` topology column.
 
 ### Graph
 

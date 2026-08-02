@@ -46,7 +46,7 @@ func (m model) View() string {
 
 func renderAppView(m model) string {
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
-	bodyWidth, bodyHeight := layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 
 	graphBudget := bodyWidth - 4
 	if graphBudget < 0 {
@@ -75,8 +75,9 @@ func renderAppView(m model) string {
 	graphRow := lipgloss.JoinHorizontal(lipgloss.Top, graphBox, rightRail)
 
 	body := graphRow
-	centeredBody := applyOuterMargins(body, bodyWidth, bodyHeight, hMargin, topMargin, max(bottomMargin-1, 0))
-	centeredBody = applyShellOverlays(m, centeredBody, bodyWidth, bodyHeight)
+	body = applyShellOverlays(m, body, bodyWidth, bodyHeight)
+	shellBody := body + "\n" + renderMainHotkeyFooter(bodyWidth)
+	centeredBody := applyOuterMargins(shellBody, bodyWidth, bodyHeight+layoutShellFooterHeight, hMargin, topMargin, max(bottomMargin-1, 0))
 
 	shell := centeredBody + "\n"
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, shell)
@@ -99,6 +100,10 @@ func popupWidthForBody(bodyWidth, minWidth, maxWidth int) int {
 	return width
 }
 
+func renderPopupFooter(width int) string {
+	return centerReviewLineInWidth(popupHelp.Render("q: close"), width)
+}
+
 func renderConfirmPopup(m model, bodyWidth int) string {
 	descStyle := popupBody
 	helpStyle := popupHelp
@@ -114,9 +119,9 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 	}
 	helpText := "y: yes  •  n: no"
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
-		helpText = "m: merge  •  r: rebase  •  esc: cancel"
+		helpText = "m: merge  •  r: rebase"
 	} else if m.status.Message == "Fast-forward available." {
-		helpText = "enter: fast-forward  •  esc: dismiss"
+		helpText = "enter: fast-forward"
 	} else if m.status.Action == state.ActionDeleteBranch {
 		helpText = "y: delete  •  n: cancel"
 	} else if m.status.Action == state.ActionDeleteTag {
@@ -132,6 +137,7 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 		centerReviewFooterLine(joinLayoutSections(
 			descStyle.Render(m.status.Detail),
 			helpStyle.Render(helpText),
+			renderPopupFooter(width-4),
 		), width-4),
 		width,
 	)
@@ -147,7 +153,7 @@ func renderReviewPopup(m model, bodyWidth int) string {
 	if popupTitle == "" {
 		popupTitle = "Branch has diverged"
 	}
-	body := centerReviewFooterLine(m.status.Detail, width-4)
+	body := joinLayoutSections(centerReviewFooterLine(m.status.Detail, width-4), renderPopupFooter(width-4))
 	return renderFloatingTitlePopup(
 		popupBox,
 		popupTitle,
@@ -188,7 +194,6 @@ func centerReviewLineInWidth(line string, width int) string {
 
 func renderResetModePopup(bodyWidth int) string {
 	bodyStyle := popupBody
-	helpStyle := popupHelp
 	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 32, 50)).
@@ -199,7 +204,7 @@ func renderResetModePopup(bodyWidth int) string {
 		strings.Join([]string{
 			bodyStyle.Render("Choose a reset mode."),
 			bodyStyle.Render("s: soft  •  m: mixed  •  h: hard"),
-			helpStyle.Render("esc: back"),
+			renderPopupFooter(popupWidthForBody(bodyWidth, 32, 50) - 4),
 		}, "\n\n"),
 		popupWidthForBody(bodyWidth, 32, 50),
 	)
@@ -229,11 +234,11 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 28, 40)).
 		Align(lipgloss.Center)
-	helpText := "enter: preview  •  esc: back"
+	helpText := "enter: preview"
 	if m.status.Action == state.ActionCheckout {
-		helpText = "enter: checkout  •  esc: back"
+		helpText = "enter: checkout"
 	} else if m.status.Action == state.ActionDeleteBranch {
-		helpText = "enter: delete  •  esc: back"
+		helpText = "enter: delete"
 	}
 	lines := []string{
 		descStyle.Render(m.status.Message),
@@ -241,6 +246,7 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 		renderTargets(m.status),
 		"",
 		helpStyle.Render(helpText),
+		renderPopupFooter(popupWidthForBody(bodyWidth, 28, 40) - 4),
 	}
 	return renderFloatingTitlePopup(
 		popupBox,
@@ -252,7 +258,6 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 
 func renderBranchInputPopup(m model, bodyWidth int) string {
 	descStyle := popupBody
-	helpStyle := popupHelp
 	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 36, 56)).
@@ -276,7 +281,7 @@ func renderBranchInputPopup(m model, bodyWidth int) string {
 		lines = append(lines, errorStyle.Render(m.branchError))
 	}
 	lines = append(lines, "")
-	lines = append(lines, helpStyle.Render("esc: back"))
+	lines = append(lines, renderPopupFooter(popupWidthForBody(bodyWidth, 36, 56)-4))
 	return renderFloatingTitlePopup(
 		popupBox,
 		"Create branch",
@@ -300,7 +305,7 @@ func renderGraphSearchPopup(m model, bodyWidth int) string {
 	lines := []string{
 		descStyle.Render("query: " + query),
 		"",
-		helpStyle.Render("enter: jump  •  n/N: next/prev  •  esc: cancel"),
+		helpStyle.Render("enter: jump  •  n/N: next/prev"),
 	}
 	if m.graphSearchError != "" {
 		lines = append(lines, "")
@@ -310,6 +315,7 @@ func renderGraphSearchPopup(m model, bodyWidth int) string {
 		lines = append(lines, "")
 		lines = append(lines, descStyle.Render(fmt.Sprintf("%d matches", len(matches))))
 	}
+	lines = append(lines, "", renderPopupFooter(popupWidthForBody(bodyWidth, 38, 58)-4))
 	return renderFloatingTitlePopup(
 		popupBox,
 		"Search Graph",

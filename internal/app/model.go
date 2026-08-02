@@ -36,6 +36,17 @@ type model struct {
 	graphSearchCursor int
 	graphSearchError  string
 
+	// Read-only Graph commit inspector.
+	commitInspectorOpen    bool
+	commitInspector        git.CommitInspection
+	commitInspectorCursor  int
+	commitInspectorPane    int
+	commitInspectorScroll  int
+	commitInspectorLines   []string
+	commitInspectorHasMore bool
+	commitInspectorLoading bool
+	commitInspectorError   string
+
 	// Modal and popup state.
 	branchOpen           bool
 	branchDraft          string

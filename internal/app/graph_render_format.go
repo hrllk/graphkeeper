@@ -10,16 +10,23 @@ import (
 )
 
 const (
-	graphBranchTokenWidth    = 10
-	graphBranchOverflowWidth = 4
-	graphBranchFieldWidth    = graphBranchTokenWidth + graphBranchOverflowWidth
-	graphStatusWidth         = 5
-	graphTitleMinimumWidth   = 12
-	graphTitlePreferredWidth = 24
+	graphCommitWidth          = 6 // five visible hash characters plus padding
+	graphBranchTokenWidth     = 10
+	graphBranchOverflowWidth  = 4
+	graphBranchFieldWidth     = graphBranchTokenWidth + graphBranchOverflowWidth
+	graphStatusWidth          = 5
+	graphTitleMinimumWidth    = 12
+	graphTitlePreferredWidth  = 24
+	graphTopologyMinimumWidth = 12
 )
 
 func graphRowFixedWidth(graphColWidth int) int {
-	return 8 + 1 + graphBranchFieldWidth + 1 + graphStatusWidth + 1 + graphColWidth + 1 + graphDateWidth + 1
+	return graphCommitWidth + 1 + graphBranchFieldWidth + 1 + graphStatusWidth + 1 + graphColWidth + 1
+}
+
+func graphTopologyWidth(width int) int {
+	current := max(graphTopologyMinimumWidth+6, int(float64(width)*0.30))
+	return max(graphTopologyMinimumWidth, int(float64(current)*0.70))
 }
 
 func graphStatusText(stashCount, tagCount int) string {

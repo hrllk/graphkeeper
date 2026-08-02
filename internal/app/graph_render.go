@@ -10,7 +10,6 @@ import (
 const (
 	graphAuthorWidthTarget = 7
 	graphTitleWidthTarget  = 20
-	graphDateWidth         = 7
 )
 
 func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
@@ -24,11 +23,11 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 	var hash, refs string
 	var refInfo decorationInfo
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
-		hash = "        "
+		hash = strings.Repeat(" ", graphCommitWidth)
 		refs = "          "
 	} else {
 		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
-		hash = renderSearchField(shorten(row.Commit.Hash, 7), searchQuery, 8, selected && graphActive)
+		hash = renderSearchField(shorten(row.Commit.Hash, 5), searchQuery, graphCommitWidth, selected && graphActive)
 		refs = renderSearchField(refInfo.Text, searchQuery, graphBranchFieldWidth, selected && graphActive)
 		isHead := hasHeadDecoration(row.Commit.Decorations)
 		pointerFocused := graphActive && selected
@@ -52,15 +51,13 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
 		status = renderGraphStatus(stashCount, len(row.Commit.Tags))
 	}
-	var when, title string
+	var title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
-		when = "       "
 		title = conflictColor.Render(row.Commit.Subject)
 	} else {
-		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
 		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, graphColWidth, selected && graphActive)
 	}
-	line := hash + " " + refs + " " + status + " " + graphCell + " " + when + " " + title
+	line := hash + " " + refs + " " + status + " " + graphCell + " " + title
 	return fitVisibleWidth(line, rowWidth)
 }
 
@@ -74,14 +71,14 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		if isHandshake {
 			graphCell = applyHandshakePoint(graphCell, stashCount, 0)
 		}
-		line := fmt.Sprintf("%-8s %-14s %-5s %-*s %-7s %s", "", "", "", graphColWidth, graphCell, "", "")
+		line := fmt.Sprintf("%-*s %-*s %-*s %-*s %s", graphCommitWidth, "", graphBranchFieldWidth, "", graphStatusWidth, "", graphColWidth, graphCell, "")
 		return fitVisibleWidth(line, rowWidth)
 	}
 	var hash, refs string
 	var refInfo decorationInfo
 	pointerFocused := false
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
-		hash = "        "
+		hash = strings.Repeat(" ", graphCommitWidth)
 		refs = "          "
 	} else {
 		graphRunes := []rune(row.Graph)
@@ -92,7 +89,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 			cursorLane = width - 1
 		}
 		pointerFocused = graphActive && selected && cursorLane == lane
-		hash = renderSearchField(shorten(row.Commit.Hash, 7), searchQuery, 8, selected && graphActive)
+		hash = renderSearchField(shorten(row.Commit.Hash, 5), searchQuery, graphCommitWidth, selected && graphActive)
 		if searchQuery == "" && pointerFocused {
 			hash = pointerMark.Render(hash)
 		}
@@ -126,19 +123,17 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" && isHandshake {
 		graphCell = applyHandshakePoint(graphCell, stashCount, len(row.Commit.Tags))
 	}
-	var when, title string
+	var title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
-		when = "       "
 		title = conflictColor.Render(row.Commit.Subject)
 	} else {
-		when = fmt.Sprintf("%-7s", compactWhenText(row.Commit.RelativeAge))
 		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, graphColWidth, selected && graphActive)
 	}
 	status := "   "
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
 		status = renderGraphStatus(stashCount, len(row.Commit.Tags))
 	}
-	line := hash + " " + refs + " " + status + " " + graphCell + " " + when + " " + title
+	line := hash + " " + refs + " " + status + " " + graphCell + " " + title
 	return fitVisibleWidth(line, rowWidth)
 }
 

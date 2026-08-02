@@ -97,3 +97,13 @@ type pullPreviewReadyMsg struct {
 type pullToastDoneMsg struct{}
 
 type branchToastDoneMsg struct{}
+
+type commitInspectorLoadedMsg struct {
+	inspection git.CommitInspection
+	err        error
+}
+
+type commitInspectorDiffMsg struct {
+	diff git.CommitDiff
+	err  error
+}

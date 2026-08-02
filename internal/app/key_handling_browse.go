@@ -197,6 +197,16 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 
 func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "enter":
+		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
+			return m, nil
+		}
+		m.commitInspectorOpen = true
+		m.commitInspectorLoading = true
+		m.commitInspectorError = ""
+		m.commitInspectorLines = nil
+		return m, inspectCommit(m.repo, focus.Hash)
 	case "esc":
 		if strings.TrimSpace(m.graphSearchQuery) != "" || m.graphSearchOpen {
 			m.graphSearchOpen = false

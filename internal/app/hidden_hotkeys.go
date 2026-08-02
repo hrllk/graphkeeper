@@ -23,7 +23,32 @@ type hiddenHotkeySection struct {
 	groups []hiddenHotkeyGroup
 }
 
-const hiddenHotkeyPopupFooter = "↑/↓ j/k: scroll · ctrl+u/d: page · esc: close"
+const hiddenHotkeyPopupFooter = "q: close"
+
+const (
+	hiddenHotkeyPopupMinWidth = 32
+	hiddenHotkeyPopupMaxWidth = 50
+)
+
+func globalHotkeyItems() []hiddenHotkeyItem {
+	return []hiddenHotkeyItem{
+		{key: "tab", desc: "switch"},
+		{key: "k/j", desc: "updown"},
+		{key: "q", desc: "quit"},
+		{key: "?", desc: "hotkeys"},
+		{key: "ctrl + u/d", desc: "scroll"},
+	}
+}
+
+func renderMainHotkeyFooter(width int) string {
+	items := globalHotkeyItems()
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		parts = append(parts, renderHotkey(item.key)+": "+item.desc)
+	}
+	footer := strings.Join(parts, " · ")
+	return fitVisibleWidth(muted.Render(footer), width)
+}
 
 func (m model) handleHiddenHotkeysKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
@@ -50,7 +75,7 @@ func (m model) scrollHiddenHotkeys(delta int) model {
 		return m
 	}
 	width, _ := hiddenHotkeyPopupBodySize(m)
-	total := len(hiddenHotkeyContentLines(m, popupWidthForBody(width, 44, 72)))
+	total := len(hiddenHotkeyContentLines(m, hiddenHotkeyPopupWidth(width)))
 	m.hiddenHotkeysScroll = clampHiddenHotkeyScroll(m.hiddenHotkeysScroll+delta, total, viewport)
 	return m
 }
@@ -66,7 +91,7 @@ func hiddenHotkeyPopupBodySize(m model) (int, int) {
 		return m.width, 0
 	}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
-	return layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	return layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 }
 
 func clampHiddenHotkeyScroll(offset, totalLines, viewportHeight int) int {
@@ -90,6 +115,10 @@ func hiddenHotkeyPopupStyle(width int) lipgloss.Style {
 		Align(lipgloss.Left)
 }
 
+func hiddenHotkeyPopupWidth(bodyWidth int) int {
+	return popupWidthForBody(bodyWidth, hiddenHotkeyPopupMinWidth, hiddenHotkeyPopupMaxWidth)
+}
+
 func hiddenHotkeyContentLines(m model, width int) []string {
 	lines := make([]string, 0)
 	sections := visibleHiddenHotkeySections(m)
@@ -109,7 +138,7 @@ func visibleHiddenHotkeySections(m model) []hiddenHotkeySection {
 	sections := hiddenHotkeySections(m)
 	visible := make([]hiddenHotkeySection, 0, 2)
 	for _, section := range sections {
-		if section.title == "Global" || section.active {
+		if section.active {
 			visible = append(visible, section)
 		}
 	}
@@ -132,7 +161,7 @@ func hiddenHotkeyPopupBody(m model, width int, content []string, showFocus bool,
 }
 
 func hiddenHotkeyPopupLayout(m model, bodyWidth, bodyHeight int) (string, int) {
-	popupWidth := popupWidthForBody(bodyWidth, 44, 72)
+	popupWidth := hiddenHotkeyPopupWidth(bodyWidth)
 	popupBox := hiddenHotkeyPopupStyle(popupWidth)
 	content := hiddenHotkeyContentLines(m, popupWidth)
 	showFocusOptions := []bool{true, false}
@@ -180,13 +209,7 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 			groups: []hiddenHotkeyGroup{
 				{
 					title: "Common",
-					items: []hiddenHotkeyItem{
-						{key: "tab", desc: "next section"},
-						{key: "shift+tab", desc: "previous section"},
-						{key: "j/k", desc: "move"},
-						{key: "q", desc: "quit"},
-						{key: "?", desc: "hidden hotkeys"},
-					},
+					items: globalHotkeyItems(),
 				},
 				{
 					title: "Moved out",

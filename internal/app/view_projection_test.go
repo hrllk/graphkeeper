@@ -20,7 +20,7 @@ func TestRenderGraphProjectionUsesProjectionInput(t *testing.T) {
 	}
 
 	got := renderGraphProjection(projection, 120, 4)
-	if !strings.Contains(got, "abcdef1") || !strings.Contains(got, "author") {
+	if !strings.Contains(got, "abcde") || !strings.Contains(got, "author") {
 		t.Fatalf("projection values were not rendered: %q", got)
 	}
 	for _, line := range strings.Split(got, "\n") {

@@ -140,6 +140,105 @@ func (r *Repo) Stashes(ctx context.Context) ([]StashEntry, error) {
 	return entries, nil
 }
 
+// InspectCommit returns read-only commit metadata and the changed file list.
+// Paths are parsed from Git's NUL-delimited output so whitespace and newlines
+// in filenames do not change the file identity.
+func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection, error) {
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return CommitInspection{}, fmt.Errorf("commit hash is empty")
+	}
+	meta, err := r.git(ctx, "show", "-s", "--format=%H%x00%P%x00%an%x00%s", hash)
+	if err != nil {
+		return CommitInspection{}, err
+	}
+	parts := strings.SplitN(meta, "\x00", 4)
+	if len(parts) != 4 {
+		return CommitInspection{}, fmt.Errorf("invalid commit metadata")
+	}
+	parents := strings.Fields(parts[1])
+	raw, err := r.gitRaw(ctx, "diff-tree", "--root", "--no-commit-id", "--name-status", "-z", "-r", "-M", "-C", hash)
+	if err != nil {
+		return CommitInspection{}, err
+	}
+	files := parseCommitDiffFiles(raw)
+	return CommitInspection{Hash: strings.TrimSpace(parts[0]), Parents: parents, Author: parts[2], Subject: parts[3], Files: files}, nil
+}
+
+func (r *Repo) CommitDiff(ctx context.Context, inspection CommitInspection, file CommitDiffFile, maxLines int, startLine int) (CommitDiff, error) {
+	parent := ""
+	if len(inspection.Parents) > 0 {
+		parent = inspection.Parents[0]
+	}
+	args := []string{"diff-tree", "--root", "--no-commit-id", "--full-index", "--no-ext-diff", "--unified=80", "-p", "-M", "-C"}
+	if parent == "" {
+		args = append(args, inspection.Hash)
+	} else {
+		args = append(args, parent, inspection.Hash)
+	}
+	args = append(args, "--", file.Path)
+	raw, err := r.gitRaw(ctx, args...)
+	if err != nil {
+		return CommitDiff{}, err
+	}
+	lines := strings.Split(strings.TrimSuffix(raw, "\n"), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		lines = nil
+	}
+	if startLine < 0 {
+		startLine = 0
+	}
+	if startLine > len(lines) {
+		startLine = len(lines)
+	}
+	end := len(lines)
+	hasMore := false
+	if maxLines > 0 && end > startLine+maxLines {
+		end = startLine + maxLines
+		hasMore = true
+	}
+	return CommitDiff{FileID: file.ID, Lines: lines[startLine:end], HasMore: hasMore}, nil
+}
+
+func parseCommitDiffFiles(raw string) []CommitDiffFile {
+	parts := strings.Split(raw, "\x00")
+	files := make([]CommitDiffFile, 0)
+	for i := 0; i < len(parts); i++ {
+		status := parts[i]
+		if status == "" {
+			continue
+		}
+		fields := strings.Fields(status)
+		if len(fields) == 0 {
+			continue
+		}
+		code := fields[0]
+		if code == "commit" || strings.HasPrefix(code, "tree") {
+			continue
+		}
+		file := CommitDiffFile{Status: string(code[0])}
+		switch code[0] {
+		case 'R', 'C':
+			if i+2 >= len(parts) {
+				continue
+			}
+			file.OldPath, file.Path = parts[i+1], parts[i+2]
+			i += 2
+			file.ID = file.OldPath + "→" + file.Path
+		default:
+			if i+1 >= len(parts) {
+				continue
+			}
+			file.Path = parts[i+1]
+			i++
+			file.ID = file.Path
+		}
+		files = append(files, file)
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+	return files
+}
+
 func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
 	entries, err := r.LocalTagEntries(ctx)
 	if err != nil {

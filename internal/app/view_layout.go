@@ -58,6 +58,17 @@ func layoutShellBodySize(m model, hMargin, topMargin, bottomMargin int) (width, 
 	return width, height
 }
 
+const layoutShellFooterHeight = 1
+
+func layoutShellContentSize(m model, hMargin, topMargin, bottomMargin int) (width, height int) {
+	width, height = layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	height -= layoutShellFooterHeight
+	if height < 1 {
+		height = 1
+	}
+	return width, height
+}
+
 func layoutHeaderHeight(bodyHeight int) int {
 	if bodyHeight <= 0 {
 		return 0
@@ -91,7 +102,7 @@ func layoutGraphRailHeight(bodyHeight int) int {
 
 func graphBoxHeightForModel(m *model) int {
 	hMargin, topMargin, bottomMargin := layoutShellMargins(*m)
-	_, bodyHeight := layoutShellBodySize(*m, hMargin, topMargin, bottomMargin)
+	_, bodyHeight := layoutShellContentSize(*m, hMargin, topMargin, bottomMargin)
 	return bodyHeight
 }
 
@@ -462,25 +473,21 @@ func overlayPopup(base string, popup string) string {
 func overlayLine(baseLine string, popupLine string, startX, popupW int) string {
 	var left strings.Builder
 	var right strings.Builder
+	activeSGR := ""
 	visWidth := 0
 	runes := []rune(baseLine)
 	i := 0
 	n := len(runes)
 	for i < n && visWidth < startX {
 		r := runes[i]
-		left.WriteRune(r)
 		if r == '\x1b' {
-			i++
-			for i < n {
-				left.WriteRune(runes[i])
-				if runes[i] == 'm' {
-					i++
-					break
-				}
-				i++
-			}
+			sequence, next := consumeANSISequence(runes, i)
+			left.WriteString(sequence)
+			activeSGR = updateActiveSGR(activeSGR, sequence)
+			i = next
 			continue
 		}
+		left.WriteRune(r)
 		visWidth += runewidth.RuneWidth(r)
 		i++
 	}
@@ -488,20 +495,20 @@ func overlayLine(baseLine string, popupLine string, startX, popupW int) string {
 	for i < n && covered < popupW {
 		r := runes[i]
 		if r == '\x1b' {
-			i++
-			for i < n {
-				if runes[i] == 'm' {
-					i++
-					break
-				}
-				i++
-			}
+			sequence, next := consumeANSISequence(runes, i)
+			activeSGR = updateActiveSGR(activeSGR, sequence)
+			i = next
 			continue
 		}
-		covered += runewidth.RuneWidth(r)
+		runeWidth := runewidth.RuneWidth(r)
+		if runeWidth > 0 && covered+runeWidth > popupW {
+			break
+		}
+		covered += runeWidth
 		i++
 	}
 	if i < n {
+		right.WriteString(activeSGR)
 		right.WriteString(string(runes[i:]))
 	}
 	paddedPopup := popupLine
@@ -509,4 +516,31 @@ func overlayLine(baseLine string, popupLine string, startX, popupW int) string {
 		paddedPopup += strings.Repeat(" ", popupW-lipgloss.Width(paddedPopup))
 	}
 	return left.String() + paddedPopup + right.String()
+}
+
+func consumeANSISequence(runes []rune, start int) (string, int) {
+	if start < 0 || start >= len(runes) || runes[start] != '\x1b' {
+		return "", start + 1
+	}
+	from := start + 1
+	if from < len(runes) && runes[from] == '[' {
+		from++
+	}
+	for i := from; i < len(runes); i++ {
+		if runes[i] >= '@' && runes[i] <= '~' {
+			return string(runes[start : i+1]), i + 1
+		}
+	}
+	return string(runes[start:]), len(runes)
+}
+
+func updateActiveSGR(active, sequence string) string {
+	if !strings.HasPrefix(sequence, "\x1b[") || !strings.HasSuffix(sequence, "m") {
+		return active
+	}
+	params := strings.TrimSuffix(strings.TrimPrefix(sequence, "\x1b["), "m")
+	if params == "" || params == "0" || strings.Contains(params, ";0") {
+		return ""
+	}
+	return active + sequence
 }
