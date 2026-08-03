@@ -15,11 +15,12 @@
             "id": 1,
             "title": "커밋 전체 메시지와 diff inspect",
             "description": "선택한 커밋에서 전체 commit message와 diff를 빠르게 확인할 수 있는 Graph detail/preview 흐름 추가",
-            "details": "",
-            "status": "pending",
+            "details": "계획 문서: docs/20260802-0001-graph-commit-inspector-plan.md. Reddit 피드백 작업 목록 1장의 요구를 구체화한다. Graph에서 enter로 기존 화면을 가리는 독립 Inspector screen을 열고, Changed files 계층형 tree와 from/to side-by-side diff를 제공한다. 구현 단계는 (1) Inspector screen state·loading/error/retry·Esc 복귀, (2) hunk/old-new line/pair 구조화 contract, (3) file tree와 3열 layout, (4) lazy diff window·bounded cache·epoch stale 폐기, (5) A/M/D·+/- semantic style·word-level diff·highlighter registry fallback, (6) root/rename/binary/empty/large diff·40/60/80열·ANSI/NO_COLOR contract matrix와 문서 동기화다. 실제 Tree-sitter grammar/query 번들과 merge commit parent 선택 UI는 P2 후속 범위로 계획 문서와 TODO에 남긴다. 현재 internal/app/commit_inspector.go와 internal/git/repo_exec.go는 기본 파일 목록/diff 로딩까지 부분 구현되어 있으며, 전체 subtask는 구현 진행 중이다.",
+            "status": "in-progress",
             "dependencies": [],
             "parentTaskId": 1,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-02T00:00:00.000Z"
           },
         {
           "id": 2,
@@ -108,9 +109,64 @@
           "parentTaskId": 1,
           "updatedAt": "2026-08-01T04:00:00.000Z",
           "parentId": "undefined"
+        },
+        {
+          "id": 10,
+          "title": "Add Repository State Summary",
+          "description": "Graph 상단에서 clean, dirty, ahead, behind, diverged 등 현재 저장소 상태를 한눈에 보여준다.",
+          "details": "계획 문서: docs/20260802-0010-add-repository-state-summary-plan.md. 현재 branch·upstream·worktree·divergence·operation 진행 상태를 기존 git.Status에서 재사용하고, 상태 조합별 요약과 low-width fallback을 제공한다. 1.11~1.14가 채우는 상태·추천·이유·영향·결과를 Graph 제목 아래 Unified Decision Card 하나로 묶으며 별도 screen/popup은 만들지 않는다.",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 1,
+          "parentId": "undefined",
+          "updatedAt": "2026-08-02T00:00:00.000Z"
+        },
+        {
+          "id": 11,
+          "title": "Add Next Action Recommendation",
+          "description": "현재 저장소 상태를 바탕으로 사용자가 다음에 수행할 Git 작업을 추천한다.",
+          "details": "계획 문서: docs/20260802-0011-add-next-action-recommendation-plan.md. 상태 요약을 입력으로 pull, push, merge, rebase, stash 등의 추천 규칙을 계산하고 Graph 화면에 추천 행동과 실행 진입점을 노출한다.",
+          "status": "in-progress",
+          "dependencies": [10],
+          "parentTaskId": 1,
+          "parentId": "undefined",
+          "updatedAt": "2026-08-03T00:00:00.000Z"
+        },
+        {
+          "id": 12,
+          "title": "Explain Branch Decision Context",
+          "description": "merge, rebase, pull 등의 추천 이유와 branch 간 commit 관계를 짧고 명확하게 설명한다.",
+          "details": "계획 문서: docs/20260802-0012-explain-branch-decision-context-plan.md. fast-forward, already aligned, target included, diverged를 구분하고 local-only·target-only commit 수와 대상 ref를 공통 문구로 제공한다.",
+          "status": "pending",
+          "dependencies": [10, 11],
+          "parentTaskId": 1,
+          "parentId": "undefined",
+          "updatedAt": "2026-08-02T00:00:00.000Z"
+        },
+        {
+          "id": 13,
+          "title": "Add Git Operation Impact Preview",
+          "description": "merge, rebase, reset, clean, delete 등 Git 작업을 실행하기 전에 예상되는 변경과 위험을 보여준다.",
+          "details": "계획 문서: docs/20260802-0013-add-git-operation-impact-preview-plan.md. 기존 confirm·review popup과 preview 로직을 재사용해 대상 ref, 예상 commit 변화, conflict 가능성, destructive risk를 실행 전에 표시한다.",
+          "status": "pending",
+          "dependencies": [12],
+          "parentTaskId": 1,
+          "parentId": "undefined",
+          "updatedAt": "2026-08-02T00:00:00.000Z"
+        },
+        {
+          "id": 14,
+          "title": "Show Post-Operation Result Summary",
+          "description": "Git 작업 완료 후 이전 상태와 비교해 실제 결과와 다음 상태를 보여준다.",
+          "details": "계획 문서: docs/20260802-0014-show-post-operation-result-summary-plan.md. 기존 executedMsg·refresh 흐름을 재사용해 성공, 실패, partial refresh, stale result를 구분하고 사용자가 Graph 문맥으로 안전하게 복귀하도록 한다.",
+          "status": "pending",
+          "dependencies": [13],
+          "parentTaskId": 1,
+          "parentId": "undefined",
+          "updatedAt": "2026-08-02T00:00:00.000Z"
         }
         ],
-        "updatedAt": "2026-08-01T00:00:00.000Z"
+        "updatedAt": "2026-08-02T00:00:00.000Z"
       },
       {
         "id": "2",
