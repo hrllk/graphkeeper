@@ -27,10 +27,15 @@ func findGraphRowByHash(rows []graphRow, hash string) int {
 
 func graphPageSize(m *model) int {
 	rows := graph.Rows(m.repoStatus)
-	return graphPageSizeForRows(m, rows, m.graphScroll, graphContentHeightForModel(m))
+	hint := repositoryStateHintForModel(m)
+	return graphPageSizeForRowsWithHint(m, rows, m.graphScroll, graphContentHeightForModel(m), hint != "")
 }
 
 func graphPageSizeForRows(m *model, rows []graphRow, start, contentHeight int) int {
+	return graphPageSizeForRowsWithHint(m, rows, start, contentHeight, false)
+}
+
+func graphPageSizeForRowsWithHint(m *model, rows []graphRow, start, contentHeight int, hasHint bool) int {
 	if len(rows) == 0 || contentHeight <= 0 {
 		return 0
 	}
@@ -38,6 +43,9 @@ func graphPageSizeForRows(m *model, rows []graphRow, start, contentHeight int) i
 		return 0
 	}
 	budget := contentHeight - 2
+	if hasHint {
+		budget--
+	}
 	if budget < 1 {
 		budget = 1
 	}
@@ -188,7 +196,8 @@ func focusGraphCommit(m *model, rs git.Status, hash string) bool {
 	}
 	m.sectionCursor[sectionGraph] = row
 	m.contextScroll = 0
-	page := graphPageSizeForRows(m, rows, row, graphContentHeightForModel(m))
+	hint := repositoryStateHintForModel(m)
+	page := graphPageSizeForRowsWithHint(m, rows, row, graphContentHeightForModel(m), hint != "")
 	m.graphScroll = clampScroll(row, len(rows), page)
 	m.graphLaneCursor = graph.PointerLane(rows[row])
 	return true

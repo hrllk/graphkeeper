@@ -15,10 +15,17 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 	if height <= 0 {
 		return ""
 	}
+	lines := make([]string, 0, height)
+	if p.StateHint != "" {
+		lines = append(lines, fitRepositoryStateHint(p.StateHint, width))
+	}
 	rows := p.Rows
 	if len(rows) == 0 {
 		emptyLine := muted.Render("  (no graph to show yet)")
-		return fitBlockLines([]string{fitVisibleWidth(emptyLine, width)}, height)
+		if len(lines) < height {
+			lines = append(lines, fitVisibleWidth(emptyLine, width))
+		}
+		return fitBlockLines(lines, height)
 	}
 	page := p.PageSize
 	if page <= 0 {
@@ -29,7 +36,6 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 	if end > len(rows) {
 		end = len(rows)
 	}
-	lines := make([]string, 0, height)
 	pageLabel := fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))
 	legend := "S stash · T tag"
 	pageLine := pageLabel
@@ -67,6 +73,10 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 		}
 	}
 	return fitBlockLines(lines, height)
+}
+
+func fitRepositoryStateHint(hint string, width int) string {
+	return fitVisibleWidth(warn.Render(hint), width)
 }
 
 func renderGraphHeader(width, graphColWidth int) string {

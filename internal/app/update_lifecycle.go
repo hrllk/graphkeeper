@@ -32,6 +32,8 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
+		m.err = nil
+		m.repoSnapshotLoaded = true
 		m.repoStatus = msg.status
 		if msg.status.TagProvenanceLoaded {
 			m.tagSyncAttempted = true
@@ -59,6 +61,8 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
+		m.err = nil
+		m.repoSnapshotLoaded = true
 		m.repoStatus = msg.status
 		if msg.status.TagProvenanceLoaded {
 			m.tagSyncAttempted = true

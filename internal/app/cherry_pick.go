@@ -63,7 +63,8 @@ func focusCherryPickTarget(m *model, idx int) {
 	}
 	m.status.TargetIdx = idx
 	m.sectionCursor[sectionGraph] = idx
-	m.graphScroll = clampScroll(idx, len(rows), graphPageSizeForRows(m, rows, idx, graphContentHeightForModel(m)))
+	hint := repositoryStateHintForModel(m)
+	m.graphScroll = clampScroll(idx, len(rows), graphPageSizeForRowsWithHint(m, rows, idx, graphContentHeightForModel(m), hint != ""))
 	m.graphLaneCursor = graph.PointerLane(rows[idx])
 	if idx < len(m.status.Targets) {
 		m.status.Selected = m.status.Targets[idx].Ref

@@ -50,3 +50,42 @@ func TestHandleLifecycleUpdateDiscardsStaleInitialLoad(t *testing.T) {
 		t.Fatalf("stale initial load changed HEAD to %q", updated.repoStatus.Head)
 	}
 }
+
+func TestHandleLifecycleUpdateClearsErrorAfterSuccessfulLoad(t *testing.T) {
+	m := model{
+		err:           errRepositoryUnavailable,
+		status:        state.New().WithError("repository unavailable"),
+		sectionCursor: testSectionCursors(),
+	}
+
+	got, _ := handleLifecycleUpdate(m, loadedMsg{status: git.Status{Root: "/repo", Branch: "main"}})
+	updated := got.(model)
+	if updated.err != nil {
+		t.Fatalf("successful load retained error: %v", updated.err)
+	}
+}
+
+func TestHandleLifecycleUpdateClearsErrorAfterSuccessfulRefresh(t *testing.T) {
+	m := model{
+		err:             errRepositoryUnavailable,
+		repositoryEpoch: 2,
+		status:          state.New().WithBrowse(),
+		repoStatus:      git.Status{Root: "/repo", Branch: "old"},
+		sectionCursor:   testSectionCursors(),
+	}
+
+	got, _ := handleLifecycleUpdate(m, refreshedMsg{status: git.Status{Root: "/repo", Branch: "main"}, epoch: 2, epochSet: true})
+	updated := got.(model)
+	if updated.err != nil {
+		t.Fatalf("successful refresh retained error: %v", updated.err)
+	}
+}
+
+func testSectionCursors() map[graphSection]int {
+	return map[graphSection]int{
+		sectionGraph:   0,
+		sectionCurrent: 0,
+		sectionRemote:  0,
+		sectionTags:    0,
+	}
+}

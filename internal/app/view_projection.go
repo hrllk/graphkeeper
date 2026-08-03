@@ -30,6 +30,7 @@ type GraphProjection struct {
 	Handshake     map[string]bool
 	StashCounts   map[string]int
 	SearchQuery   string
+	StateHint     string
 }
 
 type SectionProjection struct {
@@ -51,7 +52,8 @@ type ContextProjection struct {
 
 func (m model) screenProjection(width, height int) ScreenProjection {
 	graph := graphRows(m.repoStatus)
-	pageSize := graphPageSizeForRows(&m, graph, m.graphScroll, max(height, 1))
+	hint := repositoryStateHintForModel(&m)
+	pageSize := graphPageSizeForRowsWithHint(&m, graph, m.graphScroll, max(height, 1), hint != "")
 	stashCounts := make(map[string]int)
 	for _, row := range graph {
 		if row.Commit.Hash != "" {
@@ -69,7 +71,7 @@ func (m model) screenProjection(width, height int) ScreenProjection {
 	return ScreenProjection{
 		Width:       width,
 		Height:      height,
-		Graph:       GraphProjection{Rows: graph, PageSize: pageSize, Scroll: m.graphScroll, Cursor: m.sectionCursor[sectionGraph], LaneCursor: m.graphLaneCursor, Active: m.activeSection == sectionGraph, LocalBranches: append([]string(nil), m.repoStatus.LocalBranches...), Handshake: m.handshakeCommits, StashCounts: stashCounts, SearchQuery: m.graphSearchQuery},
+		Graph:       GraphProjection{Rows: graph, PageSize: pageSize, Scroll: m.graphScroll, Cursor: m.sectionCursor[sectionGraph], LaneCursor: m.graphLaneCursor, Active: m.activeSection == sectionGraph, LocalBranches: append([]string(nil), m.repoStatus.LocalBranches...), Handshake: m.handshakeCommits, StashCounts: stashCounts, SearchQuery: m.graphSearchQuery, StateHint: hint},
 		Sections:    sections,
 		Status:      m.status,
 		Active:      m.activeSection,

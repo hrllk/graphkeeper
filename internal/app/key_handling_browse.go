@@ -347,7 +347,8 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.activeSection = sectionGraph
 		m.sectionCursor[sectionGraph] = row
 		m.graphLaneCursor = graph.PointerLane(rows[row])
-		m.graphScroll = clampScroll(row, len(rows), graphPageSizeForRows(&m, rows, row, graphContentHeightForModel(&m)))
+		hint := repositoryStateHintForModel(&m)
+		m.graphScroll = clampScroll(row, len(rows), graphPageSizeForRowsWithHint(&m, rows, row, graphContentHeightForModel(&m), hint != ""))
 		m.awaitingGoTop = false
 		return m, nil
 	case "space", " ":

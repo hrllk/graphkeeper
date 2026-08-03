@@ -69,10 +69,11 @@ type model struct {
 	hiddenHotkeysScroll  int
 
 	// Viewport and transient errors.
-	width       int
-	height      int
-	commitLimit int
-	err         error
+	width              int
+	height             int
+	commitLimit        int
+	err                error
+	repoSnapshotLoaded bool
 
 	// repositoryEpoch invalidates repository reads that started before a user
 	// operation. Bubble Tea commands run concurrently, so an older refresh

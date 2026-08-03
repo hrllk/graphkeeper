@@ -179,7 +179,8 @@ func applyGraphSearchJump(m model, entry graphSearchEntry) model {
 	m.activeSection = sectionGraph
 	m.sectionCursor[sectionGraph] = entry.Row
 
-	page := graphPageSizeForRows(&m, rows, entry.Row, graphContentHeightForModel(&m))
+	hint := repositoryStateHintForModel(&m)
+	page := graphPageSizeForRowsWithHint(&m, rows, entry.Row, graphContentHeightForModel(&m), hint != "")
 	m.graphScroll = clampScroll(entry.Row, len(rows), page)
 	m.graphLaneCursor = graph.PointerLane(rows[entry.Row])
 	return m

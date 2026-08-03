@@ -122,7 +122,8 @@ func (m model) handleTagCreatedMsg(msg tagCreatedMsg) (model, tea.Cmd) {
 	m.activeSection = sectionGraph
 	m.sectionCursor[sectionGraph] = row
 	m.graphLaneCursor = graph.PointerLane(rows[row])
-	m.graphScroll = clampScroll(row, len(rows), graphPageSizeForRows(&m, rows, row, graphContentHeightForModel(&m)))
+	hint := repositoryStateHintForModel(&m)
+	m.graphScroll = clampScroll(row, len(rows), graphPageSizeForRowsWithHint(&m, rows, row, graphContentHeightForModel(&m), hint != ""))
 	m.status = loadingToast("Tag created.")
 	telemetry.Log("app", "tag_create", map[string]string{
 		"name":   msg.Name,
