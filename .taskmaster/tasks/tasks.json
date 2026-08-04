@@ -115,11 +115,11 @@
           "title": "Add Repository State Summary",
           "description": "Graph 상단에서 clean, dirty, ahead, behind, diverged 등 현재 저장소 상태를 한눈에 보여준다.",
           "details": "계획 문서: docs/20260802-0010-add-repository-state-summary-plan.md. 현재 branch·upstream·worktree·divergence·operation 진행 상태를 기존 git.Status에서 재사용하고, 상태 조합별 요약과 low-width fallback을 제공한다. 1.11~1.14가 채우는 상태·추천·이유·영향·결과를 Graph 제목 아래 Unified Decision Card 하나로 묶으며 별도 screen/popup은 만들지 않는다.",
-          "status": "pending",
+          "status": "done",
           "dependencies": [],
           "parentTaskId": 1,
           "parentId": "undefined",
-          "updatedAt": "2026-08-02T00:00:00.000Z"
+          "updatedAt": "2026-08-04T00:00:00.000Z"
         },
         {
           "id": 11,
