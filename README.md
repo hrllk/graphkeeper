@@ -179,6 +179,7 @@ The usual maintainer flow looks like this:
 
 ### Graph
 
+- `enter` open the selected commit in the bordered read-only Commit Inspector
 - `space` checkout the selected commit or ref
 - `m` merge
 - `r` rebase

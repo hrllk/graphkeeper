@@ -45,6 +45,9 @@ func (m model) View() string {
 }
 
 func renderAppView(m model) string {
+	if m.commitInspectorOpen {
+		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, m.renderCommitInspectorPopup(m.width, m.height))
+	}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 

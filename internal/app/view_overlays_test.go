@@ -35,7 +35,6 @@ func TestShellOverlayStackOrder(t *testing.T) {
 		got = append(got, overlay.name)
 	}
 	want := []string{
-		"commit-inspector",
 		"confirm",
 		"review",
 		"reset-mode",

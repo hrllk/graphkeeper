@@ -13,9 +13,9 @@
         "subtasks": [
           {
             "id": 1,
-            "title": "커밋 전체 메시지와 diff inspect",
-            "description": "선택한 커밋에서 전체 commit message와 diff를 빠르게 확인할 수 있는 Graph detail/preview 흐름 추가",
-            "details": "계획 문서: docs/20260802-0001-graph-commit-inspector-plan.md. Reddit 피드백 작업 목록 1장의 요구를 구체화한다. Graph에서 enter로 기존 화면을 가리는 독립 Inspector screen을 열고, Changed files 계층형 tree와 from/to side-by-side diff를 제공한다. 구현 단계는 (1) Inspector screen state·loading/error/retry·Esc 복귀, (2) hunk/old-new line/pair 구조화 contract, (3) file tree와 3열 layout, (4) lazy diff window·bounded cache·epoch stale 폐기, (5) A/M/D·+/- semantic style·word-level diff·highlighter registry fallback, (6) root/rename/binary/empty/large diff·40/60/80열·ANSI/NO_COLOR contract matrix와 문서 동기화다. 실제 Tree-sitter grammar/query 번들과 merge commit parent 선택 UI는 P2 후속 범위로 계획 문서와 TODO에 남긴다. 현재 internal/app/commit_inspector.go와 internal/git/repo_exec.go는 기본 파일 목록/diff 로딩까지 부분 구현되어 있으며, 전체 subtask는 구현 진행 중이다.",
+            "title": "commit detail",
+            "description": "Graph에서 선택한 커밋의 identity, 변경 파일 tree, unified diff를 독립 Inspector 화면으로 확인할 수 있는 read-only 흐름을 구현한다.",
+            "details": "스펙 문서: docs/20260803-0001-graph-commit-inspector-spec.md. Graph에서 Enter로 기존 화면을 가리는 bordered Inspector를 열고, 4행 고정 header(commit/message/author/path), flat changed-files list, old/new line columns을 가진 unified diff, q/Esc/? footer를 제공한다. Header에는 선택 파일 full path를, 목록에는 ../../filename 축약 경로를 표시한다. MVP keymap은 j/k로 변경 파일을 탐색하고 Ctrl+U/D로 선택 파일 diff를 스크롤한다. 별도 pane focus, fold/unfold, h/l, Enter, Tab/m/r과 message footer는 포함하지 않는다. first-parent/root basis, rename/copy identity, binary/submodule/mode-only 상태, request/epoch stale 폐기, cancellation, bounded diff, ANSI/NO_COLOR semantic marker, narrow/wide frame matrix와 테스트를 포함한다. Tree-sitter grammar/query, word-level diff, 전체 message viewport와 Working Tree staging/commit은 후속 범위다.",
             "status": "in-progress",
             "dependencies": [],
             "parentTaskId": 1,
@@ -164,6 +164,17 @@
           "parentTaskId": 1,
           "parentId": "undefined",
           "updatedAt": "2026-08-02T00:00:00.000Z"
+        },
+        {
+          "id": 15,
+          "title": "Working Tree Inspector",
+          "description": "Graph의 dirty 상태에서 현재 working tree 변경을 확인하고 일부 또는 전체 파일을 선택해 commit할 수 있는 Inspector를 추가한다.",
+          "details": "Commit Inspector와 동일한 bordered Inspector frame, 고정 header, 변경 파일 목록, unified diff, commit message footer를 공유하되 Working Tree 전용 mode로 분리한다. Graph에서 w로 진입하며 branch와 dirty 상태를 표시한다. 파일 선택 후 Space로 개별 staged 상태를 토글하고 a로 전체 staged 상태를 토글한다. staged 파일을 대상으로 commit message를 입력해 일부 파일 또는 전체 파일을 commit한다. commit 진행 중에는 입력을 잠그고, 성공하면 Working Tree Inspector를 유지한 채 파일 목록과 dirty 상태를 갱신한다. 일부 파일이 남으면 계속 탐색할 수 있고, 전체가 clean이면 clean 상태를 표시한다. q로 종료하면 최신 repository snapshot으로 Graph를 갱신하고 새로 생성된 commit이 있으면 해당 commit에 cursor를 맞추며, commit이 없으면 기존 Graph cursor와 scroll을 복원한다. commit 실패 시 화면과 입력 내용을 유지하고 재시도할 수 있어야 한다. staging/editing/commit action은 Commit Inspector에 섞지 않고 이 subtask 범위에서만 제공한다.",
+          "status": "pending",
+          "dependencies": [1],
+          "parentTaskId": 1,
+          "parentId": "undefined",
+          "updatedAt": "2026-08-04T00:40:00.000Z"
         }
         ],
         "updatedAt": "2026-08-02T00:00:00.000Z"

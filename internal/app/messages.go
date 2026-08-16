@@ -101,9 +101,13 @@ type branchToastDoneMsg struct{}
 type commitInspectorLoadedMsg struct {
 	inspection git.CommitInspection
 	err        error
+	request    uint64
+	epoch      uint64
 }
 
 type commitInspectorDiffMsg struct {
-	diff git.CommitDiff
-	err  error
+	diff    git.CommitDiff
+	err     error
+	request uint64
+	epoch   uint64
 }

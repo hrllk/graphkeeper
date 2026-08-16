@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/git"
@@ -37,15 +38,23 @@ type model struct {
 	graphSearchError  string
 
 	// Read-only Graph commit inspector.
-	commitInspectorOpen    bool
-	commitInspector        git.CommitInspection
-	commitInspectorCursor  int
-	commitInspectorPane    int
-	commitInspectorScroll  int
-	commitInspectorLines   []string
-	commitInspectorHasMore bool
-	commitInspectorLoading bool
-	commitInspectorError   string
+	commitInspectorOpen            bool
+	commitInspector                git.CommitInspection
+	commitInspectorCursor          int
+	commitInspectorScroll          int
+	commitInspectorLines           []string
+	commitInspectorHasMore         bool
+	commitInspectorLoading         bool
+	commitInspectorError           string
+	commitInspectorRequest         uint64
+	commitInspectorEpoch           uint64
+	commitInspectorCancel          context.CancelFunc
+	commitInspectorHelp            bool
+	commitInspectorMessage         bool
+	commitInspectorMessageScroll   int
+	commitInspectorMetadataLoading bool
+	commitInspectorDiffLoading     bool
+	commitInspectorDiffError       string
 
 	// Modal and popup state.
 	branchOpen           bool

@@ -31,3 +31,4 @@ node_modules/
 # tasks.json
 # tasks/
 .gbrain-source
+.gstack/

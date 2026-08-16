@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -204,9 +205,17 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.commitInspectorOpen = true
 		m.commitInspectorLoading = true
+		m.commitInspectorMetadataLoading = true
+		m.commitInspectorDiffLoading = false
 		m.commitInspectorError = ""
+		m.commitInspectorDiffError = ""
 		m.commitInspectorLines = nil
-		return m, inspectCommit(m.repo, focus.Hash)
+		m = m.cancelInspector()
+		m.commitInspectorRequest++
+		m.commitInspectorEpoch = m.repositoryEpoch
+		ctx, cancel := context.WithCancel(context.Background())
+		m.commitInspectorCancel = cancel
+		return m, inspectCommit(m.repo, focus.Hash, ctx, m.commitInspectorRequest, m.commitInspectorEpoch)
 	case "esc":
 		if strings.TrimSpace(m.graphSearchQuery) != "" || m.graphSearchOpen {
 			m.graphSearchOpen = false

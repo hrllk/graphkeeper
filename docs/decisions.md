@@ -243,3 +243,57 @@ Superseded on 2026-08-01 by the topology/status-column decision above.
 - Global 목록에는 섹션별로 반복되는 `f/F/S` 항목을 넣지 않는다. 섹션 이동,
   이동·스크롤, 종료, 오버레이 호출처럼 공통으로 필요한 항목과 별도 이동 그룹만
   유지한다.
+## 2026-08-02: Commit Inspector는 독립 read-only screen으로 확장한다
+
+- Graph에서 `enter`하면 기존 Graph shell을 가리는 독립 Inspector screen state로
+  전환한다. 기존 `overlayPopup`은 다른 popup 계약에 남긴다.
+- Inspector는 Changed files tree와 `from`/`to` side-by-side diff를 구조화된
+  hunk/line-pair contract에서 렌더링한다.
+- diff와 Tree-sitter 입력은 untrusted data로 취급하며 byte/line limit, stale
+  epoch 폐기, plain fallback, `NO_COLOR`에서도 보이는 A/M/D·+/- marker를 유지한다.
+- 실제 Tree-sitter grammar/query와 merge parent 선택 UI는 후속 subtask로
+  분리한다. MVP는 highlighter registry contract와 first-parent 표시까지만 둔다.
+
+## 2026-08-03: Commit Inspector 구현 범위를 vertical slice로 고정한다
+
+- 첫 구현 범위는 독립 bordered screen, Changed files tree, first-parent
+  from/to pairing, app-owned reader contract, request identity/cancellation,
+  bounded streaming/cache, visible tree projection으로 고정한다.
+- Tree-sitter grammar/query bundle과 merge parent selector/combined diff는
+  현재 subtask의 TODO로 남긴다. 이 둘을 MVP 완료 조건으로 암묵적으로 포함하지 않는다.
+- Graph shell은 Inspector 진입 중 가려지고, 기존 popup overlay stack에는
+  Inspector를 중복 등록하지 않는다.
+
+## 2026-08-03: Commit Inspector 디자인 계약을 단순한 terminal 흐름으로 고정한다
+
+- 저높이 화면은 commit identity·selected path·FROM/TO·최소 diff·복귀 키를
+  우선하고, 전체 message는 `m`으로 여는 secondary viewport로 둔다.
+- empty/binary/submodule은 오류와 구분되는 contextual empty state로 표시하며,
+  footer는 현재 상태에 필요한 핵심 hotkey만 노출한다. 전체 legend는 `?` 도움말로
+  이동한다.
+- narrow mode는 별도 toggle key 없이 `Tab/Shift+Tab`으로 files/from-to/message를
+  순환한다. 색상 없이도 marker·label·border·FROM/TO가 의미를 보존한다.
+
+## 2026-08-06: Commit Inspector MVP는 unified diff와 최소 keymap으로 구현한다
+
+- MVP 화면은 Graph를 완전히 대체하는 공통 bordered screen과 `commit/message/author`
+  3행 고정 header를 사용한다. footer에는 `q`, `Esc`, `?`만 둔다.
+- Changed files는 flat 경로 목록이 아닌 directory/file tree projection으로 제공하고,
+  diff는 adapter가 만든 structured paired rows를 renderer가 직접 출력한다.
+- metadata와 selected-file diff는 독립 state/request/cancel lifecycle을 가지며,
+  parent는 한 번 resolve한 snapshot을 changed-files와 diff가 공유한다.
+- metadata per-file Git N+1 호출은 금지하고 batch 조회한다. bounded output cap에
+  도달하면 child process를 종료한 뒤 partial 결과를 반환한다.
+- `Tab`, `m`, `r`, `j/k`, message footer와 full message viewport는 이 MVP에서 제거한다.
+  Tree-sitter grammar/query, word-level diff, merge parent selector는 후속 TODO다.
+
+## 2026-08-06: Commit Inspector는 파일 선택 중심으로 단순화한다
+
+- Header는 `commit`, `message`, `author`, 선택 파일 `path`의 4행으로 고정한다.
+- Changed files는 fold/unfold 없이 항상 표시하고, 파일명은 `../../filename` 형태로
+  축약한다. 선택 파일의 전체 경로는 header에서 확인한다.
+- 별도 pane focus 없이 files와 diff를 동시에 렌더링한다. `j/k`는 파일 선택,
+  `Ctrl+U/D`는 선택 파일 diff scroll만 담당하며 `h/l`, Inspector 내부 `Enter`는
+  사용하지 않는다.
+- Diff의 context/일반 코드는 기본 foreground를 사용해 과도하게 어두워지지 않게
+  하고, added/removed semantic color는 유지한다.

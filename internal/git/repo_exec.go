@@ -3,12 +3,16 @@ package git
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const remoteOperationTimeout = 30 * time.Second
@@ -148,21 +152,95 @@ func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection
 	if hash == "" {
 		return CommitInspection{}, fmt.Errorf("commit hash is empty")
 	}
-	meta, err := r.git(ctx, "show", "-s", "--format=%H%x00%P%x00%an%x00%s", hash)
+	meta, err := r.git(ctx, "show", "-s", "--format=%H%x00%P%x00%an%x00%ae%x00%s", hash)
 	if err != nil {
 		return CommitInspection{}, err
 	}
-	parts := strings.SplitN(meta, "\x00", 4)
-	if len(parts) != 4 {
+	parts := strings.SplitN(meta, "\x00", 5)
+	if len(parts) != 5 {
 		return CommitInspection{}, fmt.Errorf("invalid commit metadata")
 	}
 	parents := strings.Fields(parts[1])
+	parent := ""
+	if len(parents) > 0 {
+		parent = parents[0]
+	}
+	message, err := r.gitRaw(ctx, "show", "-s", "--format=%B", hash)
+	if err != nil {
+		return CommitInspection{}, err
+	}
 	raw, err := r.gitRaw(ctx, "diff-tree", "--root", "--no-commit-id", "--name-status", "-z", "-r", "-M", "-C", hash)
 	if err != nil {
 		return CommitInspection{}, err
 	}
 	files := parseCommitDiffFiles(raw)
-	return CommitInspection{Hash: strings.TrimSpace(parts[0]), Parents: parents, Author: parts[2], Subject: parts[3], Files: files}, nil
+	author := strings.TrimSpace(parts[2])
+	if email := strings.TrimSpace(parts[3]); email != "" {
+		author += " <" + email + ">"
+	}
+	r.annotateCommitDiffFiles(ctx, files, parent, strings.TrimSpace(parts[0]))
+	return CommitInspection{
+		Hash: strings.TrimSpace(parts[0]), Subject: sanitizeTerminalText(parts[4]), Author: sanitizeTerminalText(author),
+		Message: sanitizeTerminalText(message), Parent: parent, IsRoot: parent == "", Parents: parents, Files: files,
+	}, nil
+}
+
+func (r *Repo) annotateCommitDiffFiles(ctx context.Context, files []CommitDiffFile, parent, commit string) {
+	args := []string{"diff-tree", "--root", "--no-commit-id", "--numstat", "-z", "-r"}
+	if parent == "" {
+		args = append(args, commit)
+	} else {
+		args = append(args, parent, commit)
+	}
+	out, err := r.gitRaw(ctx, args...)
+	if err != nil {
+		return
+	}
+	parts := strings.Split(out, "\x00")
+	byPath := make(map[string][2]string, len(files))
+	for i := 0; i+2 < len(parts); i += 3 {
+		fields := strings.Fields(parts[i])
+		if len(fields) < 2 {
+			continue
+		}
+		byPath[parts[i+2]] = [2]string{fields[0], fields[1]}
+	}
+	for i := range files {
+		stat, ok := byPath[files[i].Path]
+		if !ok {
+			// Rename/copy numstat records can retain the old path. The
+			// status listing remains authoritative for identity; leave counts
+			// at zero when Git does not emit a direct path record.
+			continue
+		}
+		if stat[0] == "-" && stat[1] == "-" {
+			files[i].Status, files[i].Binary = "B", true
+			continue
+		}
+		files[i].Additions, _ = strconv.Atoi(stat[0])
+		files[i].Deletions, _ = strconv.Atoi(stat[1])
+	}
+	summaryArgs := []string{"diff-tree", "--root", "--no-commit-id", "--summary", "-r"}
+	if parent == "" {
+		summaryArgs = append(summaryArgs, commit)
+	} else {
+		summaryArgs = append(summaryArgs, parent, commit)
+	}
+	if summary, summaryErr := r.gitRaw(ctx, summaryArgs...); summaryErr == nil {
+		for i := range files {
+			for _, line := range strings.Split(summary, "\n") {
+				if !strings.Contains(line, files[i].Path) {
+					continue
+				}
+				if strings.Contains(line, "Submodule") {
+					files[i].Status = "S"
+				} else if strings.Contains(line, "mode change") && files[i].Additions == 0 && files[i].Deletions == 0 {
+					files[i].Status = "ModeOnly"
+				}
+				break
+			}
+		}
+	}
 }
 
 func (r *Repo) CommitDiff(ctx context.Context, inspection CommitInspection, file CommitDiffFile, maxLines int, startLine int) (CommitDiff, error) {
@@ -177,7 +255,7 @@ func (r *Repo) CommitDiff(ctx context.Context, inspection CommitInspection, file
 		args = append(args, parent, inspection.Hash)
 	}
 	args = append(args, "--", file.Path)
-	raw, err := r.gitRaw(ctx, args...)
+	raw, truncated, err := r.gitRawBounded(ctx, 1<<20, args...)
 	if err != nil {
 		return CommitDiff{}, err
 	}
@@ -192,13 +270,88 @@ func (r *Repo) CommitDiff(ctx context.Context, inspection CommitInspection, file
 		startLine = len(lines)
 	}
 	end := len(lines)
-	hasMore := false
+	hasMore := truncated
 	if maxLines > 0 && end > startLine+maxLines {
 		end = startLine + maxLines
 		hasMore = true
 	}
-	return CommitDiff{FileID: file.ID, Lines: lines[startLine:end], HasMore: hasMore}, nil
+	rows, err := parseCommitDiffRowsStrict(lines)
+	if err != nil {
+		return CommitDiff{}, err
+	}
+	return CommitDiff{FileID: file.ID, Lines: lines[startLine:end], Rows: rows, HasMore: hasMore}, nil
 }
+
+// parseCommitDiffRows turns unified diff hunks into deterministic paired rows.
+// It intentionally uses line structure only; syntax highlighting is a later layer.
+var diffHunkHeader = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)
+
+func parseCommitDiffRowsStrict(lines []string) ([]DiffRow, error) {
+	type numberedLine struct {
+		text string
+		num  int
+	}
+	rows := make([]DiffRow, 0)
+	oldLine, newLine := 0, 0
+	removed, added := make([]numberedLine, 0), make([]numberedLine, 0)
+	flush := func() {
+		for i := 0; i < len(removed) || i < len(added); i++ {
+			row := DiffRow{Kind: "modified"}
+			if i < len(removed) {
+				row.From, row.OldLine, row.FromPresent = removed[i].text, removed[i].num, true
+			}
+			if i < len(added) {
+				row.To, row.NewLine, row.ToPresent = added[i].text, added[i].num, true
+			}
+			if !row.FromPresent {
+				row.Kind = "added"
+			}
+			if !row.ToPresent {
+				row.Kind = "removed"
+			}
+			rows = append(rows, row)
+		}
+		removed, added = nil, nil
+	}
+	for _, line := range lines {
+		if strings.HasPrefix(line, "@@") {
+			flush()
+			matches := diffHunkHeader.FindStringSubmatch(line)
+			if matches == nil {
+				return nil, fmt.Errorf("malformed diff hunk header")
+			}
+			oldLine, _ = strconv.Atoi(matches[1])
+			newLine, _ = strconv.Atoi(matches[3])
+			continue
+		}
+		if strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "diff ") || strings.HasPrefix(line, "index ") || strings.HasPrefix(line, "Binary files") {
+			continue
+		}
+		if strings.HasPrefix(line, " ") {
+			flush()
+			text := line[1:]
+			rows = append(rows, DiffRow{Kind: "context", OldLine: oldLine, NewLine: newLine, From: text, To: text, FromPresent: true, ToPresent: true})
+			oldLine++
+			newLine++
+		} else if strings.HasPrefix(line, "-") {
+			removed = append(removed, numberedLine{text: line[1:], num: oldLine})
+			oldLine++
+		} else if strings.HasPrefix(line, "+") {
+			added = append(added, numberedLine{text: line[1:], num: newLine})
+			newLine++
+		}
+	}
+	flush()
+	return rows, nil
+}
+
+func parseCommitDiffRows(lines []string) []DiffRow {
+	rows, _ := parseCommitDiffRowsStrict(lines)
+	return rows
+}
+
+// ParseDiffRows is the read-only projection used by the terminal Inspector.
+func ParseDiffRows(lines []string) []DiffRow { return parseCommitDiffRows(lines) }
 
 func parseCommitDiffFiles(raw string) []CommitDiffFile {
 	parts := strings.Split(raw, "\x00")
@@ -222,21 +375,60 @@ func parseCommitDiffFiles(raw string) []CommitDiffFile {
 			if i+2 >= len(parts) {
 				continue
 			}
-			file.OldPath, file.Path = parts[i+1], parts[i+2]
+			rawOld, rawPath := parts[i+1], parts[i+2]
+			file.OldPath, file.Path = sanitizeTerminalText(rawOld), sanitizeTerminalText(rawPath)
+			file.ID = stableCommitFileID(file.Status, rawOld, rawPath)
 			i += 2
-			file.ID = file.OldPath + "→" + file.Path
 		default:
 			if i+1 >= len(parts) {
 				continue
 			}
-			file.Path = parts[i+1]
+			rawPath := parts[i+1]
+			file.Path = sanitizeTerminalText(rawPath)
+			file.ID = stableCommitFileID(file.Status, "", rawPath)
 			i++
-			file.ID = file.Path
 		}
 		files = append(files, file)
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 	return files
+}
+
+func stableCommitFileID(status, oldPath, path string) string {
+	h := sha256.Sum256([]byte(status + "\x00" + oldPath + "\x00" + path))
+	return fmt.Sprintf("%x", h[:])
+}
+
+func sanitizeTerminalText(value string) string {
+	if !utf8.ValidString(value) {
+		value = strings.ToValidUTF8(value, "�")
+	}
+	var b strings.Builder
+	escape := false
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if escape {
+			if c == '[' {
+				continue
+			}
+			if c >= '@' && c <= '~' {
+				escape = false
+			}
+			continue
+		}
+		if c == 0x1b {
+			escape = true
+			continue
+		}
+		if c < 0x20 && c != '\n' && c != '\t' {
+			continue
+		}
+		if c == 0x7f {
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }
 
 func (r *Repo) TagEntries(ctx context.Context) ([]TagEntry, error) {
@@ -429,7 +621,7 @@ func (r *Repo) git(ctx context.Context, args ...string) (string, error) {
 	err := cmd.Run()
 	out := strings.TrimSpace(stdout.String())
 	if err != nil {
-		msg := strings.TrimSpace(stderr.String())
+		msg := sanitizeTerminalText(strings.TrimSpace(stderr.String()))
 		if msg == "" {
 			msg = err.Error()
 		}
@@ -478,13 +670,46 @@ func (r *Repo) gitRaw(ctx context.Context, args ...string) (string, error) {
 	err := cmd.Run()
 	out := stdout.String()
 	if err != nil {
-		msg := strings.TrimSpace(stderr.String())
+		msg := sanitizeTerminalText(strings.TrimSpace(stderr.String()))
 		if msg == "" {
 			msg = err.Error()
 		}
 		return out, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, msg)
 	}
 	return out, nil
+}
+
+func (r *Repo) gitRawBounded(ctx context.Context, maxBytes int64, args ...string) (string, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = r.root
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", false, err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", false, err
+	}
+	data, readErr := io.ReadAll(io.LimitReader(stdout, maxBytes+1))
+	waitErr := cmd.Wait()
+	truncated := int64(len(data)) > maxBytes
+	if truncated {
+		data = data[:maxBytes]
+	}
+	if readErr != nil {
+		return string(data), truncated, readErr
+	}
+	if waitErr != nil {
+		msg := sanitizeTerminalText(strings.TrimSpace(stderr.String()))
+		if msg == "" {
+			msg = waitErr.Error()
+		}
+		return string(data), truncated, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), waitErr, msg)
+	}
+	return string(data), truncated, nil
 }
 
 func splitRawLines(out string) []string {
@@ -541,7 +766,7 @@ func (r *Runner) RunContext(ctx context.Context, args ...string) (string, error)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
+		msg := sanitizeTerminalText(strings.TrimSpace(stderr.String()))
 		if msg == "" {
 			msg = err.Error()
 		}

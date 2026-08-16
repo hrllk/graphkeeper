@@ -91,9 +91,10 @@ type StashEntry struct {
 }
 
 type CommitInspection struct {
-	Hash, Subject, Author string
-	Parents               []string
-	Files                 []CommitDiffFile
+	Hash, Subject, Author, Message, Parent string
+	IsRoot                                 bool
+	Parents                                []string
+	Files                                  []CommitDiffFile
 }
 
 type CommitDiffFile struct {
@@ -106,7 +107,15 @@ type CommitDiffFile struct {
 type CommitDiff struct {
 	FileID  string
 	Lines   []string
+	Rows    []DiffRow
 	HasMore bool
+}
+
+type DiffRow struct {
+	Kind                   string
+	OldLine, NewLine       int
+	From, To               string
+	FromPresent, ToPresent bool
 }
 
 type BranchTracking struct {

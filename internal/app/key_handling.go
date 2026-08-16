@@ -7,12 +7,12 @@ import (
 )
 
 func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.commitInspectorOpen {
+		return m.handleCommitInspectorKey(msg)
+	}
 	if msg.String() == "q" && m.overlayOpen() {
 		// q is the modal equivalent of esc. Browse keeps q as application quit.
 		msg = tea.KeyMsg{Type: tea.KeyEsc}
-	}
-	if m.commitInspectorOpen {
-		return m.handleCommitInspectorKey(msg)
 	}
 	if m.graphStashPopOpen {
 		return m.handleGraphStashPopKey(msg)
