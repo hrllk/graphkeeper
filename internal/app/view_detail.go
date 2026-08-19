@@ -203,8 +203,8 @@ func renderBranchDivergenceLines(rs git.Status, branch string) []string {
 		return nil
 	}
 	track, ok := rs.Tracking[branch]
-	if !ok {
-		track = git.BranchTracking{}
+	if !ok || !rs.TrackingKnown || !rs.TrackingFresh {
+		return nil
 	}
 	return []string{
 		fmt.Sprintf("%s: %d", renderContextKey("ahead"), track.Ahead),

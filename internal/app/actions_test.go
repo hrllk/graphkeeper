@@ -89,7 +89,8 @@ func TestPullReadyCases(t *testing.T) {
 		{name: "no remote", rs: git.Status{Root: "/repo", NoRemote: true}, want: false},
 		{name: "no upstream", rs: git.Status{Root: "/repo", NoUpstream: true}, want: false},
 		{name: "merge in progress", rs: git.Status{Root: "/repo", MergeInProgress: true}, want: false},
-		{name: "rebase in progress currently allowed", rs: git.Status{Root: "/repo", RebaseInProgress: true}, want: true},
+		{name: "rebase in progress", rs: git.Status{Root: "/repo", RebaseInProgress: true}, want: false},
+		{name: "cherry-pick in progress", rs: git.Status{Root: "/repo", CherryPickInProgress: true}, want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

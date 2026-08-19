@@ -207,6 +207,89 @@ func TestStatusIgnoresGoneUpstream(t *testing.T) {
 	}
 }
 
+func TestStatusMarksUpstreamResolutionFailureAsStale(t *testing.T) {
+	root := t.TempDir()
+	runGitGit(t, root, "init", "-b", "main")
+	configGitUser(t, root)
+	writeGitFile(t, root, "file.txt", "content\n")
+	runGitGit(t, root, "add", "file.txt")
+	runGitGit(t, root, "commit", "-m", "initial")
+
+	realGit, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatalf("find git failed: %v", err)
+	}
+	binDir := t.TempDir()
+	fakeGit := filepath.Join(binDir, "git")
+	script := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"rev-parse\" ] && [ \"$4\" = \"@{upstream}\" ]; then\n" +
+		"  echo 'fatal: upstream lookup failed' >&2\n" +
+		"  exit 1\n" +
+		"fi\n" + "exec " + realGit + " \"$@\"\n"
+	if err := os.WriteFile(fakeGit, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake git failed: %v", err)
+	}
+	repo, err := Open(root)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	status, err := repo.Status(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("Status without upstream returned error: %v", err)
+	}
+	if !status.NoUpstream || status.TrackingError != "" {
+		t.Fatalf("expected normal no-upstream status, got %+v", status)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	status, err = repo.Status(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if status.NoUpstream {
+		t.Fatal("expected an upstream command failure to remain distinguishable from no upstream")
+	}
+	if status.TrackingFresh {
+		t.Fatal("expected tracking to be stale after upstream command failure")
+	}
+	if !strings.Contains(status.TrackingError, "upstream lookup failed") {
+		t.Fatalf("expected upstream resolution error, got %q", status.TrackingError)
+	}
+}
+
+func TestStatusTrackingKnownIsCurrentBranchSpecific(t *testing.T) {
+	base := t.TempDir()
+	remote := filepath.Join(base, "remote.git")
+	work := filepath.Join(base, "work")
+
+	runGitGit(t, base, "init", "--bare", "remote.git")
+	runGitGit(t, base, "init", "-b", "main", "work")
+	configGitUser(t, work)
+	writeGitFile(t, work, "file.txt", "base\n")
+	runGitGit(t, work, "add", "file.txt")
+	runGitGit(t, work, "commit", "-m", "initial")
+	runGitGit(t, work, "remote", "add", "origin", remote)
+	runGitGit(t, work, "push", "-u", "origin", "main")
+	runGitGit(t, work, "checkout", "-b", "feature")
+
+	repo, err := Open(work)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	status, err := repo.Status(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if status.Branch != "feature" {
+		t.Fatalf("expected current branch feature, got %q", status.Branch)
+	}
+	if status.TrackingKnown {
+		t.Fatalf("expected tracking to be unknown for untracked current branch, got %+v", status)
+	}
+	if _, ok := status.Tracking["main"]; !ok {
+		t.Fatalf("expected tracking map to retain tracked branch, got %+v", status.Tracking)
+	}
+}
+
 func runGitGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
@@ -298,6 +381,38 @@ func TestParseTrackingInfo(t *testing.T) {
 		a, b := parseTrackingInfo(tc.input)
 		if a != tc.ahead || b != tc.behind {
 			t.Errorf("parseTrackingInfo(%q) = (%d, %d); want (%d, %d)", tc.input, a, b, tc.ahead, tc.behind)
+		}
+	}
+}
+
+func TestParseBranchMetadataLineRejectsMalformedTrackingCounts(t *testing.T) {
+	for _, input := range []string{
+		"main|origin/main",
+		"main|origin/main|[ahead 1]|extra",
+		"main|origin/main|[ahead 1",
+		"main|origin/main|ahead 1]",
+		"main|origin/main|ahead 1",
+		"main|origin/main|[]",
+		"main|origin/main|[ahead nope]",
+		"main|origin/main|[behind nope]",
+		"main|origin/main|[ahead 1x]",
+		"main|origin/main|[ahead 1, behind]",
+		"main|origin/main|",
+	} {
+		if _, _, _, ok := parseBranchMetadataLine(input); ok {
+			t.Fatalf("parseBranchMetadataLine(%q) accepted malformed tracking counts", input)
+		}
+	}
+}
+
+func TestParseBranchMetadataLineAcceptsValidTrackingForms(t *testing.T) {
+	for _, input := range []string{
+		"main||",
+		"main|origin/main|[ahead 0, behind 0]",
+		"main|origin/main|[gone]",
+	} {
+		if _, _, _, ok := parseBranchMetadataLine(input); !ok {
+			t.Fatalf("parseBranchMetadataLine(%q) rejected valid metadata", input)
 		}
 	}
 }

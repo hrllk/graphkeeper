@@ -983,6 +983,8 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 			Tracking: map[string]git.BranchTracking{
 				"main": {Behind: 1, Ahead: 2},
 			},
+			TrackingKnown: true,
+			TrackingFresh: true,
 		},
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
@@ -1028,7 +1030,7 @@ func TestRenderContextContentShowsMissingUpstreamAsNone(t *testing.T) {
 	}
 }
 
-func TestRenderContextContentShowsEqualDivergenceWhenTrackingMissing(t *testing.T) {
+func TestRenderContextContentDoesNotTreatMissingTrackingAsEqual(t *testing.T) {
 	m := model{
 		status: state.New().WithBrowse(),
 		repoStatus: git.Status{
@@ -1047,9 +1049,9 @@ func TestRenderContextContentShowsEqualDivergenceWhenTrackingMissing(t *testing.
 		},
 	}
 	got := ansi.Strip(m.renderContextContent(80, 12))
-	for _, want := range []string{"ahead: 0", "behind: 0", "divergence: equal"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("expected equal divergence to show %q, got %q", want, got)
+	for _, unwanted := range []string{"ahead: 0", "behind: 0", "divergence: equal"} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("missing tracking must not render %q, got %q", unwanted, got)
 		}
 	}
 }
@@ -1604,10 +1606,18 @@ func TestPullFetchWithoutIncomingCommitsShowsTransientToast(t *testing.T) {
 		Remote:        "origin",
 		LocalBranches: []string{"main"},
 		Tracking:      map[string]git.BranchTracking{"main": {}},
+		TrackingKnown: true,
+		TrackingFresh: true,
 	}
 	m := model{
-		status:     state.New().WithBrowse(),
-		repoStatus: repoStatus,
+		status:          state.New().WithBrowse(),
+		repoStatus:      repoStatus,
+		repositoryEpoch: 3,
+		activePullRequest: &pullRequest{
+			ID:       9,
+			Epoch:    3,
+			Baseline: pullSnapshotIdentity(repoStatus, 3),
+		},
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
 			sectionCurrent: 0,
@@ -1616,7 +1626,12 @@ func TestPullFetchWithoutIncomingCommitsShowsTransientToast(t *testing.T) {
 		},
 	}
 
-	gotModel, cmd := m.Update(pullFetchedMsg{status: repoStatus})
+	gotModel, cmd := m.Update(pullFetchedMsg{
+		status:       repoStatus,
+		requestID:    9,
+		requestEpoch: 3,
+		baseline:     pullSnapshotIdentity(repoStatus, 3),
+	})
 	got := gotModel.(model)
 	if got.status.Mode != state.ModeLoading {
 		t.Fatalf("expected transient loading toast, got %s", got.status.Mode)
@@ -1642,6 +1657,23 @@ func TestPullFetchWithoutIncomingCommitsShowsTransientToast(t *testing.T) {
 	}
 	if got2.status.Mode != state.ModeBrowse {
 		t.Fatalf("expected no-op pull toast to return to browse, got %s", got2.status.Mode)
+	}
+}
+
+func TestZeroIdentityPullFetchedMessageIsIgnored(t *testing.T) {
+	original := git.Status{Root: "/repo", Branch: "main", Head: "old"}
+	m := model{status: state.New().WithBrowse(), repoStatus: original}
+
+	next, cmd := m.Update(pullFetchedMsg{status: git.Status{Root: "/repo", Branch: "other", Head: "new"}})
+	got := next.(model)
+	if cmd != nil {
+		t.Fatalf("expected zero-identity pull message to be ignored, got command %v", cmd)
+	}
+	if !reflect.DeepEqual(got.repoStatus, original) {
+		t.Fatalf("zero-identity pull message mutated repo status: %+v", got.repoStatus)
+	}
+	if got.activePullRequest != nil {
+		t.Fatalf("zero-identity pull message created an active request: %+v", got.activePullRequest)
 	}
 }
 

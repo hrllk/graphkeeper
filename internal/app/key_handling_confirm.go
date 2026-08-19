@@ -18,6 +18,8 @@ func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfirmPullRebase()
 	case "n", "esc":
 		m.handshakeCommits = make(map[string]bool)
+		m.activePullRequest = nil
+		m.nextPullRequestID++
 		m.status = deriveStatus(m.repoStatus)
 		return m, nil
 	default:
@@ -30,12 +32,14 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 	m.handshakeCommits = make(map[string]bool)
 	switch action {
 	case state.ActionPull:
+		if m.activePullRequest == nil {
+			return m, nil
+		}
 		if m.pullIsFastForward {
 			m.status = loadingToast("Pulling...")
-			return m, executePull(m.repo, m.commitLimit)
+			return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 		}
-		m.status = loadingToast("Merging pull...")
-		return m, executePullMerge(m.repo, m.commitLimit)
+		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 	case state.ActionSetUpstream:
 		m.status = loadingToast("Pushing and tracking...")
 		return m, executePushSetUpstream(m.repo, m.repoStatus.Branch, m.commitLimit)
@@ -92,18 +96,24 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 
 func (m model) handleConfirmPullMerge() (tea.Model, tea.Cmd) {
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
+		if m.activePullRequest == nil {
+			return m, nil
+		}
 		m.handshakeCommits = make(map[string]bool)
 		m.status = loadingToast("Merging pull...")
-		return m, executePullMerge(m.repo, m.commitLimit)
+		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 	}
 	return m, nil
 }
 
 func (m model) handleConfirmPullRebase() (tea.Model, tea.Cmd) {
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
+		if m.activePullRequest == nil {
+			return m, nil
+		}
 		m.handshakeCommits = make(map[string]bool)
 		m.status = loadingToast("Rebasing pull...")
-		return m, executePullRebase(m.repo, m.commitLimit)
+		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeRebase)
 	}
 	return m, nil
 }

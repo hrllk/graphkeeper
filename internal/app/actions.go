@@ -54,7 +54,8 @@ func actionPull(rs git.Status) state.Status {
 }
 
 func pullReady(rs git.Status) bool {
-	return rs.Root != "" && !rs.WorktreeDirty && !rs.Detached && !rs.NoRemote && !rs.NoUpstream && !rs.MergeInProgress
+	return rs.Root != "" && !rs.WorktreeDirty && !rs.Detached && !rs.NoRemote && !rs.NoUpstream &&
+		!rs.MergeInProgress && !rs.RebaseInProgress && !rs.CherryPickInProgress
 }
 
 func canCreateBranch(rs git.Status) bool {

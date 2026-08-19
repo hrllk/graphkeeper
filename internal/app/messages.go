@@ -79,8 +79,10 @@ type createdBranchMsg struct {
 }
 
 type pullFetchedMsg struct {
-	status git.Status
-	err    error
+	status                  git.Status
+	err                     error
+	requestID, requestEpoch uint64
+	baseline                PullSnapshotIdentity
 }
 
 type pushFetchedMsg struct {
@@ -89,12 +91,35 @@ type pushFetchedMsg struct {
 }
 
 type pullPreviewReadyMsg struct {
-	commits []string
-	isFF    bool
-	err     error
+	commits                 []string
+	isFF                    bool
+	err                     error
+	requestID, requestEpoch uint64
+	baseline                PullSnapshotIdentity
 }
 
-type pullToastDoneMsg struct{}
+type pullValidationMsg struct {
+	requestID, requestEpoch uint64
+	baseline                PullSnapshotIdentity
+	mode                    PullMode
+	status                  git.Status
+	valid                   bool
+	err                     error
+}
+
+type pullExecutionResultMsg struct {
+	action                  state.Action
+	status                  git.Status
+	err                     error
+	requestID, requestEpoch uint64
+	baseline                PullSnapshotIdentity
+	stale                   bool
+}
+
+type pullToastDoneMsg struct {
+	requestID, requestEpoch uint64
+	baseline                PullSnapshotIdentity
+}
 
 type branchToastDoneMsg struct{}
 

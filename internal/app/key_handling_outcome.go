@@ -24,10 +24,13 @@ func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 	action := m.status.Action
 	target := m.status.Selected
 	resetMode := m.status.ResetMode
+	if action == state.ActionPull && m.activePullRequest == nil {
+		return m, nil
+	}
 	m.status = loadingToast("Running...")
 	switch action {
 	case state.ActionPull:
-		return m, executePull(m.repo, m.commitLimit)
+		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 	case state.ActionAbort:
 		return m, executeAbort(m.repo, m.commitLimit)
 	case state.ActionMerge, state.ActionRebase:
@@ -44,7 +47,11 @@ func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 
 func (m model) handleOutcomePreviewEscape() (tea.Model, tea.Cmd) {
 	switch {
-	case m.status.Action == state.ActionPull || m.status.Action == state.ActionAbort:
+	case m.status.Action == state.ActionPull:
+		m.activePullRequest = nil
+		m.nextPullRequestID++
+		m.status = deriveStatus(m.repoStatus)
+	case m.status.Action == state.ActionAbort:
 		m.status = deriveStatus(m.repoStatus)
 	default:
 		m.status = actionPickTargets(m.repoStatus, m.status.Action)

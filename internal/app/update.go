@@ -1,6 +1,9 @@
 package app
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	"hrllk/graphkeeper/internal/state"
+)
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -14,6 +17,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return handleTagUpdate(m, msg)
 	case fetchedMsg, preparedMsg, pullCheckedMsg, previewMsg, graphActionCheckMsg, pushFetchedMsg, pullFetchedMsg, pullPreviewReadyMsg, pullToastDoneMsg, branchToastDoneMsg:
 		return handleFetchUpdate(m, msg)
+	case pullValidationMsg:
+		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
+			return m, nil
+		}
+		if !samePullSnapshotIdentity(m.activePullRequest.Baseline, msg.baseline) {
+			m.activePullRequest = nil
+			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+		}
+		if msg.err != nil || !msg.valid {
+			m.activePullRequest = nil
+			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+		}
+		m.status = loadingToast("Pulling...")
+		return m, executeValidatedPull(m.repo, m.commitLimit, *m.activePullRequest, msg.mode)
+	case pullExecutionResultMsg:
+		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
+			return m, nil
+		}
+		if !samePullSnapshotIdentity(m.activePullRequest.Baseline, msg.baseline) {
+			m.activePullRequest = nil
+			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+		}
+		m.activePullRequest = nil
+		if msg.stale {
+			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+		}
+		return handlePullExecutionResult(m, msg)
 	case executedMsg:
 		return handleExecutedUpdate(m, msg)
 	case commitInspectorLoadedMsg:

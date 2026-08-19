@@ -154,38 +154,59 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = loadingToast("Pushing...")
 		return m, executePush(m.repo, msg.status.Branch, m.commitLimit)
 	case pullFetchedMsg:
+		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
+			return m, nil
+		}
 		if msg.err != nil {
+			m.activePullRequest = nil
 			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch before pull failed.", msg.err.Error())
 			return m, nil
 		}
+		if !samePullSnapshotIdentity(pullSnapshotIdentity(msg.status, msg.requestEpoch), msg.baseline) {
+			m.activePullRequest = nil
+			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+		}
 		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
+		m.activePullRequest.Baseline = msg.baseline
 		if msg.status.TagProvenanceLoaded {
 			m.tagSyncAttempted = true
 		}
 		m.storeTagEntries(msg.status)
 		syncBrowseState(&m, msg.status)
-		track := m.repoStatus.Tracking[m.repoStatus.Branch]
+		track, trackingKnown := m.repoStatus.Tracking[m.repoStatus.Branch]
+		if !m.repoStatus.TrackingKnown || !m.repoStatus.TrackingFresh || !trackingKnown {
+			m.activePullRequest = nil
+			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+		}
 		if track.Behind == 0 {
 			m.status = loadingToast("Already up to date.")
 			m.status.Detail = "Nothing to pull from upstream."
+			request := *m.activePullRequest
 			return m, tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {
-				return pullToastDoneMsg{}
+				return pullToastDoneMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
 			})
 		}
 		isFF := track.Behind > 0 && track.Ahead == 0
 		m.status = loadingToast("Analyzing pull...")
-		return m, loadPullPreviewCommits(m.repo, isFF)
+		return m, loadPullPreviewCommits(m.repo, isFF, *m.activePullRequest)
 	case pullPreviewReadyMsg:
+		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) || !samePullSnapshotIdentity(m.activePullRequest.Baseline, msg.baseline) {
+			return m, nil
+		}
 		if msg.err != nil {
+			m.activePullRequest = nil
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Analysis failed.", msg.err.Error())
 			return m, nil
 		}
 		if len(msg.commits) == 0 {
 			m.status = loadingToast("Already up to date.")
 			m.status.Detail = "Nothing to pull from upstream."
+			request := *m.activePullRequest
 			return m, tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {
-				return pullToastDoneMsg{}
+				return pullToastDoneMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
 			})
 		}
 		m.handshakeCommits = make(map[string]bool)
@@ -212,6 +233,10 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status.Title = titleMsg
 		return m, nil
 	case pullToastDoneMsg:
+		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) || !samePullSnapshotIdentity(m.activePullRequest.Baseline, msg.baseline) {
+			return m, nil
+		}
+		m.activePullRequest = nil
 		m.status = deriveStatus(m.repoStatus)
 		return m, nil
 	case branchToastDoneMsg:
@@ -220,4 +245,8 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+func (m model) pullRequestMessageActive(id, epoch uint64) bool {
+	return m.activePullRequest != nil && m.activePullRequest.ID == id && m.activePullRequest.Epoch == epoch
 }

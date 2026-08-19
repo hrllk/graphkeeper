@@ -87,7 +87,9 @@ type model struct {
 	// repositoryEpoch invalidates repository reads that started before a user
 	// operation. Bubble Tea commands run concurrently, so an older refresh
 	// must not overwrite a mutation's result when it completes later.
-	repositoryEpoch uint64
+	repositoryEpoch   uint64
+	nextPullRequestID uint64
+	activePullRequest *pullRequest
 }
 
 type graphSection int

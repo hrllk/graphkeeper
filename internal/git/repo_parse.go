@@ -3,26 +3,30 @@ package git
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 func parseBranchMetadataLine(line string) (branchName string, upstream string, tracking BranchTracking, ok bool) {
-	parts := strings.SplitN(strings.TrimSpace(line), "|", 3)
-	if len(parts) == 0 {
+	parts := strings.Split(strings.TrimSpace(line), "|")
+	if len(parts) != 3 {
 		return "", "", BranchTracking{}, false
 	}
 	branchName = strings.TrimSpace(parts[0])
 	if branchName == "" {
 		return "", "", BranchTracking{}, false
 	}
-	if len(parts) > 1 {
-		upstream = strings.TrimSpace(parts[1])
+	upstream = strings.TrimSpace(parts[1])
+	if upstream != "" && strings.TrimSpace(parts[2]) == "" {
+		return "", "", BranchTracking{}, false
 	}
-	if len(parts) > 2 {
-		tracking.Ahead, tracking.Behind = parseTrackingInfo(parts[2])
-		if strings.Contains(parts[2], "gone") {
-			upstream = ""
-		}
+	trackingInfo, trackingOK := parseTrackingInfoStrict(parts[2])
+	if !trackingOK {
+		return "", "", BranchTracking{}, false
+	}
+	tracking = trackingInfo
+	if strings.TrimSpace(parts[2]) == "[gone]" {
+		upstream = ""
 	}
 	return branchName, upstream, tracking, true
 }
@@ -46,17 +50,54 @@ func parseBranchUpstreamLine(line string) (branchName string, upstream string, o
 }
 
 func parseTrackingInfo(track string) (ahead, behind int) {
-	track = strings.Trim(track, "[]")
-	parts := strings.Split(track, ", ")
+	tracking, _ := parseTrackingInfoStrict(track)
+	return tracking.Ahead, tracking.Behind
+}
+
+func parseTrackingInfoStrict(track string) (tracking BranchTracking, ok bool) {
+	track = strings.TrimSpace(track)
+	if track == "" {
+		return BranchTracking{}, true
+	}
+	if len(track) < 2 || track[0] != '[' || track[len(track)-1] != ']' || strings.ContainsAny(track[1:len(track)-1], "[]") {
+		return BranchTracking{}, false
+	}
+	track = track[1 : len(track)-1]
+	if strings.TrimSpace(track) == "" {
+		return BranchTracking{}, false
+	}
+	parts := strings.Split(track, ",")
+	seenAhead, seenBehind := false, false
 	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if strings.HasPrefix(part, "ahead ") {
-			fmt.Sscanf(part, "ahead %d", &ahead)
-		} else if strings.HasPrefix(part, "behind ") {
-			fmt.Sscanf(part, "behind %d", &behind)
+		fields := strings.Fields(part)
+		if len(fields) == 1 && fields[0] == "gone" {
+			if len(parts) != 1 {
+				return BranchTracking{}, false
+			}
+			continue
+		}
+		if len(fields) != 2 || (fields[0] != "ahead" && fields[0] != "behind") {
+			return BranchTracking{}, false
+		}
+		count, err := strconv.Atoi(fields[1])
+		if err != nil || count < 0 {
+			return BranchTracking{}, false
+		}
+		if fields[0] == "ahead" {
+			if seenAhead {
+				return BranchTracking{}, false
+			}
+			seenAhead = true
+			tracking.Ahead = count
+		} else {
+			if seenBehind {
+				return BranchTracking{}, false
+			}
+			seenBehind = true
+			tracking.Behind = count
 		}
 	}
-	return ahead, behind
+	return tracking, true
 }
 
 func (r *Repo) graphCommits(ctx context.Context, localBranches []string, branchUpstreams map[string]string, limit int) ([]GraphCommit, error) {

@@ -591,18 +591,27 @@ func executeFetchForPush(repo *git.Repo, limit int) tea.Cmd {
 	}
 }
 
-func executeFetchForPull(repo *git.Repo, limit int) tea.Cmd {
+func beginPullRequest(m *model) pullRequest {
+	m.nextPullRequestID++
+	request := pullRequest{ID: m.nextPullRequestID, Epoch: m.repositoryEpoch + 1,
+		Baseline: pullSnapshotIdentity(m.repoStatus, m.repositoryEpoch+1)}
+	m.activePullRequest = &request
+	return request
+}
+
+func executeFetchForPull(repo *git.Repo, limit int, request pullRequest) tea.Cmd {
 	return func() tea.Msg {
 		err := repo.Fetch(context.Background())
 		status, statusErr := repo.Status(context.Background(), limit)
 		if statusErr != nil {
-			return pullFetchedMsg{err: statusErr}
+			return pullFetchedMsg{err: statusErr, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
 		}
-		return pullFetchedMsg{status: status, err: err}
+		return pullFetchedMsg{status: status, err: err, requestID: request.ID, requestEpoch: request.Epoch,
+			baseline: pullSnapshotIdentity(status, request.Epoch)}
 	}
 }
 
-func loadPullPreviewCommits(repo *git.Repo, isFF bool) tea.Cmd {
+func loadPullPreviewCommits(repo *git.Repo, isFF bool, request pullRequest) tea.Cmd {
 	return func() tea.Msg {
 		var arg string
 		if isFF {
@@ -612,7 +621,7 @@ func loadPullPreviewCommits(repo *git.Repo, isFF bool) tea.Cmd {
 		}
 		out, err := repo.Run("rev-list", arg)
 		if err != nil {
-			return pullPreviewReadyMsg{err: err, isFF: isFF}
+			return pullPreviewReadyMsg{err: err, isFF: isFF, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
 		}
 		lines := strings.Split(out, "\n")
 		commits := make([]string, 0, len(lines))
@@ -628,6 +637,42 @@ func loadPullPreviewCommits(repo *git.Repo, isFF bool) tea.Cmd {
 				commits = append(commits, strings.TrimSpace(headOut))
 			}
 		}
-		return pullPreviewReadyMsg{commits: commits, isFF: isFF}
+		return pullPreviewReadyMsg{commits: commits, isFF: isFF, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
+	}
+}
+
+func validateAndExecutePull(repo *git.Repo, limit int, request pullRequest, mode PullMode) tea.Cmd {
+	return func() tea.Msg {
+		status, err := repo.Status(context.Background(), limit)
+		if err != nil {
+			return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, mode: mode, err: err}
+		}
+		current := pullSnapshotIdentity(status, request.Epoch)
+		if !samePullSnapshotIdentity(current, request.Baseline) {
+			return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, mode: mode, status: status, valid: false}
+		}
+		return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, mode: mode, status: status, valid: true}
+	}
+}
+
+func executeValidatedPull(repo *git.Repo, limit int, request pullRequest, mode PullMode) tea.Cmd {
+	return func() tea.Msg {
+		status, statusErr := repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			return pullExecutionResultMsg{action: state.ActionPull, status: status, err: statusErr, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, stale: true}
+		}
+		if !samePullSnapshotIdentity(pullSnapshotIdentity(status, request.Epoch), request.Baseline) {
+			return pullExecutionResultMsg{action: state.ActionPull, status: status, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, stale: true}
+		}
+		args := []string{"pull", "--no-rebase", "--no-edit"}
+		if mode == PullModeRebase {
+			args = []string{"pull", "--rebase"}
+		}
+		_, err := repo.Run(args...)
+		status, statusErr = repo.Status(context.Background(), limit)
+		if statusErr != nil {
+			err = statusErr
+		}
+		return pullExecutionResultMsg{action: state.ActionPull, status: status, err: err, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
 	}
 }

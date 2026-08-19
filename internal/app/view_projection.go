@@ -44,10 +44,11 @@ type SectionProjection struct {
 // projection remains independent from terminal dimensions except for line
 // wrapping performed by the existing detail helpers.
 type ContextProjection struct {
-	Title       string
-	InfoLines   []string
-	ActionLines []string
-	Scroll      int
+	Title          string
+	InfoLines      []string
+	ActionLines    []string
+	Scroll         int
+	Recommendation *DivergedRecommendation
 }
 
 func (m model) screenProjection(width, height int) ScreenProjection {
@@ -80,11 +81,17 @@ func (m model) screenProjection(width, height int) ScreenProjection {
 }
 
 func (m model) contextProjection(width int) ContextProjection {
+	var recommendation *DivergedRecommendation
+	if m.activeSection == sectionCurrent && m.activePullRequest == nil {
+		if value, ok := recommendDivergedPull(divergedSnapshotFromStatus(m.repoStatus, m.repositoryEpoch)); ok {
+			recommendation = &value
+		}
+	}
 	return ContextProjection{
 		Title:       sectionName(m.activeSection),
 		InfoLines:   m.renderContextInfoLines(width),
 		ActionLines: renderActionHelpLines(m),
-		Scroll:      m.contextScroll,
+		Scroll:      m.contextScroll, Recommendation: recommendation,
 	}
 }
 

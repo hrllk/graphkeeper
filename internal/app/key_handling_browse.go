@@ -410,22 +410,21 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "p":
 		if m.activeSection == sectionCurrent {
 			if pullReady(m.repoStatus) {
+				request := beginPullRequest(&m)
 				m.status = loadingToast("Fetching upstream...")
-				return m, executeFetchForPull(m.repo, m.commitLimit)
+				return m, executeFetchForPull(m.repo, m.commitLimit, request)
 			}
 			m.status = actionPull(m.repoStatus)
 			return m, nil
 		}
 		if m.activeSection == sectionGraph {
-			if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
-				return m, nil
-			}
 			if !pullReady(m.repoStatus) {
 				m.status = actionPull(m.repoStatus)
 				return m, nil
 			}
 			m.status = loadingToast("Fetching upstream...")
-			return m, executeFetchForPull(m.repo, m.commitLimit)
+			request := beginPullRequest(&m)
+			return m, executeFetchForPull(m.repo, m.commitLimit, request)
 		}
 		return m, nil
 	case "n":

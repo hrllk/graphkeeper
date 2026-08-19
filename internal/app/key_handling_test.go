@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -1774,8 +1775,21 @@ func TestConfirmPullShortcutVariants(t *testing.T) {
 
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
 	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected merge-pull shortcut without an active request to be ignored")
+	}
+	if got.activePullRequest != nil || got.nextPullRequestID != 0 {
+		t.Fatalf("expected merge-pull shortcut not to create a request, got request=%+v nextID=%d", got.activePullRequest, got.nextPullRequestID)
+	}
+
+	m = testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root, Branch: "main", Head: fixture.initialHash})
+	m.status = state.New().WithConfirm(state.ActionPull, "Pull?", "Detail")
+	m.pullIsFastForward = false
+	m.activePullRequest = &pullRequest{ID: 7, Epoch: 3}
+	gotModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	got = gotModel.(model)
 	if cmd == nil {
-		t.Fatal("expected merge-pull command for m shortcut")
+		t.Fatal("expected merge-pull command for an existing request")
 	}
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Merging pull..." {
 		t.Fatalf("expected merge-pull loading state, got %+v", got.status)
@@ -1786,8 +1800,18 @@ func TestConfirmPullShortcutVariants(t *testing.T) {
 	m.pullIsFastForward = false
 	gotModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	got = gotModel.(model)
+	if cmd != nil {
+		t.Fatal("expected rebase-pull shortcut without an active request to be ignored")
+	}
+	if got.activePullRequest != nil || got.nextPullRequestID != 0 {
+		t.Fatalf("expected rebase-pull shortcut not to create a request, got request=%+v nextID=%d", got.activePullRequest, got.nextPullRequestID)
+	}
+
+	m.activePullRequest = &pullRequest{ID: 7, Epoch: 3}
+	gotModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	got = gotModel.(model)
 	if cmd == nil {
-		t.Fatal("expected rebase-pull command for r shortcut")
+		t.Fatal("expected rebase-pull command for an existing request")
 	}
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Rebasing pull..." {
 		t.Fatalf("expected rebase-pull loading state, got %+v", got.status)
@@ -1816,6 +1840,8 @@ func TestOutcomePreviewEscapeRoutesByAction(t *testing.T) {
 
 	pullModel := testKeyHandlingModel(fixture.repo, baseStatus)
 	pullModel.status = state.New().WithOutcome(state.ActionPull, "Preview", "Detail", true)
+	pullModel.activePullRequest = &pullRequest{ID: 7}
+	pullModel.nextPullRequestID = 7
 	gotModel, cmd = pullModel.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	got = gotModel.(model)
 	if cmd != nil {
@@ -1823,6 +1849,27 @@ func TestOutcomePreviewEscapeRoutesByAction(t *testing.T) {
 	}
 	if got.status.Mode != state.ModeBrowse {
 		t.Fatalf("expected pull outcome escape to return to browse, got %s", got.status.Mode)
+	}
+	if got.activePullRequest != nil {
+		t.Fatal("expected pull outcome escape to clear the active pull request")
+	}
+	if got.nextPullRequestID != 8 {
+		t.Fatalf("expected pull outcome escape to invalidate the request ID, got %d", got.nextPullRequestID)
+	}
+}
+
+func TestOutcomePreviewPullWithoutActiveRequestLeavesStatusUnchanged(t *testing.T) {
+	m := testKeyHandlingModel(nil, git.Status{})
+	m.status = state.New().WithOutcome(state.ActionPull, "Preview", "Detail", true)
+	wantStatus := m.status
+
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := gotModel.(model)
+	if cmd != nil {
+		t.Fatalf("expected no command without an active pull request, got %v", cmd)
+	}
+	if !reflect.DeepEqual(got.status, wantStatus) {
+		t.Fatalf("expected status to remain unchanged, got %+v; want %+v", got.status, wantStatus)
 	}
 }
 

@@ -31,6 +31,10 @@ type Status struct {
 	LocalBranches         []string
 	BranchUpstreams       map[string]string
 	Tracking              map[string]BranchTracking
+	TrackingKnown         bool
+	TrackingFresh         bool
+	TrackingError         string
+	UpstreamGone          bool
 	RemoteBranches        []string
 	Tags                  []string
 	TagEntries            []TagEntry
@@ -136,10 +140,26 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	head, _ := r.git(ctx, "rev-parse", "HEAD")
-	upstream, _ := r.git(ctx, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
-	remote, _ := r.git(ctx, "remote")
-	branches, branchUpstreams, tracking := r.branchMetadata(ctx)
+	head, headErr := r.git(ctx, "rev-parse", "HEAD")
+	upstream, upstreamErr := r.git(ctx, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	remote, remoteErr := r.git(ctx, "remote")
+	branches, branchUpstreams, tracking, trackingKnown, trackingFresh, trackingError, upstreamGone := r.branchMetadata(ctx, branch)
+	if headErr != nil || remoteErr != nil {
+		trackingFresh = false
+		if trackingError == "" {
+			if headErr != nil {
+				trackingError = headErr.Error()
+			} else {
+				trackingError = remoteErr.Error()
+			}
+		}
+	}
+	if upstreamErr != nil && !isExpectedNoUpstreamError(upstreamErr) {
+		trackingFresh = false
+		if trackingError == "" {
+			trackingError = upstreamErr.Error()
+		}
+	}
 	localBranches := branches
 	remoteBranches, _ := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)", "refs/remotes")
 	defaultBranch := r.defaultRemoteBranch(ctx)
@@ -194,10 +214,16 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		}
 	}
 
-	noUpstream := upstream == ""
+	noUpstream := upstream == "" && (upstreamErr == nil || isExpectedNoUpstreamError(upstreamErr))
 	noRemote := remote == ""
 	emptyRepo := isNoCommits(graphErr) || head == ""
-	remotes, _ := r.gitLines(ctx, "remote")
+	remotes, remotesErr := r.gitLines(ctx, "remote")
+	if remotesErr != nil {
+		trackingFresh = false
+		if trackingError == "" {
+			trackingError = remotesErr.Error()
+		}
+	}
 
 	conflictTargetSubject := ""
 	if conflictTarget != "" {
@@ -220,11 +246,15 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		LocalBranches:         localBranches,
 		BranchUpstreams:       branchUpstreams,
 		Tracking:              tracking,
+		TrackingKnown:         trackingKnown,
+		TrackingFresh:         trackingFresh,
+		TrackingError:         trackingError,
+		UpstreamGone:          upstreamGone,
 		RemoteBranches:        remoteBranches,
 		Tags:                  nil,
 		TagEntries:            nil,
 		LastFetchAt:           lastFetchAt,
-		RemoteSyncSummary:     remoteSyncSummary(branch, tracking, remote, noRemote, noUpstream, branch == "HEAD"),
+		RemoteSyncSummary:     remoteSyncSummary(branch, tracking, trackingKnown, remote, noRemote, noUpstream, branch == "HEAD"),
 		Remotes:               remotes,
 		EmptyRepo:             emptyRepo,
 		NoUpstream:            noUpstream,
@@ -236,6 +266,15 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		ConflictTarget:        conflictTarget,
 		ConflictTargetSubject: conflictTargetSubject,
 	}, nil
+}
+
+func isExpectedNoUpstreamError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "no upstream configured") ||
+		strings.Contains(message, "has no upstream branch")
 }
 
 func (r *Repo) fetchHeadModTime(ctx context.Context) (time.Time, bool) {
@@ -257,7 +296,7 @@ func (r *Repo) fetchHeadModTime(ctx context.Context) (time.Time, bool) {
 	return info.ModTime(), true
 }
 
-func remoteSyncSummary(branch string, tracking map[string]BranchTracking, remote string, noRemote, noUpstream, detached bool) string {
+func remoteSyncSummary(branch string, tracking map[string]BranchTracking, trackingKnown bool, remote string, noRemote, noUpstream, detached bool) string {
 	switch {
 	case branch == "":
 		return ""
@@ -267,6 +306,8 @@ func remoteSyncSummary(branch string, tracking map[string]BranchTracking, remote
 		return "no upstream"
 	case detached:
 		return "detached"
+	case !trackingKnown:
+		return "tracking unknown"
 	}
 	track := tracking[branch]
 	switch {
@@ -282,27 +323,39 @@ func remoteSyncSummary(branch string, tracking map[string]BranchTracking, remote
 	}
 }
 
-func (r *Repo) branchMetadata(ctx context.Context) ([]string, map[string]string, map[string]BranchTracking) {
+func (r *Repo) branchMetadata(ctx context.Context, currentBranch string) ([]string, map[string]string, map[string]BranchTracking, bool, bool, string, bool) {
 	branches := make([]string, 0)
 	upstreams := make(map[string]string)
 	tracking := make(map[string]BranchTracking)
 	lines, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)|%(upstream:short)|%(upstream:track)", "refs/heads")
 	if err != nil {
 		telemetry.Log("git", "branch_metadata_error", map[string]string{"error": err.Error()})
-		return branches, upstreams, tracking
+		return branches, upstreams, tracking, false, false, err.Error(), false
 	}
+	trackingKnown, upstreamGone := false, false
 	for _, line := range lines {
+		// Git emits an empty track value for an upstream with no divergence.
+		// Normalize that valid output before the strict metadata parser sees it.
+		parts := strings.Split(line, "|")
+		if len(parts) == 3 && strings.TrimSpace(parts[1]) != "" && strings.TrimSpace(parts[2]) == "" {
+			line = strings.Join([]string{parts[0], parts[1], "[ahead 0, behind 0]"}, "|")
+		}
 		branchName, upstream, track, ok := parseBranchMetadataLine(line)
 		if !ok {
-			continue
+			return branches, upstreams, tracking, false, false, "malformed branch metadata", false
 		}
 		branches = append(branches, branchName)
 		upstreams[branchName] = upstream
-		if track.Ahead > 0 || track.Behind > 0 {
+		if branchName == currentBranch {
+			fields := strings.Split(line, "|")
+			upstreamGone = upstream == "" && len(fields) == 3 && strings.TrimSpace(fields[2]) == "[gone]"
+			trackingKnown = upstream != ""
+		}
+		if upstream != "" {
 			tracking[branchName] = track
 		}
 	}
-	return branches, upstreams, tracking
+	return branches, upstreams, tracking, trackingKnown && !upstreamGone, true, "", upstreamGone
 }
 
 func (r *Repo) branchTracking(ctx context.Context, localBranches, remoteBranches []string) map[string]BranchTracking {

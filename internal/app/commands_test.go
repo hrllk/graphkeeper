@@ -944,9 +944,10 @@ func TestExecuteFetchForPushAndPull(t *testing.T) {
 		t.Fatalf("expected remote branches after fetch-for-push, got %+v", pushMsg.status)
 	}
 
-	pullMsg, ok := cmdResult(t, executeFetchForPull(fixture.repo, 40)).(pullFetchedMsg)
+	pullRequest := pullRequest{ID: 1, Epoch: 7}
+	pullMsg, ok := cmdResult(t, executeFetchForPull(fixture.repo, 40, pullRequest)).(pullFetchedMsg)
 	if !ok {
-		t.Fatalf("expected pullFetchedMsg, got %T", cmdResult(t, executeFetchForPull(fixture.repo, 40)))
+		t.Fatalf("expected pullFetchedMsg, got %T", cmdResult(t, executeFetchForPull(fixture.repo, 40, pullRequest)))
 	}
 	if pullMsg.err != nil {
 		t.Fatalf("executeFetchForPull err = %v", pullMsg.err)
@@ -954,20 +955,46 @@ func TestExecuteFetchForPushAndPull(t *testing.T) {
 	if pullMsg.status.Root == "" {
 		t.Fatalf("expected repo status after fetch-for-pull, got %+v", pullMsg.status)
 	}
+	if pullMsg.requestID != pullRequest.ID || pullMsg.requestEpoch != pullRequest.Epoch {
+		t.Fatalf("expected pull request identity %d/%d, got %d/%d", pullRequest.ID, pullRequest.Epoch, pullMsg.requestID, pullMsg.requestEpoch)
+	}
+}
+
+func TestExecuteValidatedPullRechecksSnapshotBeforeMutation(t *testing.T) {
+	fixture := newCommandRepo(t)
+	status, err := fixture.repo.Status(context.Background(), 40)
+	if err != nil {
+		t.Fatalf("Status failed: %v", err)
+	}
+	baseline := pullSnapshotIdentity(status, 7)
+	baseline.Head = "different-head"
+	request := pullRequest{ID: 1, Epoch: 7, Baseline: baseline}
+
+	result, ok := cmdResult(t, executeValidatedPull(fixture.repo, 40, request, PullModeMerge)).(pullExecutionResultMsg)
+	if !ok {
+		t.Fatalf("expected pullExecutionResultMsg, got %T", cmdResult(t, executeValidatedPull(fixture.repo, 40, request, PullModeMerge)))
+	}
+	if !result.stale {
+		t.Fatalf("expected stale execution result, got %+v", result)
+	}
 }
 
 func TestLoadPullPreviewCommitsUsesCorrectRange(t *testing.T) {
 	fixture := newCommandRepo(t)
 	remoteHead := advanceRemote(t, fixture.remote, "remote.txt", "remote\n", "remote advance")
 	behind := cloneRepoAtHash(t, fixture.remote, fixture.initialHash)
+	request := pullRequest{ID: 1, Epoch: 7}
 
-	ffReady, ok := cmdResult(t, loadPullPreviewCommits(behind.repo, true)).(pullPreviewReadyMsg)
+	ffReady, ok := cmdResult(t, loadPullPreviewCommits(behind.repo, true, request)).(pullPreviewReadyMsg)
 	if !ok {
-		t.Fatalf("expected pullPreviewReadyMsg, got %T", cmdResult(t, loadPullPreviewCommits(behind.repo, true)))
+		t.Fatalf("expected pullPreviewReadyMsg, got %T", cmdResult(t, loadPullPreviewCommits(behind.repo, true, request)))
 	}
-	nonFFReady, ok := cmdResult(t, loadPullPreviewCommits(behind.repo, false)).(pullPreviewReadyMsg)
+	nonFFReady, ok := cmdResult(t, loadPullPreviewCommits(behind.repo, false, request)).(pullPreviewReadyMsg)
 	if !ok {
-		t.Fatalf("expected pullPreviewReadyMsg, got %T", cmdResult(t, loadPullPreviewCommits(behind.repo, false)))
+		t.Fatalf("expected pullPreviewReadyMsg, got %T", cmdResult(t, loadPullPreviewCommits(behind.repo, false, request)))
+	}
+	if ffReady.requestID != request.ID || ffReady.requestEpoch != request.Epoch || nonFFReady.requestID != request.ID || nonFFReady.requestEpoch != request.Epoch {
+		t.Fatalf("expected preview messages to carry request identity %d/%d, got ff=%d/%d nonff=%d/%d", request.ID, request.Epoch, ffReady.requestID, ffReady.requestEpoch, nonFFReady.requestID, nonFFReady.requestEpoch)
 	}
 	if ffReady.err != nil || nonFFReady.err != nil {
 		t.Fatalf("unexpected preview errors: ff=%v nonff=%v", ffReady.err, nonFFReady.err)

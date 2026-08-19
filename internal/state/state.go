@@ -46,16 +46,17 @@ const (
 type BlockReason string
 
 const (
-	BlockNone        BlockReason = ""
-	BlockNoRepo      BlockReason = "no_repo"
-	BlockDetached    BlockReason = "detached_head"
-	BlockNoUpstream  BlockReason = "no_upstream"
-	BlockNoRemote    BlockReason = "no_remote"
-	BlockDiverged    BlockReason = "diverged"
-	BlockFetchFailed BlockReason = "fetch_failed"
-	BlockTargetEmpty BlockReason = "target_empty"
-	BlockDirtyTree   BlockReason = "dirty_worktree"
-	BlockUnknown     BlockReason = "unknown"
+	BlockNone          BlockReason = ""
+	BlockNoRepo        BlockReason = "no_repo"
+	BlockDetached      BlockReason = "detached_head"
+	BlockNoUpstream    BlockReason = "no_upstream"
+	BlockNoRemote      BlockReason = "no_remote"
+	BlockDiverged      BlockReason = "diverged"
+	BlockFetchFailed   BlockReason = "fetch_failed"
+	BlockTargetEmpty   BlockReason = "target_empty"
+	BlockDirtyTree     BlockReason = "dirty_worktree"
+	BlockUnknown       BlockReason = "unknown"
+	BlockStaleSnapshot BlockReason = "stale_snapshot"
 )
 
 type ResetMode string
