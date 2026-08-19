@@ -18,12 +18,12 @@ const (
 )
 
 type DivergedSnapshot struct {
-	Branch, Upstream, Head                                   string
-	LocalOnly, UpstreamOnly                                  int
-	TrackingKnown, TrackingFresh                             bool
-	WorktreeDirty, Detached, EmptyRepo, NoRemote, NoUpstream bool
-	MergeInProgress, RebaseInProgress, CherryPickInProgress  bool
-	Epoch                                                    uint64
+	Branch, Upstream, Head                                                 string
+	LocalOnly, UpstreamOnly                                                int
+	TrackingKnown, TrackingFresh                                           bool
+	WorktreeDirty, Detached, EmptyRepo, NoRemote, NoUpstream, UpstreamGone bool
+	MergeInProgress, RebaseInProgress, CherryPickInProgress                bool
+	Epoch                                                                  uint64
 }
 
 type DivergedRecommendation struct {
@@ -36,7 +36,7 @@ type DivergedRecommendation struct {
 
 func recommendDivergedPull(s DivergedSnapshot) (DivergedRecommendation, bool) {
 	if s.Branch == "" || s.Upstream == "" || s.Head == "" || s.LocalOnly <= 0 || s.UpstreamOnly <= 0 ||
-		!s.TrackingKnown || !s.TrackingFresh || s.WorktreeDirty || s.Detached || s.EmptyRepo || s.NoRemote || s.NoUpstream ||
+		!s.TrackingKnown || !s.TrackingFresh || s.WorktreeDirty || s.Detached || s.EmptyRepo || s.NoRemote || s.NoUpstream || s.UpstreamGone ||
 		s.MergeInProgress || s.RebaseInProgress || s.CherryPickInProgress {
 		return DivergedRecommendation{}, false
 	}
@@ -55,7 +55,7 @@ func divergedSnapshotFromStatus(status git.Status, epoch uint64) DivergedSnapsho
 		TrackingKnown: status.TrackingKnown && known,
 		TrackingFresh: status.TrackingFresh,
 		WorktreeDirty: status.WorktreeDirty, Detached: status.Detached, EmptyRepo: status.EmptyRepo,
-		NoRemote: status.NoRemote, NoUpstream: status.NoUpstream,
+		NoRemote: status.NoRemote, NoUpstream: status.NoUpstream, UpstreamGone: status.UpstreamGone,
 		MergeInProgress: status.MergeInProgress, RebaseInProgress: status.RebaseInProgress,
 		CherryPickInProgress: status.CherryPickInProgress, Epoch: epoch,
 	}

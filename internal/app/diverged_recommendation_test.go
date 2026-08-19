@@ -18,6 +18,7 @@ func TestRecommendDivergedPullRequiresFreshKnownTracking(t *testing.T) {
 		{"stale tracking", DivergedSnapshot{Branch: "main", Upstream: "origin/main", Head: "abc", LocalOnly: 2, UpstreamOnly: 1, TrackingKnown: true}, false},
 		{"dirty", DivergedSnapshot{Branch: "main", Upstream: "origin/main", Head: "abc", LocalOnly: 2, UpstreamOnly: 1, TrackingKnown: true, TrackingFresh: true, WorktreeDirty: true}, false},
 		{"in progress", DivergedSnapshot{Branch: "main", Upstream: "origin/main", Head: "abc", LocalOnly: 2, UpstreamOnly: 1, TrackingKnown: true, TrackingFresh: true, RebaseInProgress: true}, false},
+		{"upstream gone", DivergedSnapshot{Branch: "main", Upstream: "origin/main", Head: "abc", LocalOnly: 2, UpstreamOnly: 1, TrackingKnown: true, TrackingFresh: true, UpstreamGone: true}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

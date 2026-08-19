@@ -49,6 +49,7 @@ type ContextProjection struct {
 	ActionLines    []string
 	Scroll         int
 	Recommendation *DivergedRecommendation
+	Decision       *BranchDecisionContext
 }
 
 func (m model) screenProjection(width, height int) ScreenProjection {
@@ -82,16 +83,25 @@ func (m model) screenProjection(width, height int) ScreenProjection {
 
 func (m model) contextProjection(width int) ContextProjection {
 	var recommendation *DivergedRecommendation
-	if m.activeSection == sectionCurrent && m.activePullRequest == nil {
-		if value, ok := recommendDivergedPull(divergedSnapshotFromStatus(m.repoStatus, m.repositoryEpoch)); ok {
-			recommendation = &value
+	var decision *BranchDecisionContext
+	if m.activeSection == sectionCurrent {
+		snapshot := divergedSnapshotFromStatus(m.repoStatus, m.repositoryEpoch)
+		if m.status.Mode == state.ModeBrowse {
+			if value, ok := explainBranchDecision(snapshot); ok {
+				decision = &value
+			}
+		}
+		if m.activePullRequest == nil {
+			if value, ok := recommendDivergedPull(snapshot); ok {
+				recommendation = &value
+			}
 		}
 	}
 	return ContextProjection{
 		Title:       sectionName(m.activeSection),
 		InfoLines:   m.renderContextInfoLines(width),
 		ActionLines: renderActionHelpLines(m),
-		Scroll:      m.contextScroll, Recommendation: recommendation,
+		Scroll:      m.contextScroll, Recommendation: recommendation, Decision: decision,
 	}
 }
 

@@ -12,15 +12,23 @@ func renderContextProjection(p ContextProjection, width, height int) string {
 	}
 	infoLines := renderContextViewport(p.InfoLines, max(height-1, 0), p.Scroll, width)
 	leftLines := append([]string{renderSectionTitle(p.Title + " Details")}, infoLines...)
-	actions := append([]string(nil), p.ActionLines...)
-	if p.Recommendation != nil {
+	actions := make([]string, 0, len(p.ActionLines)+4)
+	if p.Decision != nil {
+		actions = append(actions, decisionSummaryLine(*p.Decision))
+		actions = append(actions, p.Decision.ReasonLines...)
+		actions = append(actions, p.Decision.ActionLines...)
+		if p.Recommendation != nil {
+			actions = append(actions, "p: fetch, then m: merge / r: rebase")
+		}
+	} else if p.Recommendation != nil {
 		r := p.Recommendation
-		actions = append([]string{
+		actions = append(actions,
 			fmt.Sprintf("upstream: %s", r.Upstream),
 			fmt.Sprintf("local-only: %d  upstream-only: %d", r.LocalOnly, r.UpstreamOnly),
 			"p: fetch, then m: merge / r: rebase",
-		}, actions...)
+		)
 	}
+	actions = append(actions, p.ActionLines...)
 	rightLines := append([]string{renderSectionTitle(p.Title + " Actions")}, actions...)
 	rightLines = indentLines(rightLines, 1)
 	return renderSplitColumns(leftLines, rightLines, width, height)
