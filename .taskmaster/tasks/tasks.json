@@ -176,13 +176,13 @@
             "title": "Show Post-Operation Result Summary",
             "description": "Git 작업 완료 후 이전 상태와 비교해 실제 결과와 다음 상태를 보여준다.",
             "details": "계획 문서: ~/.gstack/graphkeeper/20260802-0014-show-post-operation-result-summary-plan.md. 기존 executedMsg·refresh 흐름을 재사용해 성공, 실패, partial refresh, stale result를 구분하고 사용자가 Graph 문맥으로 안전하게 복귀하도록 한다.",
-            "status": "in-progress",
+            "status": "done",
             "dependencies": [
               13
             ],
             "parentTaskId": 1,
             "parentId": "undefined",
-            "updatedAt": "2026-08-20T07:07:02.278Z"
+            "updatedAt": "2026-08-20T07:18:49.029Z"
           },
           {
             "id": 15,
@@ -211,7 +211,7 @@
             "updatedAt": "2026-08-20T04:36:08.999Z"
           }
         ],
-        "updatedAt": "2026-08-20T07:07:02.278Z"
+        "updatedAt": "2026-08-20T07:18:49.029Z"
       },
       {
         "id": "2",
@@ -340,7 +340,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-20T07:07:02.278Z",
+      "lastModified": "2026-08-20T07:18:49.029Z",
       "taskCount": 5,
       "completedCount": 2,
       "tags": [
