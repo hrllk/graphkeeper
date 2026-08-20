@@ -15,175 +15,209 @@
             "id": 1,
             "title": "commit detail",
             "description": "Graph에서 선택한 커밋의 identity, 변경 파일 tree, unified diff를 독립 Inspector 화면으로 확인할 수 있는 read-only 흐름을 구현한다.",
-            "details": "스펙 문서: docs/20260803-0001-graph-commit-inspector-spec.md. Graph에서 Enter로 기존 화면을 가리는 bordered Inspector를 열고, 4행 고정 header(commit/message/author/path), flat changed-files list, old/new line columns을 가진 unified diff, q/Esc/? footer를 제공한다. Header에는 선택 파일 full path를, 목록에는 ../../filename 축약 경로를 표시한다. MVP keymap은 j/k로 변경 파일을 탐색하고 Ctrl+U/D로 선택 파일 diff를 스크롤한다. 별도 pane focus, fold/unfold, h/l, Enter, Tab/m/r과 message footer는 포함하지 않는다. first-parent/root basis, rename/copy identity, binary/submodule/mode-only 상태, request/epoch stale 폐기, cancellation, bounded diff, ANSI/NO_COLOR semantic marker, narrow/wide frame matrix와 테스트를 포함한다. Tree-sitter grammar/query, word-level diff, 전체 message viewport와 Working Tree staging/commit은 후속 범위다.",
+            "details": "스펙 문서: ~/.gstack/graphkeeper/20260803-0001-graph-commit-inspector-spec.md. Graph에서 Enter로 기존 화면을 가리는 bordered Inspector를 열고, 4행 고정 header(commit/message/author/path), flat changed-files list, old/new line columns을 가진 unified diff, q/Esc/? footer를 제공한다. Header에는 선택 파일 full path를, 목록에는 ../../filename 축약 경로를 표시한다. MVP keymap은 j/k로 변경 파일을 탐색하고 Ctrl+U/D로 선택 파일 diff를 스크롤한다. 별도 pane focus, fold/unfold, h/l, Enter, Tab/m/r과 message footer는 포함하지 않는다. first-parent/root basis, rename/copy identity, binary/submodule/mode-only 상태, request/epoch stale 폐기, cancellation, bounded diff, ANSI/NO_COLOR semantic marker, narrow/wide frame matrix와 테스트를 포함한다. Tree-sitter grammar/query, word-level diff, 전체 message viewport와 Working Tree staging/commit은 후속 범위다.",
             "status": "in-progress",
             "dependencies": [],
             "parentTaskId": 1,
             "parentId": "undefined",
             "updatedAt": "2026-08-02T00:00:00.000Z"
           },
-        {
-          "id": 2,
+          {
+            "id": 2,
             "title": "메인 화면 가독성·레이아웃 개선",
             "description": "Graph 중심 메인 화면의 제목 폭, stash/tag 상태 표시, Graph와 Local/Remote/Tags rail 높이, 공통 여백, overflow를 개선해 저장소 관리자와 릴리즈 담당자가 topology를 빠르게 스캔할 수 있도록 한다.",
-            "details": "계획 문서: docs/20260731-0002-project-ui-readability-improvement-plan.md. Graph topology의 `*`는 유지하고 branches와 topology 사이의 `state` 컬럼에 `S`, `T`, `S·T`를 표시한다. Graph page 정보 줄 오른쪽에 축약 범례를 노출한다. Graph 제목은 남은 폭 기반으로 계산하고, Graph와 Local/Remote/Tags의 outer height를 일치시킨다. Context·rail·popup의 공통 spacing과 overflow를 정리하며, 항목은 paging·scroll·`… +N`으로 마지막까지 접근할 수 있어야 한다. 구현 전 계획의 사용자 성공 기준, 단계별 게이트, 터미널 폭·색상 profile QA를 따른다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260731-0002-project-ui-readability-improvement-plan.md. Graph topology의 `*`는 유지하고 branches와 topology 사이의 `state` 컬럼에 `S`, `T`, `S·T`를 표시한다. Graph page 정보 줄 오른쪽에 축약 범례를 노출한다. Graph 제목은 남은 폭 기반으로 계산하고, Graph와 Local/Remote/Tags의 outer height를 일치시킨다. Context·rail·popup의 공통 spacing과 overflow를 정리하며, 항목은 paging·scroll·`… +N`으로 마지막까지 접근할 수 있어야 한다. 구현 전 계획의 사용자 성공 기준, 단계별 게이트, 터미널 폭·색상 profile QA를 따른다.",
             "status": "done",
             "dependencies": [],
             "parentTaskId": 1,
             "updatedAt": "2026-08-01T01:00:00.000Z",
-          "parentId": "undefined"
-        },
-        {
-          "id": 3,
-          "title": "메인 화면 레이아웃 재조정",
-          "description": "Global과 Context Actions를 제거하고 Context Details를 우측 상단 rail로 이동하며 Graph를 전체 높이로 확장한다. Hidden Hotkeys overlay, Graph 제목 폭 우선순위, stash/tag point 색상 누락 경로를 함께 정리한다.",
-          "details": "계획 문서: docs/20260801-0002-main-layout-redesign-plan.md. 최종 레이아웃은 GGGGCC / GGGGLL / GGGGRR / GGGGTT다. Graph와 우측 4개 패널의 outer height를 맞추고, ? overlay와 폭 허용 시 ?: hotkeys hint로 단축키를 안내한다. ANSI/NO_COLOR, low-height, overflow, normal/raw graph point 색상 회귀 테스트를 포함한다.",
-          "dependencies": [],
-          "parentTaskId": 1,
-          "status": "done",
-          "updatedAt": "2026-08-01T03:00:00.000Z",
-          "parentId": "undefined"
-        },
-        {
-          "id": 4,
-          "title": "ANSI-preserving overlay compositor",
-          "description": "Hidden Hotkeys overlay 합성 시 Local·Remote 카드 border 색상과 wide rune 경계를 보존한다.",
-          "details": "계획 문서: docs/20260801-0003-overlay-graph-density-improvement-plan.md T1. overlayLine의 SGR 상태 복원과 ANSI/TrueColor/Ascii/NO_COLOR 회귀 테스트를 포함한다.",
-          "status": "done",
-          "dependencies": [],
-          "parentTaskId": 1,
-          "updatedAt": "2026-08-01T04:00:00.000Z",
-          "parentId": "undefined"
-        },
-        {
-          "id": 5,
-          "title": "공통 overlay footer와 q/esc 키 계약",
-          "description": "공통 popup footer를 q: close로 축소하고 main q 종료 및 overlay q close와 esc close/back 동작을 일관되게 보장한다.",
-          "details": "계획 문서 T2. main에서는 q가 quit, overlay에서는 q가 close/cancel이 된다. confirm y/n·picker enter 등 작업 선택 키는 본문에 유지하고 overlay footer는 q: close로 축소한다.",
-          "status": "done",
-          "dependencies": [4],
-          "parentTaskId": 1,
-          "updatedAt": "2026-08-01T04:00:00.000Z",
-          "parentId": "undefined"
-        },
-        {
-          "id": 6,
-          "title": "Main hotkey footer와 shared registry",
-          "description": "Global 핵심 hotkey만 main 화면 최하단에 표시하고 active section 명령은 ? overlay로 유도한다.",
-          "details": "계획 문서 T3. main footer 1행 예약, width truncation, active-only overlay, main/overlay q 문맥 분기를 registry 기반으로 구현한다.",
-          "status": "done",
-          "dependencies": [5],
-          "parentTaskId": 1,
-          "updatedAt": "2026-08-01T04:00:00.000Z",
-          "parentId": "undefined"
-        },
-        {
-          "id": 7,
-          "title": "Hidden Hotkeys 폭 축소",
-          "description": "Hidden Hotkeys popup의 폭을 현재 대비 약 30% 줄이고 좁은 터미널과 scroll 경계를 보장한다.",
-          "details": "계획 문서 T4. max 50/min 32 width policy를 render·viewport·scroll 계산에서 공유하고 80/100/140열 및 12/20/40행을 검증한다.",
-          "status": "done",
-          "dependencies": [6],
-          "parentTaskId": 1,
-          "updatedAt": "2026-08-01T04:00:00.000Z",
-          "parentId": "undefined"
-        },
-        {
-          "id": 8,
-          "title": "Graph 정보 열 재배치",
-          "description": "Graph hash를 5자리로 줄이고 date를 제거하며 topology·author·title 폭을 재조정한다.",
-          "details": "계획 문서 T5. Graph pane은 유지하고 Graph 섹션 안의 graph/topology 열을 현재 계산폭의 70%로 줄이며 normal/raw/header/connector와 full hash 내부 계약을 보존한다.",
-          "status": "done",
-          "dependencies": [7],
-          "parentTaskId": 1,
-          "updatedAt": "2026-08-01T04:00:00.000Z",
-          "parentId": "undefined"
-        },
-        {
-          "id": 9,
-          "title": "통합 회귀·문서·Task Master 동기화",
-          "description": "ANSI/NO_COLOR, modal 키, layout, Graph column matrix를 검증하고 문서와 Task Master 상태를 동기화한다.",
-          "details": "계획 문서 T6. go test ./..., race test, scripts/check, scripts/build와 README/decisions 갱신을 수행한다.",
-          "status": "done",
-          "dependencies": [8],
-          "parentTaskId": 1,
-          "updatedAt": "2026-08-01T04:00:00.000Z",
-          "parentId": "undefined"
-        },
-        {
-          "id": 10,
-          "title": "Add Repository State Summary",
-          "description": "Graph 상단에서 clean, dirty, ahead, behind, diverged 등 현재 저장소 상태를 한눈에 보여준다.",
-          "details": "계획 문서: docs/20260802-0010-add-repository-state-summary-plan.md. 현재 branch·upstream·worktree·divergence·operation 진행 상태를 기존 git.Status에서 재사용하고, 상태 조합별 요약과 low-width fallback을 제공한다. 1.11~1.14가 채우는 상태·추천·이유·영향·결과를 Graph 제목 아래 Unified Decision Card 하나로 묶으며 별도 screen/popup은 만들지 않는다.",
-          "status": "done",
-          "dependencies": [],
-          "parentTaskId": 1,
-          "parentId": "undefined",
-          "updatedAt": "2026-08-04T00:00:00.000Z"
-        },
-        {
-          "id": 11,
-          "title": "Add Next Action Recommendation",
-          "description": "현재 저장소 상태를 바탕으로 사용자가 다음에 수행할 Git 작업을 추천한다.",
-          "details": "계획 문서: docs/20260802-0011-add-next-action-recommendation-plan.md. 상태 요약을 입력으로 pull, push, merge, rebase, stash 등의 추천 규칙을 계산하고 Graph 화면에 추천 행동과 실행 진입점을 노출한다.",
-          "status": "in-progress",
-          "dependencies": [10],
-          "parentTaskId": 1,
-          "parentId": "undefined",
-          "updatedAt": "2026-08-03T00:00:00.000Z"
-        },
-        {
-          "id": 12,
-          "title": "Explain Branch Decision Context",
-          "description": "merge, rebase, pull 등의 추천 이유와 branch 간 commit 관계를 짧고 명확하게 설명한다.",
-          "details": "계획 문서: docs/20260802-0012-explain-branch-decision-context-plan.md. fast-forward, already aligned, target included, diverged를 구분하고 local-only·target-only commit 수와 대상 ref를 공통 문구로 제공한다.",
-          "status": "pending",
-          "dependencies": [10, 11],
-          "parentTaskId": 1,
-          "parentId": "undefined",
-          "updatedAt": "2026-08-02T00:00:00.000Z"
-        },
-        {
-          "id": 13,
-          "title": "Add Git Operation Impact Preview",
-          "description": "merge, rebase, reset, clean, delete 등 Git 작업을 실행하기 전에 예상되는 변경과 위험을 보여준다.",
-          "details": "계획 문서: docs/20260802-0013-add-git-operation-impact-preview-plan.md. 기존 confirm·review popup과 preview 로직을 재사용해 대상 ref, 예상 commit 변화, conflict 가능성, destructive risk를 실행 전에 표시한다.",
-          "status": "pending",
-          "dependencies": [12],
-          "parentTaskId": 1,
-          "parentId": "undefined",
-          "updatedAt": "2026-08-02T00:00:00.000Z"
-        },
-        {
-          "id": 14,
-          "title": "Show Post-Operation Result Summary",
-          "description": "Git 작업 완료 후 이전 상태와 비교해 실제 결과와 다음 상태를 보여준다.",
-          "details": "계획 문서: docs/20260802-0014-show-post-operation-result-summary-plan.md. 기존 executedMsg·refresh 흐름을 재사용해 성공, 실패, partial refresh, stale result를 구분하고 사용자가 Graph 문맥으로 안전하게 복귀하도록 한다.",
-          "status": "pending",
-          "dependencies": [13],
-          "parentTaskId": 1,
-          "parentId": "undefined",
-          "updatedAt": "2026-08-02T00:00:00.000Z"
-        },
-        {
-          "id": 15,
-          "title": "Working Tree Inspector",
-          "description": "Graph의 dirty 상태에서 현재 working tree 변경을 확인하고 일부 또는 전체 파일을 선택해 commit할 수 있는 Inspector를 추가한다.",
-          "details": "Commit Inspector와 동일한 bordered Inspector frame, 고정 header, 변경 파일 목록, unified diff, commit message footer를 공유하되 Working Tree 전용 mode로 분리한다. Graph에서 w로 진입하며 branch와 dirty 상태를 표시한다. 파일 선택 후 Space로 개별 staged 상태를 토글하고 a로 전체 staged 상태를 토글한다. staged 파일을 대상으로 commit message를 입력해 일부 파일 또는 전체 파일을 commit한다. commit 진행 중에는 입력을 잠그고, 성공하면 Working Tree Inspector를 유지한 채 파일 목록과 dirty 상태를 갱신한다. 일부 파일이 남으면 계속 탐색할 수 있고, 전체가 clean이면 clean 상태를 표시한다. q로 종료하면 최신 repository snapshot으로 Graph를 갱신하고 새로 생성된 commit이 있으면 해당 commit에 cursor를 맞추며, commit이 없으면 기존 Graph cursor와 scroll을 복원한다. commit 실패 시 화면과 입력 내용을 유지하고 재시도할 수 있어야 한다. staging/editing/commit action은 Commit Inspector에 섞지 않고 이 subtask 범위에서만 제공한다.",
-          "status": "pending",
-          "dependencies": [1],
-          "parentTaskId": 1,
-          "parentId": "undefined",
-          "updatedAt": "2026-08-04T00:40:00.000Z"
-        }
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "메인 화면 레이아웃 재조정",
+            "description": "Global과 Context Actions를 제거하고 Context Details를 우측 상단 rail로 이동하며 Graph를 전체 높이로 확장한다. Hidden Hotkeys overlay, Graph 제목 폭 우선순위, stash/tag point 색상 누락 경로를 함께 정리한다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260801-0002-main-layout-redesign-plan.md. 최종 레이아웃은 GGGGCC / GGGGLL / GGGGRR / GGGGTT다. Graph와 우측 4개 패널의 outer height를 맞추고, ? overlay와 폭 허용 시 ?: hotkeys hint로 단축키를 안내한다. ANSI/NO_COLOR, low-height, overflow, normal/raw graph point 색상 회귀 테스트를 포함한다.",
+            "dependencies": [],
+            "parentTaskId": 1,
+            "status": "done",
+            "updatedAt": "2026-08-01T03:00:00.000Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "ANSI-preserving overlay compositor",
+            "description": "Hidden Hotkeys overlay 합성 시 Local·Remote 카드 border 색상과 wide rune 경계를 보존한다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260801-0003-overlay-graph-density-improvement-plan.md T1. overlayLine의 SGR 상태 복원과 ANSI/TrueColor/Ascii/NO_COLOR 회귀 테스트를 포함한다.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-01T04:00:00.000Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "공통 overlay footer와 q/esc 키 계약",
+            "description": "공통 popup footer를 q: close로 축소하고 main q 종료 및 overlay q close와 esc close/back 동작을 일관되게 보장한다.",
+            "details": "계획 문서 T2. main에서는 q가 quit, overlay에서는 q가 close/cancel이 된다. confirm y/n·picker enter 등 작업 선택 키는 본문에 유지하고 overlay footer는 q: close로 축소한다.",
+            "status": "done",
+            "dependencies": [
+              4
+            ],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-01T04:00:00.000Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Main hotkey footer와 shared registry",
+            "description": "Global 핵심 hotkey만 main 화면 최하단에 표시하고 active section 명령은 ? overlay로 유도한다.",
+            "details": "계획 문서 T3. main footer 1행 예약, width truncation, active-only overlay, main/overlay q 문맥 분기를 registry 기반으로 구현한다.",
+            "status": "done",
+            "dependencies": [
+              5
+            ],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-01T04:00:00.000Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Hidden Hotkeys 폭 축소",
+            "description": "Hidden Hotkeys popup의 폭을 현재 대비 약 30% 줄이고 좁은 터미널과 scroll 경계를 보장한다.",
+            "details": "계획 문서 T4. max 50/min 32 width policy를 render·viewport·scroll 계산에서 공유하고 80/100/140열 및 12/20/40행을 검증한다.",
+            "status": "done",
+            "dependencies": [
+              6
+            ],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-01T04:00:00.000Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Graph 정보 열 재배치",
+            "description": "Graph hash를 5자리로 줄이고 date를 제거하며 topology·author·title 폭을 재조정한다.",
+            "details": "계획 문서 T5. Graph pane은 유지하고 Graph 섹션 안의 graph/topology 열을 현재 계산폭의 70%로 줄이며 normal/raw/header/connector와 full hash 내부 계약을 보존한다.",
+            "status": "done",
+            "dependencies": [
+              7
+            ],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-01T04:00:00.000Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "통합 회귀·문서·Task Master 동기화",
+            "description": "ANSI/NO_COLOR, modal 키, layout, Graph column matrix를 검증하고 문서와 Task Master 상태를 동기화한다.",
+            "details": "계획 문서 T6. go test ./..., race test, scripts/check, scripts/build와 README/decisions 갱신을 수행한다.",
+            "status": "done",
+            "dependencies": [
+              8
+            ],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-01T04:00:00.000Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 10,
+            "title": "Add Repository State Summary",
+            "description": "Graph 상단에서 clean, dirty, ahead, behind, diverged 등 현재 저장소 상태를 한눈에 보여준다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260802-0010-add-repository-state-summary-plan.md. 현재 branch·upstream·worktree·divergence·operation 진행 상태를 기존 git.Status에서 재사용하고, 상태 조합별 요약과 low-width fallback을 제공한다. 1.11~1.14가 채우는 상태·추천·이유·영향·결과를 Graph 제목 아래 Unified Decision Card 하나로 묶으며 별도 screen/popup은 만들지 않는다.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-04T00:00:00.000Z"
+          },
+          {
+            "id": 11,
+            "title": "Add Next Action Recommendation",
+            "description": "Implement the upstream-diverged synchronization vertical slice from the approved spec. Produce a read-only PullMode recommendation from explicit tracking-validity metadata, render it only in the sectionCurrent Context Actions column, reuse state.ActionPull -> fetch -> m/r Preview/Confirm, and reject stale fetch/preview/confirmation messages before any Git mutation.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260802-0011-add-next-action-recommendation-plan.md. Spec 문서: ~/.gstack/graphkeeper/20260819-0011-upstream-diverged-sync-spec.md. 범위를 upstream diverged 동기화 vertical slice로 고정한다. git.Status 또는 변환 경계에 TrackingKnown/TrackingError/UpstreamGone/TrackingFresh를 명시하고, missing/failed tracking을 equal로 취급하지 않는다. PullMode(merge/rebase) read-only recommendation을 sectionCurrent Context Actions에만 렌더링하고, 기존 state.ActionPull -> fetch -> m/r Preview/Confirm 흐름을 재사용한다. fetch/preview message에 epoch와 snapshot identity를 연결하고 실행 직전 재검증한다. merge/rebase 자동 선택, dirty/no-upstream/progress/ahead/behind/checkout 범위는 제외한다. Engineering review에서 stale message와 tracking validity 계약이 구현 전제임을 확인했다.",
+            "status": "done",
+            "dependencies": [
+              10
+            ],
+            "parentTaskId": 1,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-03T00:00:00.000Z"
+          },
+          {
+            "id": 12,
+            "title": "Explain Branch Decision Context",
+            "description": "merge, rebase, pull 등의 추천 이유와 branch 간 commit 관계를 짧고 명확하게 설명한다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260819-0012-explain-branch-decision-context-plan.md. fast-forward, already aligned, target included, diverged를 구분하고 local-only·target-only commit 수와 대상 ref를 공통 문구로 제공한다. 구현 전 CEO review에서 Task 1.11 소유권, current/target count 방향, 기존 Context Actions 단일 projection, Task 1.13/1.14 경계를 scope lock했다.",
+            "status": "done",
+            "dependencies": [
+              10,
+              11
+            ],
+            "parentTaskId": 1,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-19T10:37:34.574Z"
+          },
+          {
+            "id": 13,
+            "title": "Add Git Operation Impact Preview",
+            "description": "merge, rebase, reset, clean, delete 등 Git 작업을 실행하기 전에 예상되는 변경과 위험을 보여준다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260820-0013-git-operation-impact-preview-plan.md. 첫 구현 범위는 pull fast-forward 및 divergent merge/rebase 선택 Preview + Confirm이며, Fetch/upstream refresh, fetchBaseline·operationBaseline, 방향별 count·resolved upstream identity, stale 보호, 기존 Confirm routing을 명시한다. Graph의 로컬 branch inventory 노출은 별도 Task 1.16과 Spec에서 다룬다.",
+            "status": "done",
+            "dependencies": [
+              12
+            ],
+            "parentTaskId": 1,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-20T04:35:19.962Z"
+          },
+          {
+            "id": 14,
+            "title": "Show Post-Operation Result Summary",
+            "description": "Git 작업 완료 후 이전 상태와 비교해 실제 결과와 다음 상태를 보여준다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260802-0014-show-post-operation-result-summary-plan.md. 기존 executedMsg·refresh 흐름을 재사용해 성공, 실패, partial refresh, stale result를 구분하고 사용자가 Graph 문맥으로 안전하게 복귀하도록 한다.",
+            "status": "pending",
+            "dependencies": [
+              13
+            ],
+            "parentTaskId": 1,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-02T00:00:00.000Z"
+          },
+          {
+            "id": 15,
+            "title": "Working Tree Inspector",
+            "description": "Graph의 dirty 상태에서 현재 working tree 변경을 확인하고 일부 또는 전체 파일을 선택해 commit할 수 있는 Inspector를 추가한다.",
+            "details": "Commit Inspector와 동일한 bordered Inspector frame, 고정 header, 변경 파일 목록, unified diff, commit message footer를 공유하되 Working Tree 전용 mode로 분리한다. Graph에서 w로 진입하며 branch와 dirty 상태를 표시한다. 파일 선택 후 Space로 개별 staged 상태를 토글하고 a로 전체 staged 상태를 토글한다. staged 파일을 대상으로 commit message를 입력해 일부 파일 또는 전체 파일을 commit한다. commit 진행 중에는 입력을 잠그고, 성공하면 Working Tree Inspector를 유지한 채 파일 목록과 dirty 상태를 갱신한다. 일부 파일이 남으면 계속 탐색할 수 있고, 전체가 clean이면 clean 상태를 표시한다. q로 종료하면 최신 repository snapshot으로 Graph를 갱신하고 새로 생성된 commit이 있으면 해당 commit에 cursor를 맞추며, commit이 없으면 기존 Graph cursor와 scroll을 복원한다. commit 실패 시 화면과 입력 내용을 유지하고 재시도할 수 있어야 한다. staging/editing/commit action은 Commit Inspector에 섞지 않고 이 subtask 범위에서만 제공한다.",
+            "status": "pending",
+            "dependencies": [
+              1
+            ],
+            "parentTaskId": 1,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-04T00:40:00.000Z"
+          },
+          {
+            "id": 16,
+            "title": "Graph local branch inventory visibility",
+            "description": "Graph 섹션에는 현재 로컬에 실제 존재하는 branch만 표시하고, 로컬에 없는 remote-only branch나 stale branch를 노출하지 않는다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260820-0013-git-operation-impact-preview-plan.md. Spec 문서: ~/.gstack/graphkeeper/20260820-0013-git-operation-impact-preview-spec.md. Graph branch 목록의 source of truth를 현재 local refs로 고정하고, remote/upstream ref는 관계·target 정보로만 사용한다. `LocalBranchesKnown`/`LocalBranchesFresh`/`LocalBranchesError` 또는 동등한 inventory validity를 snapshot 경계에서 전달해 정상적 empty와 조회 실패를 구분한다. remote-only branch, 삭제되거나 stale한 local branch, 불완전한 branch inventory는 normal Graph branch item으로 표시하지 않는다. `compactDecorationInfo`와 `formatBranchSummaryDecoration` 모두 remote fallback을 금지하며, 현재 checkout branch와 local tracking upstream의 표시 규칙, branch 삭제/rename race, narrow terminal·long ref·ANSI/NO_COLOR 회귀 테스트를 포함한다. Task 1.13 pull impact preview와 기존 Task 1.12 decision context의 책임을 중복하지 않는다.",
+            "status": "done",
+            "dependencies": [
+              12
+            ],
+            "parentTaskId": 1,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-20T04:36:08.999Z"
+          }
         ],
-        "updatedAt": "2026-08-02T00:00:00.000Z"
+        "updatedAt": "2026-08-20T04:36:08.999Z"
       },
       {
         "id": "2",
         "title": "refactor",
         "description": "CLI 진입점과 애플리케이션 내부 구조를 현대적인 경계로 점진 개선한다.",
-        "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리한 기반 위에 runtime state, screen state, workflow orchestration, Git adapter, renderer projection 경계를 단계적으로 정리한다. 구조개선 계획은 docs/20260731-0003-modern-architecture-boundary-improvement-plan.md를 따른다. T1 baseline과 T2 snapshot/operation epoch 계약을 먼저 완료하고, refresh 순서 역전과 파괴적 Git 작업의 stale target을 방지한다.",
+        "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리한 기반 위에 runtime state, screen state, workflow orchestration, Git adapter, renderer projection 경계를 단계적으로 정리한다. 구조개선 계획은 ~/.gstack/graphkeeper/20260731-0003-modern-architecture-boundary-improvement-plan.md를 따른다. T1 baseline과 T2 snapshot/operation epoch 계약을 먼저 완료하고, refresh 순서 역전과 파괴적 Git 작업의 stale target을 방지한다.",
         "testStrategy": "",
         "status": "done",
         "dependencies": [],
@@ -215,12 +249,12 @@
             "id": 3,
             "title": "점진적 아키텍처 경계 개선",
             "description": "runtime state, screen state, workflow, Git adapter, renderer projection을 단계적으로 분리하고 기존 동작·키 바인딩·Git 상태 전이를 보존한다.",
-            "details": "계획 문서: docs/20260731-0003-modern-architecture-boundary-improvement-plan.md. T1~T3 기반 위에 T4 Graph/Section/Context renderer projection, T5 최소 repository adapter/fake contract, T6 projection 테스트·contributor 문서·migration ledger 동기화를 1차 구현했다. 전체 popup projection, 모든 workflow의 OperationResult 통합, 대형 테스트 파일 분리는 후속 slice다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260731-0003-modern-architecture-boundary-improvement-plan.md. T1~T3 기반 위에 T4 Graph/Section/Context renderer projection, T5 최소 repository adapter/fake contract, T6 projection 테스트·contributor 문서·migration ledger 동기화를 1차 구현했다. 전체 popup projection, 모든 workflow의 OperationResult 통합, 대형 테스트 파일 분리는 후속 slice다.",
             "status": "done",
             "dependencies": [],
             "parentTaskId": 2,
             "parentId": "undefined",
-          "updatedAt": "2026-08-01T12:45:00.000Z"
+            "updatedAt": "2026-08-01T12:45:00.000Z"
           }
         ],
         "updatedAt": "2026-08-01T12:45:00.000Z"
@@ -306,9 +340,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-07-31T08:56:09.503Z",
+      "lastModified": "2026-08-20T04:36:08.999Z",
       "taskCount": 5,
-      "completedCount": 1,
+      "completedCount": 2,
       "tags": [
         "master"
       ]
