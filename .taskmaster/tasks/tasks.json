@@ -238,6 +238,37 @@
               17
             ],
             "parentTaskId": 1
+          },
+          {
+            "id": 20,
+            "title": "Commit Inspector contract와 fake reader state test",
+            "description": "Commit Inspector의 app-owned reader contract와 stale/cancel/error 상태 전이를 production·fake reader 공통 경로로 고정한다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260820-0020-commit-inspector-contract-state-test-plan.md. inspectCommit/loadCommitInspectorDiff가 app-owned reader를 통해서만 요청하도록 최소 production wiring과 projection migration을 수행한다. CommitSnapshot/DiffWindow 또는 동등한 DTO를 model/message 경계에 연결하고, 현재 renderer에 필요한 최소 paired-row projection을 adapter 경계에서 제공한다. cursor index가 아닌 stable FileID로 결과를 적용하며, request ID와 기존 model.repositoryEpoch를 검증한다. Inspector당 active reader operation은 하나인 직렬 lifecycle을 유지한다. context.Canceled는 canceled reader outcome으로 매핑하고, epoch 변경 시 active operation cancel·loading clear·기존 value/error 보존·late result 폐기를 검증한다. deterministic fake reader로 key→command→Update, A→B→A stale response, pane-local error/partial/canceled, q/Esc/?와 loading key contract를 테스트한다. layout matrix, retry UX, continuation UI, streaming, child process lifecycle은 후속 task 범위다.",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 21,
+            "title": "Commit Inspector independent screen/layout matrix",
+            "description": "Commit Inspector를 독립 screen 경계로 정리하고 wide/compact/narrow 및 width/height 렌더링 계약을 고정한다.",
+            "details": "Task 1.20의 app-owned state/DTO 경계를 사용한다. Graph shell과 Inspector의 screen boundary, bordered frame, 4행 identity header, changed-files와 unified diff projection, q/Esc/? footer를 독립 screen으로 정리한다. 40/60/80 폭과 12/20/30 높이, NO_COLOR, long path/message/diff, selected FileID와 FROM/TO 방향 보존을 renderer snapshot/matrix test로 검증한다. loading/error/partial/canceled 상태에서 identity와 ready pane 보존을 유지한다. bounded streaming/window 생성과 child process lifecycle은 Task 1.22에 남긴다.",
+            "status": "done",
+            "dependencies": [
+              20
+            ],
+            "parentTaskId": 1
+          },
+          {
+            "id": 22,
+            "title": "Commit Inspector bounded diff streaming/cancellation",
+            "description": "Commit Inspector의 대용량 diff를 bounded window/streaming으로 처리하고 continuation 및 child process cancellation을 검증한다.",
+            "details": "Task 1.20의 reader identity와 Task 1.21의 screen contract를 소비한다. 전체 stdout materialize를 피하는 bounded reader/parser, byte/line budget, partial result와 HasMore/continuation request, file switch·close·epoch change 시 child process 종료를 구현한다. context cancellation과 deadline을 canceled/error로 구분하고, stale continuation result를 request ID·FileID·repository epoch로 폐기한다. 10MiB 이상 diff fixture, MaxBytes/MaxLines 경계, continuation equivalence, cancellation 후 Wait/child 잔존 여부, hostile stderr sanitization을 stream/integration test로 검증한다. 새로운 diff layout이나 Confirm/Toast abstraction은 포함하지 않는다.",
+            "status": "done",
+            "dependencies": [
+              21
+            ],
+            "parentTaskId": 1
           }
         ],
         "updatedAt": "2026-08-20T07:18:49.029Z"
