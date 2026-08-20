@@ -62,6 +62,14 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg.err != nil {
+			if m.status.Mode == state.ModeOperationResult && m.operationResult != nil {
+				m.operationResult.RefreshError = msg.err
+				m.operationResult.Verification = VerificationUnknown
+				m.operationResult.Headline = "PULL COMPLETED — STATE UNVERIFIED"
+				m.operationResult.RefreshRetryable = true
+				m.status.Message = m.operationResult.Headline
+				m.status.Detail = "Press f to refresh repository state."
+			}
 			return m, nil
 		}
 		msg.status = m.withCachedTagEntries(msg.status)

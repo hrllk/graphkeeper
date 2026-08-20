@@ -715,11 +715,14 @@ func executeValidatedPull(repo *git.Repo, limit int, request pullRequest, mode P
 		if mode == PullModeRebase {
 			args = []string{"pull", "--rebase"}
 		}
-		_, err := repo.Run(args...)
-		status, statusErr = repo.Status(context.Background(), limit)
-		if statusErr != nil {
-			err = statusErr
+		_, executionErr := repo.Run(args...)
+		status, refreshErr := repo.Status(context.Background(), limit)
+		var err error
+		if executionErr != nil {
+			err = executionErr
+		} else if refreshErr != nil {
+			err = refreshErr
 		}
-		return pullExecutionResultMsg{action: state.ActionPull, status: status, err: err, requestID: request.ID, requestEpoch: request.Epoch, baseline: baseline, operationBaseline: baseline, operationBaselineSet: request.OperationBaselineSet, mode: mode}
+		return pullExecutionResultMsg{action: state.ActionPull, status: status, err: err, executionErr: executionErr, refreshErr: refreshErr, requestID: request.ID, requestEpoch: request.Epoch, baseline: baseline, operationBaseline: baseline, operationBaselineSet: request.OperationBaselineSet, mode: mode}
 	}
 }

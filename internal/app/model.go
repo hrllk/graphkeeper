@@ -94,6 +94,7 @@ type model struct {
 	pullConfirmStale          bool
 	lastPullMode              PullMode
 	lastPullOperationBaseline PullSnapshotIdentity
+	operationResult           *OperationResultSummary
 }
 
 type graphSection int

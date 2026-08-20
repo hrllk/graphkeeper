@@ -1603,7 +1603,7 @@ func TestRenderBranchOpenShowsCenteredPopupOverlay(t *testing.T) {
 	}
 }
 
-func TestPullFetchWithoutIncomingCommitsShowsTransientToast(t *testing.T) {
+func TestPullFetchWithoutIncomingCommitsShowsVerifiedResultSummary(t *testing.T) {
 	fixture := newCommandRepo(t)
 	repoStatus := git.Status{
 		Root:          fixture.root,
@@ -1642,30 +1642,17 @@ func TestPullFetchWithoutIncomingCommitsShowsTransientToast(t *testing.T) {
 		operationBaselineSet: true,
 	})
 	got := gotModel.(model)
-	if got.status.Mode != state.ModeLoading {
-		t.Fatalf("expected transient loading toast, got %s", got.status.Mode)
+	if got.status.Mode != state.ModeOperationResult {
+		t.Fatalf("expected operation result mode, got %s", got.status.Mode)
 	}
-	if got.status.Message != "Already up to date." {
-		t.Fatalf("expected no-op pull toast message, got %q", got.status.Message)
+	if got.status.Message != "PULL COMPLETED" {
+		t.Fatalf("expected result summary message, got %q", got.status.Message)
 	}
-	if got.status.Detail != "Nothing to pull from upstream." {
-		t.Fatalf("expected no-op pull toast detail, got %q", got.status.Detail)
+	if got.operationResult == nil || !got.operationResult.NoOp {
+		t.Fatalf("expected verified no-op result, got %+v", got.operationResult)
 	}
-	if cmd == nil {
-		t.Fatal("expected transient toast dismissal command")
-	}
-	msg := cmd()
-	done, ok := msg.(pullToastDoneMsg)
-	if !ok {
-		t.Fatalf("expected pullToastDoneMsg, got %T", msg)
-	}
-	gotModel2, cmd2 := got.Update(done)
-	got2 := gotModel2.(model)
-	if cmd2 != nil {
-		t.Fatalf("expected no follow-up command after dismiss, got %v", cmd2)
-	}
-	if got2.status.Mode != state.ModeBrowse {
-		t.Fatalf("expected no-op pull toast to return to browse, got %s", got2.status.Mode)
+	if cmd != nil {
+		t.Fatalf("expected no dismissal command for result summary")
 	}
 }
 

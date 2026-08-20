@@ -62,12 +62,12 @@ func divergedSnapshotFromStatus(status git.Status, epoch uint64) DivergedSnapsho
 }
 
 type PullSnapshotIdentity struct {
-	Epoch                                                    uint64
-	Branch, Head, Upstream, UpstreamOID                      string
-	Ahead, Behind                                            int
-	TrackingKnown, TrackingFresh                             bool
-	WorktreeDirty, Detached, EmptyRepo, NoRemote, NoUpstream bool
-	MergeInProgress, RebaseInProgress, CherryPickInProgress  bool
+	Epoch                                                                  uint64
+	Branch, Head, Upstream, UpstreamOID                                    string
+	Ahead, Behind                                                          int
+	TrackingKnown, TrackingFresh                                           bool
+	WorktreeDirty, Detached, EmptyRepo, NoRemote, NoUpstream, UpstreamGone bool
+	MergeInProgress, RebaseInProgress, CherryPickInProgress                bool
 }
 
 func pullSnapshotIdentity(status git.Status, epoch uint64) PullSnapshotIdentity {
@@ -75,7 +75,7 @@ func pullSnapshotIdentity(status git.Status, epoch uint64) PullSnapshotIdentity 
 	return PullSnapshotIdentity{Epoch: epoch, Branch: status.Branch, Head: status.Head, Upstream: status.Upstream, UpstreamOID: status.UpstreamOID,
 		Ahead: tracking.Ahead, Behind: tracking.Behind, TrackingKnown: status.TrackingKnown && known,
 		TrackingFresh: status.TrackingFresh, WorktreeDirty: status.WorktreeDirty, Detached: status.Detached,
-		EmptyRepo: status.EmptyRepo, NoRemote: status.NoRemote, NoUpstream: status.NoUpstream,
+		EmptyRepo: status.EmptyRepo, NoRemote: status.NoRemote, NoUpstream: status.NoUpstream, UpstreamGone: status.UpstreamGone,
 		MergeInProgress: status.MergeInProgress, RebaseInProgress: status.RebaseInProgress,
 		CherryPickInProgress: status.CherryPickInProgress}
 }

@@ -28,6 +28,9 @@ type refreshedMsg struct {
 	epochSet          bool
 	refreshGeneration uint64
 	generationSet     bool
+	purpose           RefreshPurpose
+	operationRequest  uint64
+	operationEpoch    uint64
 }
 
 type fetchedMsg struct {
@@ -127,6 +130,8 @@ type pullExecutionResultMsg struct {
 	operationBaselineSet    bool
 	mode                    PullMode
 	stale                   bool
+	executionErr            error
+	refreshErr              error
 }
 
 type pullToastDoneMsg struct {

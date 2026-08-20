@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -190,12 +189,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.refreshCmd()
 		}
 		if track.Behind == 0 {
-			m.status = loadingToast("Already up to date.")
-			m.status.Detail = "Nothing to pull from upstream."
 			request := *m.activePullRequest
-			return m, tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {
-				return pullToastDoneMsg{requestID: request.ID, requestEpoch: request.Epoch}
-			})
+			m.activePullRequest = nil
+			return completePullNoOp(m, m.repoStatus, request, m.lastPullMode)
 		}
 		if !impact.Valid && track.Behind > 0 {
 			m.activePullRequest = nil
@@ -215,12 +211,9 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if len(msg.commits) == 0 {
-			m.status = loadingToast("Already up to date.")
-			m.status.Detail = "Nothing to pull from upstream."
 			request := *m.activePullRequest
-			return m, tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {
-				return pullToastDoneMsg{requestID: request.ID, requestEpoch: request.Epoch}
-			})
+			m.activePullRequest = nil
+			return completePullNoOp(m, m.repoStatus, request, m.lastPullMode)
 		}
 		m.handshakeCommits = make(map[string]bool)
 		if msg.isFF {

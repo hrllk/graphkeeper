@@ -3,18 +3,19 @@ package state
 type Mode string
 
 const (
-	ModeBrowse         Mode = "browse"
-	ModePullCheck      Mode = "pull_check"
-	ModeTargetPick     Mode = "target_pick"
-	ModeCherryPickPick Mode = "cherry_pick_pick"
-	ModeOutcomePreview Mode = "outcome_preview"
-	ModeReview         Mode = "review"
-	ModeResetModePick  Mode = "reset_mode_pick"
-	ModeBlocked        Mode = "blocked"
-	ModeLoading        Mode = "loading"
-	ModeEmpty          Mode = "empty"
-	ModeError          Mode = "error"
-	ModeConfirm        Mode = "confirm"
+	ModeBrowse          Mode = "browse"
+	ModePullCheck       Mode = "pull_check"
+	ModeTargetPick      Mode = "target_pick"
+	ModeCherryPickPick  Mode = "cherry_pick_pick"
+	ModeOutcomePreview  Mode = "outcome_preview"
+	ModeReview          Mode = "review"
+	ModeResetModePick   Mode = "reset_mode_pick"
+	ModeBlocked         Mode = "blocked"
+	ModeLoading         Mode = "loading"
+	ModeEmpty           Mode = "empty"
+	ModeError           Mode = "error"
+	ModeConfirm         Mode = "confirm"
+	ModeOperationResult Mode = "operation_result"
 )
 
 type Action string

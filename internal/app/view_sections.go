@@ -98,6 +98,8 @@ func renderStatusCompact(s state.Status) string {
 		return ok.Render("Reset")
 	case state.ModeBlocked:
 		return warn.Render("Blocked") + " | " + msg
+	case state.ModeOperationResult:
+		return ok.Render("Result") + " | " + msg
 	default:
 		return msg
 	}
@@ -314,6 +316,8 @@ func renderActionHelpLines(m model) []string {
 			return []string{"• enter: execute                    • esc: back"}
 		}
 		return []string{"• esc: back"}
+	case state.ModeOperationResult:
+		return []string{"• f: refresh state", "• q/Esc: back"}
 	default:
 		return []string{"• r: refresh"}
 	}
