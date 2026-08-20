@@ -21,15 +21,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
 			return m, nil
 		}
-		if !samePullSnapshotIdentity(m.activePullRequest.Baseline, msg.baseline) {
+		if !samePullSnapshotIdentity(m.activePullRequest.OperationBaseline, msg.baseline) {
 			m.activePullRequest = nil
 			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+			return m, m.refreshCmd()
 		}
 		if msg.err != nil || !msg.valid {
 			m.activePullRequest = nil
 			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+			return m, m.refreshCmd()
 		}
 		m.status = loadingToast("Pulling...")
 		return m, executeValidatedPull(m.repo, m.commitLimit, *m.activePullRequest, msg.mode)
@@ -37,15 +37,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
 			return m, nil
 		}
-		if !samePullSnapshotIdentity(m.activePullRequest.Baseline, msg.baseline) {
+		if !samePullSnapshotIdentity(m.activePullRequest.OperationBaseline, msg.baseline) {
 			m.activePullRequest = nil
 			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+			return m, m.refreshCmd()
 		}
 		m.activePullRequest = nil
 		if msg.stale {
 			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+			return m, m.refreshCmd()
 		}
 		return handlePullExecutionResult(m, msg)
 	case executedMsg:

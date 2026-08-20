@@ -968,7 +968,7 @@ func TestExecuteValidatedPullRechecksSnapshotBeforeMutation(t *testing.T) {
 	}
 	baseline := pullSnapshotIdentity(status, 7)
 	baseline.Head = "different-head"
-	request := pullRequest{ID: 1, Epoch: 7, Baseline: baseline}
+	request := pullRequest{ID: 1, Epoch: 7, OperationBaseline: baseline}
 
 	result, ok := cmdResult(t, executeValidatedPull(fixture.repo, 40, request, PullModeMerge)).(pullExecutionResultMsg)
 	if !ok {

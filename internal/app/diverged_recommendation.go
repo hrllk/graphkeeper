@@ -63,7 +63,7 @@ func divergedSnapshotFromStatus(status git.Status, epoch uint64) DivergedSnapsho
 
 type PullSnapshotIdentity struct {
 	Epoch                                                    uint64
-	Branch, Head, Upstream                                   string
+	Branch, Head, Upstream, UpstreamOID                      string
 	Ahead, Behind                                            int
 	TrackingKnown, TrackingFresh                             bool
 	WorktreeDirty, Detached, EmptyRepo, NoRemote, NoUpstream bool
@@ -72,7 +72,7 @@ type PullSnapshotIdentity struct {
 
 func pullSnapshotIdentity(status git.Status, epoch uint64) PullSnapshotIdentity {
 	tracking, known := status.Tracking[status.Branch]
-	return PullSnapshotIdentity{Epoch: epoch, Branch: status.Branch, Head: status.Head, Upstream: status.Upstream,
+	return PullSnapshotIdentity{Epoch: epoch, Branch: status.Branch, Head: status.Head, Upstream: status.Upstream, UpstreamOID: status.UpstreamOID,
 		Ahead: tracking.Ahead, Behind: tracking.Behind, TrackingKnown: status.TrackingKnown && known,
 		TrackingFresh: status.TrackingFresh, WorktreeDirty: status.WorktreeDirty, Detached: status.Detached,
 		EmptyRepo: status.EmptyRepo, NoRemote: status.NoRemote, NoUpstream: status.NoUpstream,
@@ -83,6 +83,8 @@ func pullSnapshotIdentity(status git.Status, epoch uint64) PullSnapshotIdentity 
 func samePullSnapshotIdentity(a, b PullSnapshotIdentity) bool { return a == b }
 
 type pullRequest struct {
-	ID, Epoch uint64
-	Baseline  PullSnapshotIdentity
+	ID, Epoch            uint64
+	FetchBaseline        PullSnapshotIdentity
+	OperationBaseline    PullSnapshotIdentity
+	OperationBaselineSet bool
 }

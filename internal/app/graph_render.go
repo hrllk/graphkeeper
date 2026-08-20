@@ -12,13 +12,24 @@ const (
 	graphTitleWidthTarget  = 20
 )
 
-func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
-	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount, "")
+func renderInventory(value any) LocalBranchInventory {
+	switch v := value.(type) {
+	case LocalBranchInventory:
+		return v
+	case []string:
+		return LocalBranchInventory{Names: v, Known: false, Fresh: false}
+	default:
+		return LocalBranchInventory{Known: false, Fresh: false}
+	}
 }
 
-func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
+func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
+	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, isHandshake, stashCount, "")
+}
+
+func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
 	if row.Graph != "" {
-		return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount, searchQuery)
+		return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, isHandshake, stashCount, searchQuery)
 	}
 	var hash, refs string
 	var refInfo decorationInfo
@@ -26,7 +37,7 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		hash = strings.Repeat(" ", graphCommitWidth)
 		refs = "          "
 	} else {
-		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
+		refInfo = compactDecorationInfo(row.Commit.Decorations, renderInventory(inventory))
 		hash = renderSearchField(shorten(row.Commit.Hash, 5), searchQuery, graphCommitWidth, selected && graphActive)
 		refs = renderSearchField(refInfo.Text, searchQuery, graphBranchFieldWidth, selected && graphActive)
 		isHead := hasHeadDecoration(row.Commit.Decorations)
@@ -61,11 +72,11 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 	return fitVisibleWidth(line, rowWidth)
 }
 
-func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
-	return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, localBranches, graphColWidth, rowWidth, isHandshake, stashCount, "")
+func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
+	return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, isHandshake, stashCount, "")
 }
 
-func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, localBranches []string, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
+func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
 		graphCell := padRight(row.Graph, graphColWidth)
 		if isHandshake {
@@ -93,7 +104,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		if searchQuery == "" && pointerFocused {
 			hash = pointerMark.Render(hash)
 		}
-		refInfo = compactDecorationInfo(row.Commit.Decorations, localBranches)
+		refInfo = compactDecorationInfo(row.Commit.Decorations, renderInventory(inventory))
 		refs = renderSearchField(refInfo.Text, searchQuery, graphBranchFieldWidth, selected && graphActive)
 		if searchQuery == "" && refInfo.HasLocalHead {
 			refs = headMark.Render(refs)

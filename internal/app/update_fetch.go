@@ -162,14 +162,22 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch before pull failed.", msg.err.Error())
 			return m, nil
 		}
-		if !samePullSnapshotIdentity(pullSnapshotIdentity(msg.status, msg.requestEpoch), msg.baseline) {
+		if msg.operationBaseline == (PullSnapshotIdentity{}) || !msg.operationBaselineSet {
+			m.activePullRequest = nil
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Pull impact unavailable.", "Refresh before pulling again.")
+			return m, m.refreshCmd()
+		}
+		if !samePullSnapshotIdentity(pullSnapshotIdentity(msg.status, msg.requestEpoch), msg.operationBaseline) {
 			m.activePullRequest = nil
 			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+			return m, m.refreshCmd()
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
 		m.repoStatus = msg.status
-		m.activePullRequest.Baseline = msg.baseline
+		m.activePullRequest.FetchBaseline = msg.fetchBaseline
+		m.activePullRequest.OperationBaseline = msg.operationBaseline
+		m.activePullRequest.OperationBaselineSet = msg.operationBaselineSet
+		impact := pullImpactSet(msg.snapshot)
 		if msg.status.TagProvenanceLoaded {
 			m.tagSyncAttempted = true
 		}
@@ -179,21 +187,26 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.repoStatus.TrackingKnown || !m.repoStatus.TrackingFresh || !trackingKnown {
 			m.activePullRequest = nil
 			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch)
+			return m, m.refreshCmd()
 		}
 		if track.Behind == 0 {
 			m.status = loadingToast("Already up to date.")
 			m.status.Detail = "Nothing to pull from upstream."
 			request := *m.activePullRequest
 			return m, tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {
-				return pullToastDoneMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
+				return pullToastDoneMsg{requestID: request.ID, requestEpoch: request.Epoch}
 			})
 		}
-		isFF := track.Behind > 0 && track.Ahead == 0
+		if !impact.Valid && track.Behind > 0 {
+			m.activePullRequest = nil
+			m.status = state.New().WithBlocked(state.BlockUnknown, "Pull impact unavailable.", "Refresh before pulling again.")
+			return m, m.refreshCmd()
+		}
+		isFF := msg.snapshot.IsFastForward && msg.snapshot.FastForwardKnown
 		m.status = loadingToast("Analyzing pull...")
 		return m, loadPullPreviewCommits(m.repo, isFF, *m.activePullRequest)
 	case pullPreviewReadyMsg:
-		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) || !samePullSnapshotIdentity(m.activePullRequest.Baseline, msg.baseline) {
+		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) || !samePullSnapshotIdentity(m.activePullRequest.OperationBaseline, msg.baseline) {
 			return m, nil
 		}
 		if msg.err != nil {
@@ -206,7 +219,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status.Detail = "Nothing to pull from upstream."
 			request := *m.activePullRequest
 			return m, tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {
-				return pullToastDoneMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
+				return pullToastDoneMsg{requestID: request.ID, requestEpoch: request.Epoch}
 			})
 		}
 		m.handshakeCommits = make(map[string]bool)
@@ -227,13 +240,13 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
 		} else {
 			titleMsg = "Choose pull mode"
-			detailMsg = "Branches diverged.\n\nm: merge\nr: rebase\nesc: cancel"
+			detailMsg = "Branches diverged.\n\n" + formatPullImpact(msg.impact) + "\n\nm: merge\nr: rebase\nesc: cancel"
 			m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
 		}
 		m.status.Title = titleMsg
 		return m, nil
 	case pullToastDoneMsg:
-		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) || !samePullSnapshotIdentity(m.activePullRequest.Baseline, msg.baseline) {
+		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
 			return m, nil
 		}
 		m.activePullRequest = nil
@@ -248,5 +261,5 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) pullRequestMessageActive(id, epoch uint64) bool {
-	return m.activePullRequest != nil && m.activePullRequest.ID == id && m.activePullRequest.Epoch == epoch
+	return m.activePullRequest != nil && m.activePullRequest.ID == id && m.activePullRequest.Epoch == epoch && !m.pullConfirmStale
 }

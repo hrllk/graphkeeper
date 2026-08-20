@@ -868,7 +868,9 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 					Decorations: []string{"HEAD -> main", "origin/main"},
 				},
 			},
-			LocalBranches: []string{"main"},
+			LocalBranches:      []string{"main"},
+			LocalBranchesKnown: true,
+			LocalBranchesFresh: true,
 		},
 		sectionCursor: map[graphSection]int{sectionGraph: 0},
 	}
@@ -885,8 +887,8 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 	if !strings.Contains(got, "parent: (multi parent)") || !strings.Contains(got, "  - def56789") || !strings.Contains(got, "  - 98765432") {
 		t.Fatalf("expected focus block to include multi-parent list, got %q", got)
 	}
-	if !strings.Contains(got, "branches:") || !strings.Contains(got, "  - l->main (HEAD)") || !strings.Contains(got, "  - o->main") {
-		t.Fatalf("expected focus block to include branches list, got %q", got)
+	if !strings.Contains(got, "branches:") || !strings.Contains(got, "  - l->main (HEAD)") || strings.Contains(got, "  - o->main") {
+		t.Fatalf("expected focus block to include only local branches, got %q", got)
 	}
 	if strings.Contains(got, "hash:") {
 		t.Fatalf("expected hash label to be removed, got %q", got)
@@ -906,6 +908,9 @@ func TestRenderDetailContentShowsGraphOptionalMetadata(t *testing.T) {
 					Subject:     "commit subject",
 				},
 			},
+			LocalBranches:      []string{"main", "feature/topic"},
+			LocalBranchesKnown: true,
+			LocalBranchesFresh: true,
 		},
 		stashByBase: map[string][]git.StashEntry{
 			"abc1234": []git.StashEntry{{Ref: "stash@{0}", Subject: "wip", BaseHash: "abc1234"}},
@@ -930,7 +935,7 @@ func TestCompactDecorationInfoUsesFourteenCharBranchField(t *testing.T) {
 		"origin/main",
 		"featureone",
 		"featuretwo",
-	}, []string{"main"})
+	}, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true})
 	got := ansi.Strip(info.Text)
 	if width := lipgloss.Width(got); width != graphBranchFieldWidth {
 		t.Fatalf("expected branch field width %d, got %d for %q", graphBranchFieldWidth, width, got)
@@ -938,8 +943,8 @@ func TestCompactDecorationInfoUsesFourteenCharBranchField(t *testing.T) {
 	if !strings.Contains(got, "l->main") {
 		t.Fatalf("expected compact branch token to keep the branch name visible, got %q", got)
 	}
-	if !strings.Contains(got, "+2") || strings.Contains(got, " + 2") {
-		t.Fatalf("expected compact branch token to show compact plus count, got %q", got)
+	if strings.Contains(got, "+2") || strings.Contains(got, " + 2") {
+		t.Fatalf("remote-only decorations must not contribute branch overflow, got %q", got)
 	}
 }
 
@@ -952,14 +957,14 @@ func TestFormatBranchSummaryDecorationUsesLocalAndRemotePrefixes(t *testing.T) {
 	}{
 		{name: "head", decoration: "HEAD -> tmp2", want: "l->tmp2 (HEAD)", wantOK: true},
 		{name: "local", decoration: "tmp2-3", want: "l->tmp2-3", wantOK: true},
-		{name: "remote", decoration: "origin/tmp2", want: "o->tmp2", wantOK: true},
-		{name: "remote head", decoration: "origin/HEAD -> origin/tmp2", want: "o->tmp2", wantOK: true},
+		{name: "remote", decoration: "origin/tmp2", wantOK: false},
+		{name: "remote head", decoration: "origin/HEAD -> origin/tmp2", wantOK: false},
 		{name: "tag", decoration: "tag: v1.0.0", wantOK: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := formatBranchSummaryDecoration(tt.decoration)
+			got, ok := formatBranchSummaryDecoration(tt.decoration, LocalBranchInventory{Names: []string{"tmp2", "tmp2-3"}, Known: true, Fresh: true})
 			if ok != tt.wantOK {
 				t.Fatalf("expected ok=%t, got %t with %q", tt.wantOK, ok, got)
 			}
@@ -1125,7 +1130,9 @@ func TestRenderDetailContentClipsToWidth(t *testing.T) {
 					Decorations: []string{"HEAD -> main", "origin/main"},
 				},
 			},
-			LocalBranches: []string{"main"},
+			LocalBranches:      []string{"main"},
+			LocalBranchesKnown: true,
+			LocalBranchesFresh: true,
 		},
 		sectionCursor: map[graphSection]int{sectionGraph: 0},
 	}
@@ -1614,9 +1621,9 @@ func TestPullFetchWithoutIncomingCommitsShowsTransientToast(t *testing.T) {
 		repoStatus:      repoStatus,
 		repositoryEpoch: 3,
 		activePullRequest: &pullRequest{
-			ID:       9,
-			Epoch:    3,
-			Baseline: pullSnapshotIdentity(repoStatus, 3),
+			ID:                9,
+			Epoch:             3,
+			OperationBaseline: pullSnapshotIdentity(repoStatus, 3),
 		},
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
@@ -1627,10 +1634,12 @@ func TestPullFetchWithoutIncomingCommitsShowsTransientToast(t *testing.T) {
 	}
 
 	gotModel, cmd := m.Update(pullFetchedMsg{
-		status:       repoStatus,
-		requestID:    9,
-		requestEpoch: 3,
-		baseline:     pullSnapshotIdentity(repoStatus, 3),
+		status:               repoStatus,
+		requestID:            9,
+		requestEpoch:         3,
+		baseline:             pullSnapshotIdentity(repoStatus, 3),
+		operationBaseline:    pullSnapshotIdentity(repoStatus, 3),
+		operationBaselineSet: true,
 	})
 	got := gotModel.(model)
 	if got.status.Mode != state.ModeLoading {
@@ -2610,7 +2619,7 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 }
 
 func TestFormatCompactDecorations(t *testing.T) {
-	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "origin/main", "tag: v1.0.0"}, []string{"main", "develop"})
+	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "origin/main", "tag: v1.0.0"}, LocalBranchInventory{Names: []string{"main", "develop"}, Known: true, Fresh: true})
 	if !strings.HasPrefix(got, "o/l->") || !strings.Contains(got, "+1") || strings.Contains(got, " + 1") {
 		t.Fatalf("expected a single compact branch token with compact overflow count, got %q", got)
 	}
@@ -2620,26 +2629,26 @@ func TestFormatCompactDecorations(t *testing.T) {
 }
 
 func TestFormatCompactDecorationsUsesHeadThenAlphabeticalWithOverflow(t *testing.T) {
-	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "release"}, []string{"main", "develop", "release"})
+	got := formatCompactDecorations([]string{"HEAD -> main", "develop", "release"}, LocalBranchInventory{Names: []string{"main", "develop", "release"}, Known: true, Fresh: true})
 	if !strings.HasPrefix(got, "l->main") || !strings.Contains(got, "+2") || strings.Contains(got, " + 2") {
 		t.Fatalf("expected HEAD branch to lead with compact overflow count, got %q", got)
 	}
 
-	got = formatCompactDecorations([]string{"release", "develop", "main"}, []string{"main", "develop", "release"})
+	got = formatCompactDecorations([]string{"release", "develop", "main"}, LocalBranchInventory{Names: []string{"main", "develop", "release"}, Known: true, Fresh: true})
 	if !strings.HasPrefix(got, "l->") {
 		t.Fatalf("expected alphabetical local branch fallback, got %q", got)
 	}
 
-	got = formatCompactDecorations([]string{"origin/release", "origin/develop"}, nil)
-	if !strings.HasPrefix(got, "o->") || !strings.Contains(got, "+1") || strings.Contains(got, " + 1") {
-		t.Fatalf("expected alphabetical remote branch fallback with compact overflow count, got %q", got)
+	got = formatCompactDecorations([]string{"origin/release", "origin/develop"}, LocalBranchInventory{Known: false, Fresh: false})
+	if got != "-" {
+		t.Fatalf("expected remote-only decorations to be hidden, got %q", got)
 	}
 }
 
 func TestFormatCompactDecorationsKeepsOverflowCountForLongBranches(t *testing.T) {
 	got := formatCompactDecorations(
 		[]string{"HEAD -> feature/very-long-branch-name", "develop", "release"},
-		[]string{"feature/very-long-branch-name", "develop", "release"},
+		LocalBranchInventory{Names: []string{"feature/very-long-branch-name", "develop", "release"}, Known: true, Fresh: true},
 	)
 	if !strings.Contains(got, "+2") || strings.Contains(got, " + 2") {
 		t.Fatalf("expected compact overflow count to survive long branch names, got %q", got)
@@ -2745,9 +2754,9 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.HasPrefix(rows[0].Graph, "*") || rows[1].Commit.Hash != "" || !strings.HasPrefix(rows[2].Graph, "| *") {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
-	line := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 88, false, 0)
-	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "+2") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "Merge branch") < 0 {
-		t.Fatalf("expected graph line to include hash, branches, title and graph, got %q", line)
+	line := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 88, false, 0)
+	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "Merge branch") < 0 {
+		t.Fatalf("expected graph line to include hash, local branch, title and graph, got %q", line)
 	}
 	if !strings.Contains(line, headMark.Render("*")) {
 		t.Fatalf("expected HEAD pointer to be highlighted, got %q", line)
@@ -2761,18 +2770,18 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Contains(line, "Merge branch 'main' into develop") || strings.Contains(line, "origin/") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
 	}
-	narrow := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 70, false, 0)
+	narrow := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 70, false, 0)
 	if strings.Contains(narrow, "alexa..") {
 		t.Fatalf("expected author to shrink away before title on narrow rows, got %q", narrow)
 	}
 	if !strings.Contains(narrow, "Merge branch '") {
 		t.Fatalf("expected title to stay visible with a narrow-width ellipsis, got %q", narrow)
 	}
-	connector := renderGraphLine(rows[1], false, true, 0, []string{"main"}, 24, 80, false, 0)
+	connector := renderGraphLine(rows[1], false, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, false, 0)
 	if !strings.Contains(connector, "|\\") {
 		t.Fatalf("expected connector graph line to stay visible, got %q", connector)
 	}
-	focused := renderGraphLine(rows[2], true, true, 0, []string{"main"}, 24, 80, false, 0)
+	focused := renderGraphLine(rows[2], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, false, 0)
 	if !strings.Contains(focused, pointerMark.Render("*")) {
 		t.Fatalf("expected branch row graph pointer to be highlighted, got %q", focused)
 	}
@@ -2825,8 +2834,8 @@ func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 row, got %d", len(rows))
 	}
-	withoutStash := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 0)
-	withStash := renderGraphLine(rows[0], true, true, 0, []string{"main"}, 24, 80, false, 1)
+	withoutStash := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, false, 0)
+	withStash := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, false, 1)
 	if withStash == withoutStash {
 		t.Fatalf("expected stash highlight to change focused graph row rendering\nwithout: %q\nwith:    %q", withoutStash, withStash)
 	}

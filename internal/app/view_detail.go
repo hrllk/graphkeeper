@@ -52,7 +52,7 @@ func (m model) renderContextInfoLines(width int) []string {
 		if focus.Hash != "" {
 			lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("focus"), shorten(focus.Hash, 8)))
 			lines = append(lines, focusParentLines(focus, width)...)
-			if branchLines := focusBranchSummaryLines(focus, width); len(branchLines) > 0 {
+			if branchLines := focusBranchSummaryLines(focus, width, LocalBranchInventory{Names: m.repoStatus.LocalBranches, Known: m.repoStatus.LocalBranchesKnown, Fresh: m.repoStatus.LocalBranchesFresh, Error: m.repoStatus.LocalBranchesError, Epoch: m.repositoryEpoch}); len(branchLines) > 0 {
 				lines = append(lines, fmt.Sprintf("%s:", renderContextKey("branches")))
 				lines = append(lines, branchLines...)
 			}
@@ -295,7 +295,7 @@ func (m model) renderDetailContent(width, height int) string {
 	if focus.Hash != "" {
 		lines = append(lines, fmt.Sprintf("focus: %s", shorten(focus.Hash, max(width-7, 0))))
 		lines = append(lines, focusParentLines(focus, width)...)
-		if branchLines := focusBranchSummaryLines(focus, width); len(branchLines) > 0 {
+		if branchLines := focusBranchSummaryLines(focus, width, LocalBranchInventory{Names: m.repoStatus.LocalBranches, Known: m.repoStatus.LocalBranchesKnown, Fresh: m.repoStatus.LocalBranchesFresh, Error: m.repoStatus.LocalBranchesError, Epoch: m.repositoryEpoch}); len(branchLines) > 0 {
 			lines = append(lines, "branches:")
 			lines = append(lines, branchLines...)
 		}

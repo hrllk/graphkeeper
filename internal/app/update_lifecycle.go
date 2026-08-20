@@ -48,9 +48,13 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		return m, loadStashState(m.repo)
 	case tickMsg:
-		return m, tea.Batch(scheduleRefresh(), refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch))
+		return m, tea.Batch(scheduleRefresh(), m.refreshCmd())
 	case refreshedMsg:
-		if msg.epochSet && msg.epoch != m.repositoryEpoch {
+		generationMismatch := msg.generationSet && msg.refreshGeneration != m.refreshGeneration
+		if (msg.epochSet && msg.epoch != m.repositoryEpoch) || generationMismatch {
+			if m.activePullRequest != nil && (m.status.Mode == state.ModeReview || m.status.Mode == state.ModeConfirm || m.status.Action == state.ActionPull) {
+				m.pullConfirmStale = true
+			}
 			telemetry.Log("app", "discard_stale_refresh", map[string]string{
 				"expected_epoch": fmt.Sprintf("%d", m.repositoryEpoch),
 				"received_epoch": fmt.Sprintf("%d", msg.epoch),

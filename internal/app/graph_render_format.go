@@ -59,8 +59,8 @@ func hasHeadDecoration(decorations []string) bool {
 	return false
 }
 
-func formatCompactDecorations(decorations []string, localBranches []string) string {
-	return compactDecorationInfo(decorations, localBranches).Text
+func formatCompactDecorations(decorations []string, inventory LocalBranchInventory) string {
+	return compactDecorationInfo(decorations, inventory).Text
 }
 
 type decorationInfo struct {
@@ -74,13 +74,19 @@ type branchState struct {
 	remote bool
 }
 
-func compactDecorationInfo(decorations []string, localBranches []string) decorationInfo {
+func compactDecorationInfo(decorations []string, inventory LocalBranchInventory) decorationInfo {
+	if !inventory.Known || !inventory.Fresh {
+		return decorationInfo{Text: "-"}
+	}
 	if len(decorations) == 0 {
 		return decorationInfo{Text: "-"}
 	}
-	localSet := make(map[string]struct{}, len(localBranches))
-	for _, branch := range localBranches {
-		localSet[branch] = struct{}{}
+	localSet := make(map[string]struct{}, len(inventory.Names))
+	for _, branch := range inventory.Names {
+		branch = strings.TrimSpace(branch)
+		if branch != "" {
+			localSet[branch] = struct{}{}
+		}
 	}
 	branches := make(map[string]*branchState)
 	hasBranch := false
@@ -108,6 +114,9 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 		switch {
 		case strings.HasPrefix(decoration, "HEAD -> "):
 			name := strings.TrimPrefix(decoration, "HEAD -> ")
+			if _, ok := localSet[strings.TrimSpace(name)]; !ok {
+				continue
+			}
 			if state := addBranch(name); state != nil {
 				state.local = true
 				hasBranch = true
@@ -115,18 +124,22 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 				headBranch = strings.TrimSpace(name)
 			}
 		case strings.HasPrefix(decoration, "origin/HEAD -> origin/"):
-			if state := addBranch(strings.TrimPrefix(decoration, "origin/HEAD -> origin/")); state != nil {
+			name := strings.TrimPrefix(decoration, "origin/HEAD -> origin/")
+			if _, ok := localSet[name]; !ok {
+				continue
+			}
+			if state := addBranch(name); state != nil {
 				state.remote = true
 				hasBranch = true
 			}
 		case decoration == "origin/HEAD":
-			if state := addBranch("HEAD"); state != nil {
-				state.remote = true
-				hasBranch = true
-			}
+			continue
 		case strings.HasPrefix(decoration, "origin/"):
 			name := strings.TrimPrefix(decoration, "origin/")
 			if name == "HEAD" {
+				continue
+			}
+			if _, ok := localSet[name]; !ok {
 				continue
 			}
 			if state := addBranch(name); state != nil {
@@ -137,11 +150,6 @@ func compactDecorationInfo(decorations []string, localBranches []string) decorat
 			continue
 		default:
 			if _, ok := localSet[decoration]; ok {
-				if state := addBranch(decoration); state != nil {
-					state.local = true
-					hasBranch = true
-				}
-			} else if !strings.Contains(decoration, "/") {
 				if state := addBranch(decoration); state != nil {
 					state.local = true
 					hasBranch = true
@@ -190,11 +198,24 @@ func fitBranchField(value string, width int) string {
 	if lipgloss.Width(value) <= width {
 		return padRight(value, width)
 	}
-	runes := []rune(value)
-	if width <= 3 {
-		return string(runes[:width])
+	budget := width
+	if width >= 3 {
+		budget -= 3
 	}
-	return string(runes[:width-3]) + "..."
+	var b strings.Builder
+	visible := 0
+	for _, r := range value {
+		rw := runewidth.RuneWidth(r)
+		if visible+rw > budget {
+			break
+		}
+		b.WriteRune(r)
+		visible += rw
+	}
+	if width >= 3 {
+		return b.String() + "..."
+	}
+	return b.String()
 }
 
 func pickCompactBranchName(branches map[string]*branchState, headBranch string) string {
@@ -220,10 +241,6 @@ func pickCompactBranchName(branches map[string]*branchState, headBranch string) 
 	if len(localNames) > 0 {
 		sort.Strings(localNames)
 		return localNames[0]
-	}
-	if len(remoteNames) > 0 {
-		sort.Strings(remoteNames)
-		return remoteNames[0]
 	}
 	return ""
 }
@@ -370,23 +387,34 @@ func focusParentLines(node graphNode, width int) []string {
 	return lines
 }
 
-func focusBranchSummaryLines(node graphNode, width int) []string {
+func focusBranchSummaryLines(node graphNode, width int, inventory LocalBranchInventory) []string {
 	if len(node.Decorations) == 0 {
 		return nil
 	}
 	lines := make([]string, 0, len(node.Decorations))
 	for _, dec := range node.Decorations {
-		line, ok := formatBranchSummaryDecoration(dec)
+		line, ok := formatBranchSummaryDecoration(dec, inventory)
 		if !ok {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("  - %s", shorten(line, max(width-6, 0))))
+		lines = append(lines, fmt.Sprintf("  - %s", fitBranchField(line, max(width-6, 0))))
 	}
 	return lines
 }
 
-func formatBranchSummaryDecoration(decoration string) (string, bool) {
-	decoration = strings.TrimSpace(decoration)
+func formatBranchSummaryDecoration(decoration string, inventory LocalBranchInventory) (string, bool) {
+	if !inventory.Known || !inventory.Fresh {
+		return "", false
+	}
+	local := make(map[string]struct{}, len(inventory.Names))
+	for _, name := range inventory.Names {
+		if name = strings.TrimSpace(name); name != "" {
+			local[name] = struct{}{}
+		}
+	}
+	if !inventory.Known || !inventory.Fresh {
+		return "", false
+	}
 	if decoration == "" || strings.HasPrefix(decoration, "tag: ") {
 		return "", false
 	}
@@ -396,22 +424,17 @@ func formatBranchSummaryDecoration(decoration string) (string, bool) {
 		if name == "" {
 			return "", false
 		}
+		if _, ok := local[name]; !ok {
+			return "", false
+		}
 		return "l->" + name + " (HEAD)", true
 	case strings.HasPrefix(decoration, "origin/HEAD -> origin/"):
-		name := strings.TrimSpace(strings.TrimPrefix(decoration, "origin/HEAD -> origin/"))
-		if name == "" {
-			return "", false
-		}
-		return "o->" + name, true
+		return "", false
 	case strings.HasPrefix(decoration, "origin/"):
-		name := strings.TrimSpace(strings.TrimPrefix(decoration, "origin/"))
-		if name == "" || name == "HEAD" {
-			return "", false
-		}
-		return "o->" + name, true
+		return "", false
 	default:
-		if strings.Contains(decoration, "/") {
-			return "l->" + decoration, true
+		if _, ok := local[decoration]; !ok {
+			return "", false
 		}
 		return "l->" + decoration, true
 	}

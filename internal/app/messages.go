@@ -22,10 +22,12 @@ type stashLoadedMsg struct {
 }
 
 type refreshedMsg struct {
-	status   git.Status
-	err      error
-	epoch    uint64
-	epochSet bool
+	status            git.Status
+	err               error
+	epoch             uint64
+	epochSet          bool
+	refreshGeneration uint64
+	generationSet     bool
 }
 
 type fetchedMsg struct {
@@ -83,6 +85,10 @@ type pullFetchedMsg struct {
 	err                     error
 	requestID, requestEpoch uint64
 	baseline                PullSnapshotIdentity
+	fetchBaseline           PullSnapshotIdentity
+	operationBaseline       PullSnapshotIdentity
+	operationBaselineSet    bool
+	snapshot                PullImpactSnapshot
 }
 
 type pushFetchedMsg struct {
@@ -96,11 +102,15 @@ type pullPreviewReadyMsg struct {
 	err                     error
 	requestID, requestEpoch uint64
 	baseline                PullSnapshotIdentity
+	snapshot                PullImpactSnapshot
+	impact                  PullImpactSet
 }
 
 type pullValidationMsg struct {
 	requestID, requestEpoch uint64
 	baseline                PullSnapshotIdentity
+	operationBaseline       PullSnapshotIdentity
+	operationBaselineSet    bool
 	mode                    PullMode
 	status                  git.Status
 	valid                   bool
@@ -113,12 +123,14 @@ type pullExecutionResultMsg struct {
 	err                     error
 	requestID, requestEpoch uint64
 	baseline                PullSnapshotIdentity
+	operationBaseline       PullSnapshotIdentity
+	operationBaselineSet    bool
+	mode                    PullMode
 	stale                   bool
 }
 
 type pullToastDoneMsg struct {
 	requestID, requestEpoch uint64
-	baseline                PullSnapshotIdentity
 }
 
 type branchToastDoneMsg struct{}

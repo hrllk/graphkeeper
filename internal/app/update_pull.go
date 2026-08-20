@@ -5,5 +5,7 @@ import (
 )
 
 func handlePullExecutionResult(m model, msg pullExecutionResultMsg) (tea.Model, tea.Cmd) {
+	m.lastPullMode = msg.mode
+	m.lastPullOperationBaseline = msg.operationBaseline
 	return handleExecutedUpdate(m, executedMsg{action: msg.action, status: msg.status, err: msg.err})
 }

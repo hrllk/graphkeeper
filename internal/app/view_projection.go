@@ -20,17 +20,25 @@ type ScreenProjection struct {
 }
 
 type GraphProjection struct {
-	Rows          []graphRow
-	PageSize      int
-	Scroll        int
-	Cursor        int
-	LaneCursor    int
-	Active        bool
-	LocalBranches []string
-	Handshake     map[string]bool
-	StashCounts   map[string]int
-	SearchQuery   string
-	StateHint     string
+	Rows                 []graphRow
+	PageSize             int
+	Scroll               int
+	Cursor               int
+	LaneCursor           int
+	Active               bool
+	LocalBranchInventory LocalBranchInventory
+	Handshake            map[string]bool
+	StashCounts          map[string]int
+	SearchQuery          string
+	StateHint            string
+}
+
+type LocalBranchInventory struct {
+	Names []string
+	Known bool
+	Fresh bool
+	Error string
+	Epoch uint64
 }
 
 type SectionProjection struct {
@@ -73,7 +81,7 @@ func (m model) screenProjection(width, height int) ScreenProjection {
 	return ScreenProjection{
 		Width:       width,
 		Height:      height,
-		Graph:       GraphProjection{Rows: graph, PageSize: pageSize, Scroll: m.graphScroll, Cursor: m.sectionCursor[sectionGraph], LaneCursor: m.graphLaneCursor, Active: m.activeSection == sectionGraph, LocalBranches: append([]string(nil), m.repoStatus.LocalBranches...), Handshake: m.handshakeCommits, StashCounts: stashCounts, SearchQuery: m.graphSearchQuery, StateHint: hint},
+		Graph:       GraphProjection{Rows: graph, PageSize: pageSize, Scroll: m.graphScroll, Cursor: m.sectionCursor[sectionGraph], LaneCursor: m.graphLaneCursor, Active: m.activeSection == sectionGraph, LocalBranchInventory: LocalBranchInventory{Names: append([]string(nil), m.repoStatus.LocalBranches...), Known: m.repoStatus.LocalBranchesKnown, Fresh: m.repoStatus.LocalBranchesFresh, Error: m.repoStatus.LocalBranchesError, Epoch: m.repositoryEpoch}, Handshake: m.handshakeCommits, StashCounts: stashCounts, SearchQuery: m.graphSearchQuery, StateHint: hint},
 		Sections:    sections,
 		Status:      m.status,
 		Active:      m.activeSection,

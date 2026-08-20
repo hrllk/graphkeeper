@@ -22,6 +22,7 @@ type Status struct {
 	Head                  string
 	DefaultBranch         string
 	Upstream              string
+	UpstreamOID           string
 	Remote                string
 	Detached              bool
 	HasCommits            bool
@@ -29,6 +30,9 @@ type Status struct {
 	GraphCommits          []GraphCommit
 	Branches              []string
 	LocalBranches         []string
+	LocalBranchesKnown    bool
+	LocalBranchesFresh    bool
+	LocalBranchesError    string
 	BranchUpstreams       map[string]string
 	Tracking              map[string]BranchTracking
 	TrackingKnown         bool
@@ -142,8 +146,11 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	}
 	head, headErr := r.git(ctx, "rev-parse", "HEAD")
 	upstream, upstreamErr := r.git(ctx, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	upstreamOID, upstreamOIDErr := r.git(ctx, "rev-parse", "--verify", "@{upstream}")
 	remote, remoteErr := r.git(ctx, "remote")
 	branches, branchUpstreams, tracking, trackingKnown, trackingFresh, trackingError, upstreamGone := r.branchMetadata(ctx, branch)
+	localBranchesKnown := trackingError == ""
+	localBranchesFresh := localBranchesKnown
 	if headErr != nil || remoteErr != nil {
 		trackingFresh = false
 		if trackingError == "" {
@@ -158,6 +165,12 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 		trackingFresh = false
 		if trackingError == "" {
 			trackingError = upstreamErr.Error()
+		}
+	}
+	if upstreamErr == nil && upstreamOIDErr != nil {
+		trackingFresh = false
+		if trackingError == "" {
+			trackingError = upstreamOIDErr.Error()
 		}
 	}
 	localBranches := branches
@@ -233,17 +246,26 @@ func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
 	}
 
 	return Status{
-		Root:                  r.root,
-		Branch:                branch,
-		Head:                  head,
-		DefaultBranch:         defaultBranch,
-		Upstream:              upstream,
-		Remote:                strings.Join(remotes, ", "),
-		Detached:              branch == "HEAD",
-		HasCommits:            !emptyRepo,
-		GraphCommits:          graphCommits,
-		Branches:              branches,
-		LocalBranches:         localBranches,
+		Root:               r.root,
+		Branch:             branch,
+		Head:               head,
+		DefaultBranch:      defaultBranch,
+		Upstream:           upstream,
+		UpstreamOID:        strings.TrimSpace(upstreamOID),
+		Remote:             strings.Join(remotes, ", "),
+		Detached:           branch == "HEAD",
+		HasCommits:         !emptyRepo,
+		GraphCommits:       graphCommits,
+		Branches:           branches,
+		LocalBranches:      localBranches,
+		LocalBranchesKnown: localBranchesKnown,
+		LocalBranchesFresh: localBranchesFresh,
+		LocalBranchesError: func() string {
+			if localBranchesKnown {
+				return ""
+			}
+			return trackingError
+		}(),
 		BranchUpstreams:       branchUpstreams,
 		Tracking:              tracking,
 		TrackingKnown:         trackingKnown,

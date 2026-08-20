@@ -39,9 +39,9 @@ func TestStalePullFetchedMessageDoesNotReplaceState(t *testing.T) {
 func TestPullFetchedMessageRequiresFreshKnownTrackingEntry(t *testing.T) {
 	baseline := PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "abc", Upstream: "origin/main", TrackingKnown: true, TrackingFresh: true}
 	m := model{status: state.New().WithBrowse(), repoStatus: git.Status{Root: "/repo", Branch: "main", Head: "abc"}, sectionCursor: map[graphSection]int{},
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3, Baseline: baseline}}
+		activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline}}
 
-	next, cmd := m.Update(pullFetchedMsg{status: git.Status{Root: "/repo", Branch: "main", Head: "abc", TrackingKnown: true, TrackingFresh: true}, requestID: 9, requestEpoch: 3, baseline: baseline})
+	next, cmd := m.Update(pullFetchedMsg{status: git.Status{Root: "/repo", Branch: "main", Head: "abc", TrackingKnown: true, TrackingFresh: true}, requestID: 9, requestEpoch: 3, baseline: baseline, operationBaseline: baseline, operationBaselineSet: true})
 	got := next.(model)
 	if got.activePullRequest != nil {
 		t.Fatal("expected invalid tracking to clear the active pull request")
@@ -59,10 +59,10 @@ func TestPullFetchedMessageRejectsBaselineMismatchBeforeInstallingState(t *testi
 	status := git.Status{Root: "/repo", Branch: "main", Head: "new", TrackingKnown: true, TrackingFresh: true}
 	baseline := pullSnapshotIdentity(status, 3)
 	m := model{status: state.New().WithBrowse(), repoStatus: original,
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3, Baseline: baseline}}
+		activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline}}
 
 	next, cmd := m.Update(pullFetchedMsg{status: status, requestID: 9, requestEpoch: 3,
-		baseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "different"}})
+		baseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "different"}, operationBaseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "different"}, operationBaselineSet: true})
 	got := next.(model)
 	if got.activePullRequest != nil {
 		t.Fatal("expected baseline mismatch to clear the active pull request")
@@ -81,7 +81,7 @@ func TestPullFetchedMessageRejectsBaselineMismatchBeforeInstallingState(t *testi
 func TestPullValidationMessageRejectsBaselineMismatch(t *testing.T) {
 	baseline := PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "old"}
 	m := model{status: state.New().WithBrowse(), repoStatus: git.Status{Root: "/repo"},
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3, Baseline: baseline}}
+		activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline}}
 
 	next, cmd := m.Update(pullValidationMsg{requestID: 9, requestEpoch: 3,
 		baseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "new"}, valid: true})
@@ -117,7 +117,7 @@ func TestStalePullExecutionResultBlocksAndRefreshes(t *testing.T) {
 func TestPullExecutionResultRejectsBaselineMismatch(t *testing.T) {
 	baseline := PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "old"}
 	m := model{status: state.New().WithConfirm(state.ActionPull, "Pull", "Pull"), repoStatus: git.Status{Root: "/repo"},
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3, Baseline: baseline}}
+		activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline}}
 
 	next, cmd := m.Update(pullExecutionResultMsg{action: state.ActionPull, requestID: 9, requestEpoch: 3,
 		baseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "new"}})

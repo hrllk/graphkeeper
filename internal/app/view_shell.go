@@ -180,19 +180,20 @@ func centerReviewFooterLine(body string, width int) string {
 	if last < 0 {
 		return body
 	}
+	for i := range lines {
+		lines[i] = fitVisibleWidth(lines[i], width)
+	}
 	lines[last] = centerReviewLineInWidth(lines[last], width)
 	return strings.Join(lines, "\n")
 }
 
 func centerReviewLineInWidth(line string, width int) string {
+	line = fitVisibleWidth(line, width)
 	visible := lipgloss.Width(line)
 	if visible >= width {
 		return line
 	}
-	return lipgloss.NewStyle().
-		Width(width).
-		Align(lipgloss.Center).
-		Render(line)
+	return lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(line)
 }
 
 func renderResetModePopup(bodyWidth int) string {

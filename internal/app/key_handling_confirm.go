@@ -19,6 +19,7 @@ func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n", "esc":
 		m.handshakeCommits = make(map[string]bool)
 		m.activePullRequest = nil
+		m.pullConfirmStale = false
 		m.nextPullRequestID++
 		m.status = deriveStatus(m.repoStatus)
 		return m, nil
@@ -32,7 +33,7 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 	m.handshakeCommits = make(map[string]bool)
 	switch action {
 	case state.ActionPull:
-		if m.activePullRequest == nil {
+		if m.activePullRequest == nil || m.pullConfirmStale {
 			return m, nil
 		}
 		if m.pullIsFastForward {
@@ -96,7 +97,7 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 
 func (m model) handleConfirmPullMerge() (tea.Model, tea.Cmd) {
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
-		if m.activePullRequest == nil {
+		if m.activePullRequest == nil || m.pullConfirmStale {
 			return m, nil
 		}
 		m.handshakeCommits = make(map[string]bool)
@@ -108,7 +109,7 @@ func (m model) handleConfirmPullMerge() (tea.Model, tea.Cmd) {
 
 func (m model) handleConfirmPullRebase() (tea.Model, tea.Cmd) {
 	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
-		if m.activePullRequest == nil {
+		if m.activePullRequest == nil || m.pullConfirmStale {
 			return m, nil
 		}
 		m.handshakeCommits = make(map[string]bool)

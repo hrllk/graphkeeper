@@ -30,6 +30,11 @@ func loadRepoState(repo *git.Repo, limit int, epochs ...uint64) tea.Cmd {
 	}
 }
 
+func (m *model) refreshCmd() tea.Cmd {
+	m.refreshGeneration++
+	return refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch, m.refreshGeneration)
+}
+
 func scheduleRefresh() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
@@ -41,9 +46,13 @@ func refreshRepoState(repo *git.Repo, limit int, epochs ...uint64) tea.Cmd {
 	if len(epochs) > 0 {
 		epoch = epochs[0]
 	}
+	var generation uint64
+	if len(epochs) > 1 {
+		generation = epochs[1]
+	}
 	return func() tea.Msg {
 		status, err := repo.Status(context.Background(), limit)
-		return refreshedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0}
+		return refreshedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0, refreshGeneration: generation, generationSet: len(epochs) > 1}
 	}
 }
 
@@ -593,9 +602,10 @@ func executeFetchForPush(repo *git.Repo, limit int) tea.Cmd {
 
 func beginPullRequest(m *model) pullRequest {
 	m.nextPullRequestID++
-	request := pullRequest{ID: m.nextPullRequestID, Epoch: m.repositoryEpoch + 1,
-		Baseline: pullSnapshotIdentity(m.repoStatus, m.repositoryEpoch+1)}
+	baseline := pullSnapshotIdentity(m.repoStatus, m.repositoryEpoch+1)
+	request := pullRequest{ID: m.nextPullRequestID, Epoch: m.repositoryEpoch + 1, FetchBaseline: baseline}
 	m.activePullRequest = &request
+	m.pullConfirmStale = false
 	return request
 }
 
@@ -604,11 +614,41 @@ func executeFetchForPull(repo *git.Repo, limit int, request pullRequest) tea.Cmd
 		err := repo.Fetch(context.Background())
 		status, statusErr := repo.Status(context.Background(), limit)
 		if statusErr != nil {
-			return pullFetchedMsg{err: statusErr, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
+			return pullFetchedMsg{err: statusErr, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.FetchBaseline, fetchBaseline: request.FetchBaseline}
 		}
+		if err != nil {
+			return pullFetchedMsg{status: status, err: err, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.FetchBaseline, fetchBaseline: request.FetchBaseline}
+		}
+		operationBaseline := pullSnapshotIdentity(status, request.Epoch)
+		fastForward, fastForwardKnown := resolvePullFastForward(repo)
+		if !fastForwardKnown {
+			return pullFetchedMsg{status: status, err: fmt.Errorf("fast-forward impact is unavailable"), requestID: request.ID, requestEpoch: request.Epoch, baseline: request.FetchBaseline, fetchBaseline: request.FetchBaseline}
+		}
+		statusAgain, statusAgainErr := repo.Status(context.Background(), limit)
+		if statusAgainErr != nil || !samePullSnapshotIdentity(operationBaseline, pullSnapshotIdentity(statusAgain, request.Epoch)) {
+			if statusAgainErr == nil {
+				statusAgainErr = fmt.Errorf("repository changed while resolving pull impact")
+			}
+			return pullFetchedMsg{status: statusAgain, err: statusAgainErr, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.FetchBaseline, fetchBaseline: request.FetchBaseline}
+		}
+		snapshot := pullImpactSnapshot(operationBaseline, request)
+		snapshot.IsFastForward = fastForward
+		snapshot.FastForwardKnown = fastForwardKnown
+		snapshot.Validity.FastForwardKnown = fastForwardKnown
 		return pullFetchedMsg{status: status, err: err, requestID: request.ID, requestEpoch: request.Epoch,
-			baseline: pullSnapshotIdentity(status, request.Epoch)}
+			baseline: request.FetchBaseline, fetchBaseline: request.FetchBaseline, operationBaseline: operationBaseline, operationBaselineSet: err == nil, snapshot: snapshot}
 	}
+}
+
+func resolvePullFastForward(repo *git.Repo) (bool, bool) {
+	_, err := repo.Run("merge-base", "--is-ancestor", "HEAD", "@{upstream}")
+	if err == nil {
+		return true, true
+	}
+	if strings.Contains(err.Error(), "exit status 1") {
+		return false, true
+	}
+	return false, false
 }
 
 func loadPullPreviewCommits(repo *git.Repo, isFF bool, request pullRequest) tea.Cmd {
@@ -621,7 +661,7 @@ func loadPullPreviewCommits(repo *git.Repo, isFF bool, request pullRequest) tea.
 		}
 		out, err := repo.Run("rev-list", arg)
 		if err != nil {
-			return pullPreviewReadyMsg{err: err, isFF: isFF, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
+			return pullPreviewReadyMsg{err: err, isFF: isFF, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.OperationBaseline, snapshot: pullImpactSnapshot(request.OperationBaseline, request), impact: pullImpactSet(pullImpactSnapshot(request.OperationBaseline, request))}
 		}
 		lines := strings.Split(out, "\n")
 		commits := make([]string, 0, len(lines))
@@ -637,7 +677,7 @@ func loadPullPreviewCommits(repo *git.Repo, isFF bool, request pullRequest) tea.
 				commits = append(commits, strings.TrimSpace(headOut))
 			}
 		}
-		return pullPreviewReadyMsg{commits: commits, isFF: isFF, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
+		return pullPreviewReadyMsg{commits: commits, isFF: isFF, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.OperationBaseline, snapshot: pullImpactSnapshot(request.OperationBaseline, request), impact: pullImpactSet(pullImpactSnapshot(request.OperationBaseline, request))}
 	}
 }
 
@@ -645,13 +685,16 @@ func validateAndExecutePull(repo *git.Repo, limit int, request pullRequest, mode
 	return func() tea.Msg {
 		status, err := repo.Status(context.Background(), limit)
 		if err != nil {
-			return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, mode: mode, err: err}
+			return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.FetchBaseline, mode: mode, err: err}
+		}
+		if !request.OperationBaselineSet {
+			return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.OperationBaseline, operationBaseline: request.OperationBaseline, operationBaselineSet: false, mode: mode, status: status, valid: false}
 		}
 		current := pullSnapshotIdentity(status, request.Epoch)
-		if !samePullSnapshotIdentity(current, request.Baseline) {
-			return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, mode: mode, status: status, valid: false}
+		if !samePullSnapshotIdentity(current, request.OperationBaseline) {
+			return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.OperationBaseline, operationBaseline: request.OperationBaseline, operationBaselineSet: true, mode: mode, status: status, valid: false}
 		}
-		return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, mode: mode, status: status, valid: true}
+		return pullValidationMsg{requestID: request.ID, requestEpoch: request.Epoch, baseline: request.OperationBaseline, operationBaseline: request.OperationBaseline, operationBaselineSet: true, mode: mode, status: status, valid: true}
 	}
 }
 
@@ -659,10 +702,14 @@ func executeValidatedPull(repo *git.Repo, limit int, request pullRequest, mode P
 	return func() tea.Msg {
 		status, statusErr := repo.Status(context.Background(), limit)
 		if statusErr != nil {
-			return pullExecutionResultMsg{action: state.ActionPull, status: status, err: statusErr, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, stale: true}
+			return pullExecutionResultMsg{action: state.ActionPull, status: status, err: statusErr, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.OperationBaseline, operationBaseline: request.OperationBaseline, operationBaselineSet: request.OperationBaselineSet, mode: mode, stale: true}
 		}
-		if !samePullSnapshotIdentity(pullSnapshotIdentity(status, request.Epoch), request.Baseline) {
-			return pullExecutionResultMsg{action: state.ActionPull, status: status, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline, stale: true}
+		if !request.OperationBaselineSet {
+			return pullExecutionResultMsg{action: state.ActionPull, status: status, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.OperationBaseline, operationBaseline: request.OperationBaseline, operationBaselineSet: false, mode: mode, stale: true}
+		}
+		baseline := request.OperationBaseline
+		if !samePullSnapshotIdentity(pullSnapshotIdentity(status, request.Epoch), baseline) {
+			return pullExecutionResultMsg{action: state.ActionPull, status: status, requestID: request.ID, requestEpoch: request.Epoch, baseline: baseline, operationBaseline: baseline, operationBaselineSet: request.OperationBaselineSet, mode: mode, stale: true}
 		}
 		args := []string{"pull", "--no-rebase", "--no-edit"}
 		if mode == PullModeRebase {
@@ -673,6 +720,6 @@ func executeValidatedPull(repo *git.Repo, limit int, request pullRequest, mode P
 		if statusErr != nil {
 			err = statusErr
 		}
-		return pullExecutionResultMsg{action: state.ActionPull, status: status, err: err, requestID: request.ID, requestEpoch: request.Epoch, baseline: request.Baseline}
+		return pullExecutionResultMsg{action: state.ActionPull, status: status, err: err, requestID: request.ID, requestEpoch: request.Epoch, baseline: baseline, operationBaseline: baseline, operationBaselineSet: request.OperationBaselineSet, mode: mode}
 	}
 }
