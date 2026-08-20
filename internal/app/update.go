@@ -50,40 +50,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return handlePullExecutionResult(m, msg)
 	case executedMsg:
 		return handleExecutedUpdate(m, msg)
-	case commitInspectorLoadedMsg:
-		if !m.commitInspectorOpen || msg.request != m.commitInspectorRequest || msg.epoch != m.commitInspectorEpoch {
+	case commitInspectorResultMsg:
+		return m.applyCommitInspectorResult(msg)
+	case ContinuationRequested:
+		if msg.Commit != m.commitInspectorSnapshot.FullHash || msg.Parent != m.commitInspectorSnapshot.Parent || msg.FileID != m.commitInspectorDiffWindow.FileID || msg.RepositoryEpoch != m.commitInspectorEpoch || msg.RequestID != m.commitInspectorRequest || msg.Window != m.commitInspectorWindowRequest || m.commitInspectorLoading || m.commitInspectorMetadataLoading || m.commitInspectorDiffLoading {
 			return m, nil
 		}
-		m.commitInspectorMetadataLoading = false
-		if msg.err != nil {
-			m.commitInspectorLoading = false
-			m.commitInspectorError = msg.err.Error()
-			return m, nil
+		return startInspectorContinuation(m)
+	case inspectorContinuationKeyMsg:
+		if m.commitInspectorOpen && m.commitInspectorDiffWindow.HasMore && !m.commitInspectorLoading && !m.commitInspectorMetadataLoading && !m.commitInspectorDiffLoading {
+			m.commitInspectorContinuationPending = false
+			return startInspectorContinuation(m)
 		}
-		m.commitInspector = msg.inspection
-		m.commitInspectorCursor = 0
-		m.commitInspectorScroll = 0
-		m.commitInspectorError = ""
-		if len(msg.inspection.Files) > 0 {
-			return m.startInspectorDiff()
-		}
-		m.commitInspectorLoading = false
-		return m, nil
-	case commitInspectorDiffMsg:
-		if !m.commitInspectorOpen || msg.request != m.commitInspectorRequest || msg.epoch != m.commitInspectorEpoch {
-			return m, nil
-		}
-		m.commitInspectorLoading = false
-		m.commitInspectorDiffLoading = false
-		m.commitInspectorCancel = nil
-		if msg.err != nil {
-			m.commitInspectorDiffError = msg.err.Error()
-			return m, nil
-		}
-		m.commitInspectorLines = msg.diff.Lines
-		m.commitInspectorScroll = 0
-		m.commitInspectorHasMore = msg.diff.HasMore
-		m.commitInspectorDiffError = ""
 		return m, nil
 	case createdBranchMsg:
 		return handleBranchUpdate(m, msg)

@@ -113,10 +113,12 @@ type CommitDiffFile struct {
 }
 
 type CommitDiff struct {
-	FileID  string
-	Lines   []string
-	Rows    []DiffRow
-	HasMore bool
+	FileID        string
+	Lines         []string
+	Rows          []DiffRow
+	HasMore       bool
+	PartialReason string
+	NextStartLine int
 }
 
 type DiffRow struct {

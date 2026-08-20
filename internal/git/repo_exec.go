@@ -1,6 +1,7 @@
 package git
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -11,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
@@ -214,7 +216,7 @@ func (r *Repo) annotateCommitDiffFiles(ctx context.Context, files []CommitDiffFi
 			continue
 		}
 		if stat[0] == "-" && stat[1] == "-" {
-			files[i].Status, files[i].Binary = "B", true
+			files[i].Binary = true
 			continue
 		}
 		files[i].Additions, _ = strconv.Atoi(stat[0])
@@ -244,6 +246,10 @@ func (r *Repo) annotateCommitDiffFiles(ctx context.Context, files []CommitDiffFi
 }
 
 func (r *Repo) CommitDiff(ctx context.Context, inspection CommitInspection, file CommitDiffFile, maxLines int, startLine int) (CommitDiff, error) {
+	return r.CommitDiffWindow(ctx, inspection, file, maxLines, startLine, 1<<20)
+}
+
+func (r *Repo) CommitDiffWindow(ctx context.Context, inspection CommitInspection, file CommitDiffFile, maxLines int, startLine int, maxBytes int) (CommitDiff, error) {
 	parent := ""
 	if len(inspection.Parents) > 0 {
 		parent = inspection.Parents[0]
@@ -255,31 +261,194 @@ func (r *Repo) CommitDiff(ctx context.Context, inspection CommitInspection, file
 		args = append(args, parent, inspection.Hash)
 	}
 	args = append(args, "--", file.Path)
-	raw, truncated, err := r.gitRawBounded(ctx, 1<<20, args...)
+	raw, truncated, err := r.gitRawLogicalWindow(ctx, int64(maxBytes), startLine, args...)
 	if err != nil {
 		return CommitDiff{}, err
+	}
+	if strings.Contains(raw, incompletePairMarker) {
+		return CommitDiff{}, fmt.Errorf("configuration: bounded window split an indivisible pair")
 	}
 	lines := strings.Split(strings.TrimSuffix(raw, "\n"), "\n")
 	if len(lines) == 1 && lines[0] == "" {
 		lines = nil
 	}
-	if startLine < 0 {
-		startLine = 0
-	}
-	if startLine > len(lines) {
-		startLine = len(lines)
-	}
+	rawStart := 0
 	end := len(lines)
 	hasMore := truncated
-	if maxLines > 0 && end > startLine+maxLines {
-		end = startLine + maxLines
-		hasMore = true
+	logical := 0
+	usedBytes := 0
+	for i := rawStart; i < len(lines); i++ {
+		line := lines[i]
+		if maxLines > 0 && isLogicalDiffLine(line) && logical >= maxLines {
+			end, hasMore = i, true
+			break
+		}
+		if maxBytes > 0 {
+			next := usedBytes + len(line) + 1
+			if next > maxBytes {
+				end, hasMore = i, true
+				break
+			}
+			usedBytes = next
+		}
+		if isLogicalDiffLine(line) {
+			logical++
+		}
 	}
-	rows, err := parseCommitDiffRowsStrict(lines)
+	if end < len(lines) && end > rawStart && isLogicalDiffLine(lines[end-1]) && (strings.HasPrefix(lines[end-1], "-") || strings.HasPrefix(lines[end-1], "+")) {
+		groupStart := end - 1
+		for groupStart > rawStart && (strings.HasPrefix(lines[groupStart-1], "-") || strings.HasPrefix(lines[groupStart-1], "+")) {
+			groupStart--
+		}
+		groupEnd := end
+		for groupEnd < len(lines) && (strings.HasPrefix(lines[groupEnd], "-") || strings.HasPrefix(lines[groupEnd], "+")) {
+			groupEnd++
+		}
+		if groupEnd > end {
+			groupLines := lines[groupStart:groupEnd]
+			groupCount := logicalDiffLineCount(groupLines)
+			beforeCount := logicalDiffLineCount(lines[rawStart:groupStart])
+			beforeBytes := diffPayloadBytes(lines[rawStart:groupStart])
+			if (maxLines > 0 && groupCount > maxLines) || (maxBytes > 0 && diffPayloadBytes(groupLines) > maxBytes) {
+				return CommitDiff{}, fmt.Errorf("configuration: indivisible diff pair exceeds window budget")
+			}
+			fitsRemaining := (maxLines <= 0 || beforeCount+groupCount <= maxLines) && (maxBytes <= 0 || beforeBytes+diffPayloadBytes(groupLines) <= maxBytes)
+			if fitsRemaining {
+				end = groupEnd
+			} else {
+				end, hasMore = groupStart, true
+			}
+		}
+	}
+	parseLines := append([]string(nil), lines[rawStart:end]...)
+	if header := activeHunkHeader(lines, rawStart); header != "" && (rawStart == len(lines) || !strings.HasPrefix(lines[rawStart], "@@")) {
+		parseLines = append([]string{header}, parseLines...)
+	}
+	rows, err := parseCommitDiffRowsStrict(parseLines)
 	if err != nil {
 		return CommitDiff{}, err
 	}
-	return CommitDiff{FileID: file.ID, Lines: lines[startLine:end], Rows: rows, HasMore: hasMore}, nil
+	windowLines := parseLines
+	if hasHunkHeader(windowLines) && logicalDiffLineCount(windowLines) == 0 {
+		return CommitDiff{}, fmt.Errorf("configuration: hunk header cannot fit a structural line")
+	}
+	if maxBytes > 0 {
+		for _, line := range windowLines {
+			if strings.HasPrefix(line, "@@") && maxBytes < len(line)+len("… [line truncated]\\n") {
+				return CommitDiff{}, fmt.Errorf("configuration: hunk header and minimum placeholder exceed window budget")
+			}
+		}
+	}
+	if maxBytes > 0 && diffPayloadBytes(windowLines) > maxBytes {
+		return CommitDiff{}, fmt.Errorf("configuration: hunk header and first structural line exceed window budget")
+	}
+	next := startLine + logicalDiffLineCount(lines[rawStart:end])
+	reason := ""
+	if hasMore {
+		reason = "line_limit"
+		lineTruncated := false
+		for _, line := range windowLines {
+			if strings.Contains(line, "[line truncated]") {
+				lineTruncated = true
+				break
+			}
+		}
+		if lineTruncated {
+			reason = "line_truncated"
+		} else if truncated {
+			reason = "byte_limit"
+		} else if maxBytes > 0 && diffPayloadBytes(windowLines) >= maxBytes {
+			reason = "byte_limit"
+		}
+	}
+	return CommitDiff{FileID: file.ID, Lines: windowLines, Rows: rows, HasMore: hasMore, PartialReason: reason, NextStartLine: next}, nil
+}
+
+func hasHunkHeader(lines []string) bool {
+	for _, line := range lines {
+		if strings.HasPrefix(line, "@@") {
+			return true
+		}
+	}
+	return false
+}
+func diffPayloadBytes(lines []string) int {
+	n := 0
+	for _, line := range lines {
+		n += len(line) + 1
+	}
+	return n
+}
+func logicalDiffLineCount(lines []string) int {
+	n := 0
+	for _, line := range lines {
+		if isLogicalDiffLine(line) {
+			n++
+		}
+	}
+	return n
+}
+func activeHunkHeader(lines []string, at int) string {
+	for i := at - 1; i >= 0; i-- {
+		if strings.HasPrefix(lines[i], "@@") {
+			return lines[i]
+		}
+		if strings.HasPrefix(lines[i], "diff ") {
+			break
+		}
+	}
+	return ""
+}
+func isLogicalDiffLine(line string) bool {
+	return (strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") || strings.HasPrefix(line, " ")) && !strings.HasPrefix(line, "+++") && !strings.HasPrefix(line, "---")
+}
+
+func rawIndexForLogicalDiffLine(lines []string, logicalStart int) int {
+	if logicalStart < 0 {
+		logicalStart = 0
+	}
+	seen := 0
+	for i, line := range lines {
+		if isLogicalDiffLine(line) {
+			if seen >= logicalStart {
+				return i
+			}
+			seen++
+		}
+	}
+	return len(lines)
+}
+
+func rowsForDiffLineWindow(lines []string, start, end int, rows []DiffRow) []DiffRow {
+	if start < 0 {
+		start = 0
+	}
+	if end > len(lines) {
+		end = len(lines)
+	}
+	if start > end {
+		start = end
+	}
+	countMarkers := func(input []string) int {
+		n := 0
+		for _, line := range input {
+			if (strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") || strings.HasPrefix(line, " ")) && !strings.HasPrefix(line, "+++") && !strings.HasPrefix(line, "---") {
+				n++
+			}
+		}
+		return n
+	}
+	from, to := countMarkers(lines[:start]), countMarkers(lines[:end])
+	if from > len(rows) {
+		from = len(rows)
+	}
+	if to > len(rows) {
+		to = len(rows)
+	}
+	if to < from {
+		to = from
+	}
+	return rows[from:to]
 }
 
 // parseCommitDiffRows turns unified diff hunks into deterministic paired rows.
@@ -339,6 +508,8 @@ func parseCommitDiffRowsStrict(lines []string) ([]DiffRow, error) {
 		} else if strings.HasPrefix(line, "+") {
 			added = append(added, numberedLine{text: line[1:], num: newLine})
 			newLine++
+		} else if strings.TrimSpace(line) != "" && !strings.HasPrefix(line, "\\ No newline") {
+			return nil, fmt.Errorf("malformed diff record")
 		}
 	}
 	flush()
@@ -679,11 +850,14 @@ func (r *Repo) gitRaw(ctx context.Context, args ...string) (string, error) {
 	return out, nil
 }
 
-func (r *Repo) gitRawBounded(ctx context.Context, maxBytes int64, args ...string) (string, bool, error) {
+const incompletePairMarker = "__GRAPHKEEPER_INCOMPLETE_PAIR__"
+
+func (r *Repo) gitRawLogicalWindow(ctx context.Context, maxBytes int64, startLine int, args ...string) (string, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.Command("git", args...)
 	cmd.Dir = r.root
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	stdout, err := cmd.StdoutPipe()
@@ -693,14 +867,170 @@ func (r *Repo) gitRawBounded(ctx context.Context, maxBytes int64, args ...string
 	if err := cmd.Start(); err != nil {
 		return "", false, err
 	}
-	data, readErr := io.ReadAll(io.LimitReader(stdout, maxBytes+1))
+	stopKiller := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+			select {
+			case <-time.After(3 * time.Second):
+				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			case <-stopKiller:
+			}
+		case <-stopKiller:
+		}
+	}()
+	defer close(stopKiller)
+	reader := bufio.NewReader(stdout)
+	var out strings.Builder
+	started := false
+	truncated := false
+	logical := 0
+	activeHeader := ""
+	var streamErr error
+	lineBuf := make([]byte, 0, 1<<20)
+	lineOverlong := false
+	overflowPair := false
+	processLine := func(raw []byte, overlong bool) {
+		text := strings.TrimRight(string(raw), "\n")
+		isPairLine := strings.HasPrefix(text, "-") || strings.HasPrefix(text, "+")
+		if overflowPair && !isPairLine {
+			out.WriteString(incompletePairMarker)
+			out.WriteByte('\n')
+			overflowPair = false
+		}
+		if strings.HasPrefix(text, "@@") {
+			activeHeader = text
+		}
+		logicalLine := isLogicalDiffLine(text)
+		if !started && logical >= max(startLine, 0) && logicalLine {
+			started = true
+			if activeHeader != "" {
+				out.WriteString(activeHeader)
+				out.WriteByte('\n')
+			}
+		}
+		if started && (logicalLine || strings.HasPrefix(text, "\\") || strings.HasPrefix(text, "@@")) {
+			payload := text + "\n"
+			if logicalLine && (overlong || int64(len(raw)) > maxBytes) {
+				payload = "… [line truncated]\n"
+				truncated = true
+			}
+			if int64(out.Len()+len(payload)) <= maxBytes+4096 {
+				out.WriteString(payload)
+			} else {
+				truncated = true
+				if isPairLine {
+					overflowPair = true
+				}
+			}
+		}
+		if logicalLine {
+			logical++
+		}
+	}
+	for {
+		part, readErr := reader.ReadSlice('\n')
+		if len(part) > 0 {
+			if len(lineBuf) == 0 {
+				lineOverlong = false
+			}
+			room := int(maxBytes+4096) - len(lineBuf)
+			if room > 0 {
+				take := part
+				if len(take) > room {
+					take = take[:room]
+					lineOverlong = true
+				}
+				lineBuf = append(lineBuf, take...)
+			} else {
+				lineOverlong = true
+			}
+		}
+		if readErr == bufio.ErrBufferFull {
+			continue
+		}
+		if len(lineBuf) > 0 {
+			processLine(lineBuf, lineOverlong)
+		}
+		lineBuf = lineBuf[:0]
+		if readErr != nil {
+			if readErr != io.EOF {
+				streamErr = readErr
+			}
+			break
+		}
+	}
+	if overflowPair {
+		out.WriteString(incompletePairMarker)
+		out.WriteByte('\n')
+	}
 	waitErr := cmd.Wait()
+	if streamErr != nil {
+		return out.String(), truncated, streamErr
+	}
+	if ctx.Err() != nil {
+		return out.String(), truncated, ctx.Err()
+	}
+	if waitErr != nil {
+		msg := sanitizeTerminalText(strings.TrimSpace(stderr.String()))
+		if msg == "" {
+			msg = waitErr.Error()
+		}
+		return out.String(), truncated, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), waitErr, msg)
+	}
+	return out.String(), truncated, nil
+}
+
+func (r *Repo) gitRawBounded(ctx context.Context, maxBytes int64, args ...string) (string, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = r.root
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", false, err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", false, err
+	}
+	readDone := make(chan struct{})
+	var data []byte
+	var readErr error
+	go func() { data, readErr = io.ReadAll(io.LimitReader(stdout, maxBytes+1)); close(readDone) }()
+	select {
+	case <-readDone:
+	case <-ctx.Done():
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		select {
+		case <-readDone:
+		case <-time.After(3 * time.Second):
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			<-readDone
+		}
+	}
+	go func() { _, _ = io.Copy(io.Discard, stdout) }()
+	waitDone := make(chan error, 1)
+	go func() { waitDone <- cmd.Wait() }()
+	var waitErr error
+	select {
+	case waitErr = <-waitDone:
+	case <-time.After(3 * time.Second):
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		waitErr = <-waitDone
+	}
 	truncated := int64(len(data)) > maxBytes
 	if truncated {
 		data = data[:maxBytes]
 	}
 	if readErr != nil {
 		return string(data), truncated, readErr
+	}
+	if ctx.Err() != nil {
+		return string(data), truncated, ctx.Err()
 	}
 	if waitErr != nil {
 		msg := sanitizeTerminalText(strings.TrimSpace(stderr.String()))

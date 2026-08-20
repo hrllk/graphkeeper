@@ -9,9 +9,10 @@ import (
 )
 
 type model struct {
-	repo       *git.Repo
-	status     state.Status
-	repoStatus git.Status
+	repo            *git.Repo
+	inspectorReader CommitInspectorReader
+	status          state.Status
+	repoStatus      git.Status
 
 	// Repository-derived caches and snapshots.
 	tagEntries        []git.TagEntry
@@ -38,23 +39,31 @@ type model struct {
 	graphSearchError  string
 
 	// Read-only Graph commit inspector.
-	commitInspectorOpen            bool
-	commitInspector                git.CommitInspection
-	commitInspectorCursor          int
-	commitInspectorScroll          int
-	commitInspectorLines           []string
-	commitInspectorHasMore         bool
-	commitInspectorLoading         bool
-	commitInspectorError           string
-	commitInspectorRequest         uint64
-	commitInspectorEpoch           uint64
-	commitInspectorCancel          context.CancelFunc
-	commitInspectorHelp            bool
-	commitInspectorMessage         bool
-	commitInspectorMessageScroll   int
-	commitInspectorMetadataLoading bool
-	commitInspectorDiffLoading     bool
-	commitInspectorDiffError       string
+	commitInspectorOpen                bool
+	commitInspector                    git.CommitInspection
+	commitInspectorSnapshot            CommitSnapshot
+	commitInspectorDiffWindow          DiffWindow
+	commitInspectorWindowRequest       DiffWindowRequest
+	commitInspectorCursor              int
+	commitInspectorScroll              int
+	commitInspectorLines               []string
+	commitInspectorHasMore             bool
+	commitInspectorLoading             bool
+	commitInspectorError               string
+	commitInspectorRequest             uint64
+	commitInspectorEpoch               uint64
+	commitInspectorRequestedCommit     string
+	commitInspectorRequestedParent     string
+	commitInspectorCancel              context.CancelFunc
+	commitInspectorContext             context.Context
+	commitInspectorHelp                bool
+	commitInspectorMessage             bool
+	commitInspectorMessageScroll       int
+	commitInspectorMetadataLoading     bool
+	commitInspectorDiffLoading         bool
+	commitInspectorDiffError           string
+	commitInspectorStale               bool
+	commitInspectorContinuationPending bool
 
 	// Modal and popup state.
 	branchOpen           bool
@@ -115,9 +124,10 @@ const (
 
 func New(repo *git.Repo) (tea.Model, error) {
 	m := model{
-		repo:          repo,
-		status:        loadingToast("Loading..."),
-		activeSection: sectionGraph,
+		repo:            repo,
+		inspectorReader: newGitCommitInspectorReader(repo),
+		status:          loadingToast("Loading..."),
+		activeSection:   sectionGraph,
 		sectionCursor: map[graphSection]int{
 			sectionGraph:   0,
 			sectionCurrent: 0,

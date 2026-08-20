@@ -16,23 +16,6 @@ import (
 
 const inspectorDiffPage = 18
 
-func inspectCommit(repo *git.Repo, hash string, ctx context.Context, request, epoch uint64) tea.Cmd {
-	return func() tea.Msg {
-		inspection, err := repo.InspectCommit(ctx, hash)
-		return commitInspectorLoadedMsg{inspection: inspection, err: err, request: request, epoch: epoch}
-	}
-}
-
-func loadCommitInspectorDiff(repo *git.Repo, inspection git.CommitInspection, index int, ctx context.Context, request, epoch uint64) tea.Cmd {
-	return func() tea.Msg {
-		if index < 0 || index >= len(inspection.Files) {
-			return commitInspectorDiffMsg{err: fmt.Errorf("file selection is out of range"), request: request, epoch: epoch}
-		}
-		diff, err := repo.CommitDiff(ctx, inspection, inspection.Files[index], 2000, 0)
-		return commitInspectorDiffMsg{diff: diff, err: err, request: request, epoch: epoch}
-	}
-}
-
 func (m model) cancelInspector() model {
 	if m.commitInspectorCancel != nil {
 		m.commitInspectorCancel()
@@ -42,17 +25,25 @@ func (m model) cancelInspector() model {
 }
 
 func (m model) startInspectorDiff() (model, tea.Cmd) {
-	if m.commitInspectorCursor < 0 || m.commitInspectorCursor >= len(m.commitInspector.Files) {
-		return m, nil
+	if m.commitInspectorCursor < 0 || m.commitInspectorCursor >= len(m.commitInspectorSnapshot.Files) {
+		if len(m.commitInspectorSnapshot.Files) == 0 && len(m.commitInspector.Files) > 0 {
+			m.commitInspectorSnapshot = gitInspectionToSnapshot(m.commitInspector)
+		} else {
+			return m, nil
+		}
 	}
 	m = m.cancelInspector()
-	ctx, cancel := context.WithCancel(context.Background())
+	var cancel context.CancelFunc
+	m.commitInspectorContext, cancel = context.WithCancel(context.Background())
 	m.commitInspectorCancel = cancel
 	m.commitInspectorDiffLoading = true
 	m.commitInspectorLoading = true
 	m.commitInspectorDiffError = ""
 	m.commitInspectorRequest++
-	return m, loadCommitInspectorDiff(m.repo, m.commitInspector, m.commitInspectorCursor, ctx, m.commitInspectorRequest, m.commitInspectorEpoch)
+	file := m.commitInspectorSnapshot.Files[m.commitInspectorCursor]
+	window := DiffWindowRequest{StartLine: 0, MaxLines: 2000, MaxBytes: 1 << 20}
+	m.commitInspectorWindowRequest = window
+	return m, loadCommitInspectorDiffCommand(m.commitInspectorContext, m, DiffRequest{Commit: m.commitInspectorSnapshot.FullHash, Parent: m.commitInspectorSnapshot.Parent, FileID: file.StableID, RequestID: m.commitInspectorRequest, RepositoryEpoch: m.commitInspectorEpoch, Window: window})
 }
 
 func (m model) closeCommitInspector() model {
@@ -62,6 +53,7 @@ func (m model) closeCommitInspector() model {
 	m.commitInspectorMetadataLoading = false
 	m.commitInspectorDiffLoading = false
 	m.commitInspectorLoading = false
+	m.commitInspectorContinuationPending = false
 	return m
 }
 
@@ -81,16 +73,25 @@ func (m model) handleCommitInspectorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.closeCommitInspector(), nil
 	}
+	filesCount := len(m.commitInspectorSnapshot.Files)
+	if filesCount == 0 {
+		filesCount = len(m.commitInspector.Files)
+	}
 	if m.commitInspectorHelp || m.commitInspectorMetadataLoading || m.commitInspectorDiffLoading {
 		return m, nil
+	}
+	if key == "n" && m.commitInspectorDiffWindow.HasMore && !m.commitInspectorLoading && !m.commitInspectorMetadataLoading && !m.commitInspectorDiffLoading {
+		return m, func() tea.Msg {
+			return ContinuationRequested{Commit: m.commitInspectorSnapshot.FullHash, Parent: m.commitInspectorSnapshot.Parent, FileID: m.commitInspectorDiffWindow.FileID, RequestID: m.commitInspectorRequest, RepositoryEpoch: m.commitInspectorEpoch, Window: m.commitInspectorWindowRequest}
+		}
 	}
 
 	switch key {
 	case "j", "down":
-		if len(m.commitInspector.Files) == 0 {
+		if filesCount == 0 {
 			return m, nil
 		}
-		if m.commitInspectorCursor < len(m.commitInspector.Files)-1 {
+		if m.commitInspectorCursor < filesCount-1 {
 			m.commitInspectorCursor++
 			return m.selectInspectorFile()
 		}
@@ -111,10 +112,13 @@ func (m model) handleCommitInspectorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) selectInspectorFile() (tea.Model, tea.Cmd) {
-	if len(m.commitInspector.Files) == 0 {
+	if len(m.commitInspectorSnapshot.Files) == 0 && len(m.commitInspector.Files) == 0 {
 		return m, nil
 	}
 	m.commitInspectorLines = nil
+	m.commitInspectorDiffWindow = DiffWindow{}
+	m.commitInspectorWindowRequest = DiffWindowRequest{}
+	m.commitInspectorContinuationPending = false
 	m.commitInspectorScroll = 0
 	return m.startInspectorDiff()
 }
@@ -143,6 +147,9 @@ func (m model) renderCommitInspectorPopup(width, height int) string {
 		lines[2] = truncateInspector(lines[2]+"  FROM ROOT COMMIT", innerWidth)
 	} else if m.commitInspector.Parent != "" {
 		lines[2] = truncateInspector(lines[2]+"  FROM "+m.commitInspector.Parent, innerWidth)
+	}
+	if m.commitInspectorStale {
+		lines = append(lines, truncateInspector("Repository changed; close and reopen to refresh.", innerWidth))
 	}
 	lines = append(lines, strings.Repeat("─", innerWidth))
 
@@ -301,7 +308,36 @@ func fitInspectorPath(path string, width int) string {
 	return truncateInspector(name, width)
 }
 
+func renderInspectorDiffWindow(window DiffWindow) []string {
+	lines := make([]string, 0)
+	for _, hunk := range window.Hunks {
+		if hunk.Header != "" {
+			lines = append(lines, hunk.Header)
+		}
+		for _, row := range hunk.Rows {
+			if row.Kind == "context" && row.FromPresent && row.ToPresent {
+				lines = append(lines, formatInspectorDiffLine(" ", row.From.Number, row.To.Number, row.To.Text, "context"))
+			} else if row.Kind == "modified" && row.FromPresent && row.ToPresent {
+				lines = append(lines, formatInspectorDiffLine("-", row.From.Number, 0, row.From.Text, "removed"), formatInspectorDiffLine("+", 0, row.To.Number, row.To.Text, "added"))
+			} else if row.FromPresent && !row.ToPresent {
+				lines = append(lines, formatInspectorDiffLine("-", row.From.Number, 0, row.From.Text, "removed"))
+			} else if row.ToPresent {
+				lines = append(lines, formatInspectorDiffLine("+", 0, row.To.Number, row.To.Text, "added"))
+			} else {
+				lines = append(lines, formatInspectorDiffLine(" ", 0, 0, "", "context"))
+			}
+		}
+	}
+	if len(lines) == 0 {
+		return []string{"No textual changes"}
+	}
+	return lines
+}
+
 func (m model) commitInspectorUnifiedLines() []string {
+	if len(m.commitInspectorDiffWindow.Hunks) > 0 {
+		return renderInspectorDiffWindow(m.commitInspectorDiffWindow)
+	}
 	if m.commitInspectorCursor < 0 || m.commitInspectorCursor >= len(m.commitInspector.Files) {
 		return []string{"Select a file"}
 	}

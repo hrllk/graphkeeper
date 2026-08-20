@@ -138,18 +138,15 @@ type pullToastDoneMsg struct {
 	requestID, requestEpoch uint64
 }
 
+type ContinuationRequested struct {
+	Commit          string
+	Parent          string
+	FileID          string
+	RequestID       uint64
+	RepositoryEpoch uint64
+	Window          DiffWindowRequest
+}
+
+type inspectorContinuationKeyMsg struct{}
+
 type branchToastDoneMsg struct{}
-
-type commitInspectorLoadedMsg struct {
-	inspection git.CommitInspection
-	err        error
-	request    uint64
-	epoch      uint64
-}
-
-type commitInspectorDiffMsg struct {
-	diff    git.CommitDiff
-	err     error
-	request uint64
-	epoch   uint64
-}

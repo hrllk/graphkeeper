@@ -2,9 +2,6 @@ package app
 
 import "context"
 
-// The Inspector contract is intentionally owned by app. Git adapters may use a
-// different internal representation, but the screen only depends on these
-// request/result semantics and never reparses raw Git output.
 type InspectorPaneState string
 
 const (
@@ -16,10 +13,45 @@ const (
 	PaneCanceled InspectorPaneState = "canceled"
 )
 
+type PartialReason string
+
+const (
+	PartialByteLimit     PartialReason = "byte_limit"
+	PartialLineLimit     PartialReason = "line_limit"
+	PartialLineTruncated PartialReason = "line_truncated"
+	PartialProcessLimit  PartialReason = "process_limit"
+)
+
+type ChangedFileStatus string
+
+const (
+	StatusAdded     ChangedFileStatus = "added"
+	StatusModified  ChangedFileStatus = "modified"
+	StatusDeleted   ChangedFileStatus = "deleted"
+	StatusRenamed   ChangedFileStatus = "renamed"
+	StatusCopied    ChangedFileStatus = "copied"
+	StatusBinary    ChangedFileStatus = "binary"
+	StatusModeOnly  ChangedFileStatus = "mode_only"
+	StatusSubmodule ChangedFileStatus = "submodule"
+)
+
 type InspectorError struct {
 	Kind      string
 	Message   string
 	Retryable bool
+}
+
+const (
+	defaultInspectorMaxLines = 2000
+	defaultInspectorMaxBytes = 1 << 20
+	maxInspectorMaxLines     = 10000
+	maxInspectorMaxBytes     = 16 << 20
+)
+
+type DiffWindowRequest struct {
+	StartLine int
+	MaxLines  int
+	MaxBytes  int
 }
 
 type InspectorResult[T any] struct {
@@ -29,33 +61,26 @@ type InspectorResult[T any] struct {
 	Commit          string
 	Parent          string
 	FileID          string
-	RequestID       string
+	RequestID       uint64
 	RepositoryEpoch uint64
+	Window          DiffWindowRequest
 }
 
 type CommitRequest struct {
 	Commit          string
-	RequestID       string
+	RequestID       uint64
 	RepositoryEpoch uint64
-}
-
-type DiffWindowRequest struct {
-	StartLine int
-	MaxLines  int
-	MaxBytes  int
 }
 
 type DiffRequest struct {
 	Commit          string
 	Parent          string
 	FileID          string
-	RequestID       string
+	RequestID       uint64
 	RepositoryEpoch uint64
 	Window          DiffWindowRequest
 }
 
-// CommitInspectorReader is the boundary used by a future alternate reader;
-// the production adapter is currently wired through git.Repo commands.
 type CommitInspectorReader interface {
 	InspectCommit(context.Context, CommitRequest) InspectorResult[CommitSnapshot]
 	LoadDiff(context.Context, DiffRequest) InspectorResult[DiffWindow]
@@ -64,9 +89,9 @@ type CommitInspectorReader interface {
 type CommitSnapshot struct {
 	FullHash    string
 	Subject     string
-	MessageBody string
-	MessageRaw  string
+	AuthorName  string
 	AuthorEmail string
+	MessageBody string
 	Parent      string
 	IsRoot      bool
 	Files       []ChangedFile
@@ -74,18 +99,20 @@ type CommitSnapshot struct {
 
 type ChangedFile struct {
 	StableID  string
-	Status    string
+	Status    ChangedFileStatus
 	OldPath   string
 	Path      string
 	Additions int
 	Deletions int
+	Binary    bool
 }
 
 type DiffWindow struct {
 	FileID        string
 	Hunks         []DiffHunk
 	HasMore       bool
-	PartialReason string
+	PartialReason PartialReason
+	NextStartLine int
 }
 
 type DiffHunk struct {

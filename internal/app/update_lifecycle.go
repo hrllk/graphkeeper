@@ -61,6 +61,10 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 			return m, nil
 		}
+		if msg.epochSet && msg.epoch > m.commitInspectorEpoch {
+			m = invalidateCommitInspectorForEpoch(m)
+			m.commitInspectorEpoch = msg.epoch
+		}
 		if msg.err != nil {
 			if m.status.Mode == state.ModeOperationResult && m.operationResult != nil {
 				m.operationResult.RefreshError = msg.err

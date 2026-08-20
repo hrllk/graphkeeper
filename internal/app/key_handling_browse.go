@@ -209,13 +209,19 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commitInspectorDiffLoading = false
 		m.commitInspectorError = ""
 		m.commitInspectorDiffError = ""
+		m.commitInspectorSnapshot = CommitSnapshot{}
+		m.commitInspectorDiffWindow = DiffWindow{}
+		m.commitInspectorWindowRequest = DiffWindowRequest{}
+		m.commitInspectorStale = false
+		m.commitInspectorContinuationPending = false
 		m.commitInspectorLines = nil
 		m = m.cancelInspector()
 		m.commitInspectorRequest++
 		m.commitInspectorEpoch = m.repositoryEpoch
-		ctx, cancel := context.WithCancel(context.Background())
-		m.commitInspectorCancel = cancel
-		return m, inspectCommit(m.repo, focus.Hash, ctx, m.commitInspectorRequest, m.commitInspectorEpoch)
+		m.commitInspectorRequestedCommit = focus.Hash
+		m.commitInspectorRequestedParent = ""
+		m.commitInspectorContext, m.commitInspectorCancel = context.WithCancel(context.Background())
+		return m, inspectCommitCommand(m.commitInspectorContext, m, CommitRequest{Commit: focus.Hash, RequestID: m.commitInspectorRequest, RepositoryEpoch: m.commitInspectorEpoch})
 	case "esc":
 		if strings.TrimSpace(m.graphSearchQuery) != "" || m.graphSearchOpen {
 			m.graphSearchOpen = false
