@@ -209,6 +209,35 @@
             "parentTaskId": 1,
             "parentId": "undefined",
             "updatedAt": "2026-08-20T04:36:08.999Z"
+          },
+          {
+            "id": 17,
+            "title": "공통 Confirm 및 BinaryConfirm",
+            "description": "Confirm 상호작용을 선택지 유형별 공통 컴포넌트로 분리하고, y/n 확인은 최대한 간결한 표시를 제공한다.",
+            "details": "기존 renderConfirmPopup과 handleConfirmKey의 action별 분기를 정리한다. BinaryConfirm은 화면에 y: yes · n: no만 표시하고 q: close를 노출하지 않는다. n과 Esc는 취소 동작으로 유지하되 footer에는 y/n만 표시한다. Pull의 m/r, fast-forward의 enter 등 binary가 아닌 선택지는 별도 choice confirm 계약으로 분리한다. 제목·설명·선택지·footer의 렌더링 모델과 keymap을 공통화하고 branch/delete/tag/stash/clean/checkout/reset confirm의 회귀 테스트를 추가한다. Merge 전용 layout과 공통 Toast/Progress 구현은 별도 task로 둔다.",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 18,
+            "title": "공통 Toast 및 Progress 처리",
+            "description": "loading, success, failure, blocked, operation result 상태의 공통 표시 규칙과 생성 경계를 정리한다.",
+            "details": "loadingToast와 action별 진행 문자열을 공통 status/toast factory로 정리한다. title·message·detail·footer의 역할과 loading 중 입력 잠금, 완료 후 Graph 복귀 규칙을 명시한다. 기존 operation result와 충돌하지 않도록 loading/progress와 결과 요약의 경계를 유지하고, 기존 Git 작업의 진행·성공·실패·blocked 렌더링 회귀 테스트를 추가한다. 새로운 전역 toast framework나 화면 전체 layout 개편은 포함하지 않는다.",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 1
+          },
+          {
+            "id": 19,
+            "title": "Merge Confirm 전용 Layout",
+            "description": "merge/rebase 선택 confirm에서 대상 branch와 commit 관계를 간결하게 보여주고 좁은 터미널에서도 선택지를 명확히 표시한다.",
+            "details": "Task 1.17의 choice confirm 계약을 재사용한다. merge 대상 ref, current·target 관계, local-only·target-only commit 요약, m: merge · r: rebase 선택지를 전용 layout으로 구성한다. 좁은 terminal의 줄바꿈·overflow, stale preview/refresh 이후 confirm 비활성화, merge와 rebase의 선택 이유 표시를 테스트한다. 실제 Git 실행 정책과 stale mutation 방지는 기존 Pull workflow 계약을 유지하며, 공통 Toast/Progress 표시 연계는 Task 1.18 범위와 충돌하지 않게 분리한다.",
+            "status": "pending",
+            "dependencies": [
+              17
+            ],
+            "parentTaskId": 1
           }
         ],
         "updatedAt": "2026-08-20T07:18:49.029Z"
@@ -265,7 +294,7 @@
         "description": "로컬 로그의 개인정보·권한·비활성화 정책을 정비한다.",
         "details": "현재 0644 로그 파일 생성, 로그 비활성화 부재, 전용 테스트 부재를 해결한다.",
         "testStrategy": "",
-        "status": "pending",
+        "status": "cancelled",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -274,7 +303,7 @@
             "title": "로컬 로그 권한·비활성화·테스트",
             "description": "0644 로그 파일 생성을 수정하고 로그 비활성화 옵션 및 전용 테스트 추가",
             "details": "",
-            "status": "pending",
+            "status": "cancelled",
             "dependencies": [],
             "parentTaskId": 3,
             "parentId": "undefined"
@@ -320,7 +349,7 @@
             "title": "표준 스크립트 정합성",
             "description": "AGENTS에 언급된 scripts/eval·scripts/doctor·scripts/hooks를 추가할지 지침을 정정할지 결정",
             "details": "",
-            "status": "pending",
+            "status": "cancelled",
             "dependencies": [],
             "parentTaskId": 5,
             "parentId": "undefined"
