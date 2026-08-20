@@ -7,6 +7,9 @@ import (
 )
 
 func completePullNoOp(m model, status git.Status, request pullRequest, mode PullMode) (tea.Model, tea.Cmd) {
+	if mode == "" {
+		mode = PullModeNoOp
+	}
 	identity := pullSnapshotIdentity(status, request.Epoch)
 	result := classifyOperationResult(OperationResultInput{
 		Operation: PullResultMetadata{Action: state.ActionPull, Mode: mode, Branch: identity.Branch, Upstream: identity.Upstream},

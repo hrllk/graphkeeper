@@ -7,6 +7,7 @@ type PullMode string
 const (
 	PullModeMerge  PullMode = "merge"
 	PullModeRebase PullMode = "rebase"
+	PullModeNoOp   PullMode = "no-op"
 )
 
 type TrackingState string
