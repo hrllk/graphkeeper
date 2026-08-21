@@ -338,12 +338,13 @@
             "title": "ARCH-P1",
             "description": "[bounded-context port 분리] Commit Inspector outbound adapter extraction",
             "details": "Commit Inspector Git reader와 DTO mapping을 outbound adapter로 이동하고 app에는 neutral port와 DTO만 남긴다. Commit Inspector application tests는 fake reader만 사용하고 adapter tests는 stable FileID, bounded diff, cancellation, error mapping을 검증한다. internal/app의 inspector reader는 internal/git를 직접 import하지 않아야 한다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               4
             ],
             "parentTaskId": 2,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-21T09:01:00.323Z"
           },
           {
             "id": 6,
@@ -406,7 +407,7 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-21T09:00:17.216Z"
+        "updatedAt": "2026-08-21T09:01:00.323Z"
       },
       {
         "id": "3",
@@ -489,7 +490,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T09:00:17.216Z",
+      "lastModified": "2026-08-21T09:01:00.323Z",
       "taskCount": 5,
       "completedCount": 1,
       "tags": [
