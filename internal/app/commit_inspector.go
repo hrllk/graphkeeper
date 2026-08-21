@@ -10,8 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	ansiutil "github.com/charmbracelet/x/ansi"
-
-	"hrllk/graphkeeper/internal/git"
 )
 
 const inspectorDiffPage = 18
@@ -27,7 +25,7 @@ func (m model) cancelInspector() model {
 func (m model) startInspectorDiff() (model, tea.Cmd) {
 	if m.commitInspectorCursor < 0 || m.commitInspectorCursor >= len(m.commitInspectorSnapshot.Files) {
 		if len(m.commitInspectorSnapshot.Files) == 0 && len(m.commitInspector.Files) > 0 {
-			m.commitInspectorSnapshot = gitInspectionToSnapshot(m.commitInspector)
+			m.commitInspectorSnapshot = m.commitInspector
 		} else {
 			return m, nil
 		}
@@ -135,9 +133,9 @@ func (m model) renderCommitInspectorPopup(width, height int) string {
 
 	lines := make([]string, 0, contentHeight)
 	lines = append(lines,
-		truncateInspector("commit: "+m.commitInspector.Hash, innerWidth),
+		truncateInspector("commit: "+m.commitInspector.FullHash, innerWidth),
 		truncateInspector("message: "+truncateInspector(m.commitInspector.Subject, min(100, max(innerWidth-lipgloss.Width("message: "), 1))), innerWidth),
-		truncateInspector("author: "+m.commitInspector.Author, innerWidth),
+		truncateInspector("author: "+m.commitInspector.AuthorName, innerWidth),
 		truncateInspector("path: "+m.commitInspectorSelectedPath(), innerWidth),
 	)
 	for len(lines) < 3 {
@@ -262,12 +260,13 @@ func (m model) inspectorTreeRows(width int) []inspectorTreeRow {
 	return rows
 }
 
-func inspectorFileLabel(file git.CommitDiffFile, width int) string {
+func inspectorFileLabel(file ChangedFile, width int) string {
 	path := compactInspectorPath(file.Path)
 	if file.OldPath != "" && file.OldPath != file.Path {
 		path = compactInspectorPath(file.OldPath) + " → " + compactInspectorPath(file.Path)
 	}
-	prefix := "  " + inspectorStatusStyle(file.Status).Render(inspectorStatus(file.Status)) + " "
+	status := screenStatus(file.Status)
+	prefix := "  " + inspectorStatusStyle(status).Render(status) + " "
 	available := max(width-lipgloss.Width(prefix), 1)
 	path = fitInspectorPath(path, available)
 	return prefix + path
@@ -342,10 +341,10 @@ func (m model) commitInspectorUnifiedLines() []string {
 		return []string{"Select a file"}
 	}
 	file := m.commitInspector.Files[m.commitInspectorCursor]
-	if file.Status == "B" || file.Status == "S" || file.Status == "ModeOnly" {
+	if file.Status == StatusBinary || file.Status == StatusSubmodule || file.Status == StatusModeOnly {
 		return []string{"No textual diff"}
 	}
-	rows := git.ParseDiffRows(m.commitInspectorLines)
+	rows := parseInspectorDiffRows(m.commitInspectorLines)
 	hunks := inspectorHunkHeaders(m.commitInspectorLines)
 	if len(rows) == 0 && len(hunks) == 0 {
 		return []string{"No textual changes"}
@@ -376,6 +375,50 @@ func (m model) commitInspectorUnifiedLines() []string {
 		lines = append(lines, formatInspectorDiffLine(marker, oldNumber, newNumber, text, kind))
 	}
 	return lines
+}
+
+func parseInspectorDiffRows(lines []string) []inspectorDiffRow {
+	rows := make([]inspectorDiffRow, 0)
+	oldLine, newLine := 0, 0
+	for _, line := range lines {
+		if strings.HasPrefix(line, "@@") {
+			var oldStart, newStart int
+			if _, err := fmt.Sscanf(line, "@@ -%d", &oldStart); err == nil {
+				oldLine = oldStart
+			}
+			if marker := strings.Index(line, "+"); marker >= 0 {
+				_, _ = fmt.Sscanf(line[marker:], "+%d", &newStart)
+				newLine = newStart
+			}
+			continue
+		}
+		if len(line) < 1 {
+			continue
+		}
+		switch line[0] {
+		case ' ':
+			rows = append(rows, inspectorDiffRow{Kind: "context", OldLine: oldLine, NewLine: newLine, From: line[1:], To: line[1:], FromPresent: true, ToPresent: true})
+			oldLine++
+			newLine++
+		case '-':
+			rows = append(rows, inspectorDiffRow{Kind: "removed", OldLine: oldLine, From: line[1:], FromPresent: true})
+			oldLine++
+		case '+':
+			if strings.HasPrefix(line, "+++") {
+				continue
+			}
+			rows = append(rows, inspectorDiffRow{Kind: "added", NewLine: newLine, To: line[1:], ToPresent: true})
+			newLine++
+		}
+	}
+	return rows
+}
+
+type inspectorDiffRow struct {
+	Kind                   string
+	OldLine, NewLine       int
+	From, To               string
+	FromPresent, ToPresent bool
 }
 
 func inspectorHunkHeaders(lines []string) []string {

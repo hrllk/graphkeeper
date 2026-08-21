@@ -4,7 +4,6 @@ import (
 	"context"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"hrllk/graphkeeper/internal/git"
 )
 
 type commitInspectorResultMsg struct {
@@ -52,7 +51,7 @@ func (m model) applyCommitInspectorResult(msg commitInspectorResultMsg) (model, 
 			return m, nil
 		}
 		m.commitInspectorSnapshot = result.Value
-		m.commitInspector = snapshotToGitInspection(result.Value)
+		m.commitInspector = result.Value
 		m.commitInspectorCursor, m.commitInspectorScroll = 0, 0
 		if len(result.Value.Files) == 0 {
 			m.commitInspectorLoading = false
@@ -118,43 +117,4 @@ func (m model) currentInspectorFileID() string {
 		return ""
 	}
 	return m.commitInspectorSnapshot.Files[m.commitInspectorCursor].StableID
-}
-
-func gitInspectionToSnapshot(inspection git.CommitInspection) CommitSnapshot {
-	files := make([]ChangedFile, 0, len(inspection.Files))
-	for _, file := range inspection.Files {
-		files = append(files, ChangedFile{StableID: file.ID, Status: mapInspectorStatus(file), OldPath: file.OldPath, Path: file.Path, Additions: file.Additions, Deletions: file.Deletions, Binary: file.Binary})
-	}
-	return CommitSnapshot{FullHash: inspection.Hash, Subject: inspection.Subject, AuthorName: inspection.Author, MessageBody: inspection.Message, Parent: inspection.Parent, IsRoot: inspection.IsRoot, Files: files}
-}
-
-func snapshotToGitInspection(snapshot CommitSnapshot) git.CommitInspection {
-	files := make([]git.CommitDiffFile, 0, len(snapshot.Files))
-	for _, file := range snapshot.Files {
-		files = append(files, git.CommitDiffFile{ID: file.StableID, Path: file.Path, OldPath: file.OldPath, Status: statusToGit(file.Status), Additions: file.Additions, Deletions: file.Deletions, Binary: file.Binary})
-	}
-	return git.CommitInspection{Hash: snapshot.FullHash, Subject: snapshot.Subject, Author: snapshot.AuthorName, Message: snapshot.MessageBody, Parent: snapshot.Parent, IsRoot: snapshot.IsRoot, Files: files}
-}
-
-func statusToGit(status ChangedFileStatus) string {
-	switch status {
-	case StatusAdded:
-		return "A"
-	case StatusModified:
-		return "M"
-	case StatusDeleted:
-		return "D"
-	case StatusRenamed:
-		return "R"
-	case StatusCopied:
-		return "C"
-	case StatusBinary:
-		return "B"
-	case StatusSubmodule:
-		return "S"
-	case StatusModeOnly:
-		return "ModeOnly"
-	default:
-		return "?"
-	}
 }

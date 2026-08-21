@@ -1,4 +1,4 @@
-package app
+package commitinspector
 
 import "context"
 

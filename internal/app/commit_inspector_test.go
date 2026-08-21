@@ -6,8 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-
-	"hrllk/graphkeeper/internal/git"
 )
 
 func TestCommitInspectorQAndEscClose(t *testing.T) {
@@ -40,7 +38,7 @@ func TestCommitInspectorKeymapKeepsNavigationInInspector(t *testing.T) {
 func TestCommitInspectorJKMovesChangedFileSelection(t *testing.T) {
 	m := model{
 		commitInspectorOpen: true,
-		commitInspector: git.CommitInspection{Files: []git.CommitDiffFile{
+		commitInspector: CommitSnapshot{Files: []ChangedFile{
 			{Status: "M", Path: "a.go"},
 			{Status: "A", Path: "b.go"},
 		}},
@@ -57,9 +55,9 @@ func TestCommitInspectorRendersBorderedTreeAndUnifiedRows(t *testing.T) {
 	m := model{
 		width: 80, height: 20,
 		commitInspectorOpen: true,
-		commitInspector: git.CommitInspection{
-			Hash: "abc123", Subject: "change", Author: "dev", Parent: "parent",
-			Files: []git.CommitDiffFile{{Status: "M", Path: "internal/app/main.go"}},
+		commitInspector: CommitSnapshot{
+			FullHash: "abc123", Subject: "change", AuthorName: "dev", Parent: "parent",
+			Files: []ChangedFile{{Status: "M", Path: "internal/app/main.go"}},
 		},
 		commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+new"},
 		commitInspectorCursor: 0,
@@ -77,9 +75,9 @@ func TestCommitInspectorRendersBorderedTreeAndUnifiedRows(t *testing.T) {
 
 func TestCommitInspectorDiffDoesNotWrapLongCode(t *testing.T) {
 	m := model{
-		commitInspector: git.CommitInspection{
-			Hash: "abc123", Subject: "change", Author: "dev",
-			Files: []git.CommitDiffFile{{Status: "M", Path: "main.go"}},
+		commitInspector: CommitSnapshot{
+			FullHash: "abc123", Subject: "change", AuthorName: "dev",
+			Files: []ChangedFile{{Status: "M", Path: "main.go"}},
 		},
 		commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+a very long line that must stay on one terminal row"},
 		commitInspectorCursor: 0,
@@ -95,7 +93,7 @@ func TestCommitInspectorDiffDoesNotWrapLongCode(t *testing.T) {
 
 func TestCommitInspectorKeepsDividerAlignedWithANSISelectedRow(t *testing.T) {
 	m := model{
-		commitInspector: git.CommitInspection{Files: []git.CommitDiffFile{
+		commitInspector: CommitSnapshot{Files: []ChangedFile{
 			{Status: "M", Path: "first.go"},
 			{Status: "A", Path: "second.go"},
 		}},
