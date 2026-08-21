@@ -390,12 +390,13 @@
             "title": "ARCH-P5",
             "description": "[bounded-context infrastructure 분리] Tag provenance persistence adapter",
             "details": "tag provenance policy와 .git JSON filesystem persistence를 분리한다. TagProvenanceStore와 fake store를 도입하고 missing/malformed/round-trip/permission behavior를 adapter tests로 검증한다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               4
             ],
             "parentTaskId": 2,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-21T09:03:01.362Z"
           },
           {
             "id": 10,
@@ -410,7 +411,7 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-21T09:02:34.887Z"
+        "updatedAt": "2026-08-21T09:03:01.362Z"
       },
       {
         "id": "3",
@@ -493,7 +494,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T09:02:34.887Z",
+      "lastModified": "2026-08-21T09:03:01.362Z",
       "taskCount": 5,
       "completedCount": 1,
       "tags": [
