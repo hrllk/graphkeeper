@@ -12,7 +12,6 @@ import (
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/graph"
 	"hrllk/graphkeeper/internal/state"
-	"hrllk/graphkeeper/internal/telemetry"
 )
 
 type tagCreatedMsg struct {
@@ -45,7 +44,7 @@ func (m model) handleTagPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.tagPopupOpen = false
 		m.status = loadingToast("Tagging commit...")
-		return m, executeCreateTag(m.repo, name, m.tagPopupTarget, m.commitLimit)
+		return m, executeCreateTag(m.repo, name, m.tagPopupTarget, m.commitLimit, m.tagProvenance)
 	case "backspace":
 		if len(m.tagPopupDraft) > 0 {
 			runes := []rune(m.tagPopupDraft)
@@ -70,14 +69,14 @@ func (m model) handleTagPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func executeCreateTag(repo *git.Repo, name, target string, limit int) tea.Cmd {
+func executeCreateTag(repo *git.Repo, name, target string, limit int, stores ...TagProvenanceStore) tea.Cmd {
 	return func() tea.Msg {
 		if err := repo.CreateTag(context.Background(), name, target); err != nil {
 			return tagCreatedMsg{Name: name, Target: target, Err: err}
 		}
 		status, err := repo.Status(context.Background(), limit)
 		if err == nil {
-			status, err = loadLocalTagStatus(repo, status)
+			status, err = loadLocalTagStatus(repo, status, firstTagStore(stores))
 		}
 		return tagCreatedMsg{Name: name, Target: target, Status: status, Err: err}
 	}
@@ -101,7 +100,7 @@ func (m model) handleTagCreatedMsg(msg tagCreatedMsg) (model, tea.Cmd) {
 			detail = "Choose a different tag name."
 		}
 		m.status = state.New().WithBlocked(reason, message, detail)
-		telemetry.Log("app", "tag_create_failed", map[string]string{
+		m.publish("app", "tag_create_failed", map[string]string{
 			"name":   msg.Name,
 			"target": msg.Target,
 			"error":  msg.Err.Error(),
@@ -113,7 +112,7 @@ func (m model) handleTagCreatedMsg(msg tagCreatedMsg) (model, tea.Cmd) {
 	m.repoStatus = msg.Status
 	m.storeTagEntries(msg.Status)
 	syncBrowseState(&m, msg.Status)
-	rows := graph.Rows(msg.Status)
+	rows := graphRows(msg.Status)
 	row := graph.FindRowByHash(rows, msg.Target)
 	if row < 0 {
 		m.status = state.New().WithBlocked(state.BlockUnknown, "Tag target is missing.", "Refresh the repo and try again.")
@@ -125,7 +124,7 @@ func (m model) handleTagCreatedMsg(msg tagCreatedMsg) (model, tea.Cmd) {
 	hint := repositoryStateHintForModel(&m)
 	m.graphScroll = clampScroll(row, len(rows), graphPageSizeForRowsWithHint(&m, rows, row, graphContentHeightForModel(&m), hint != ""))
 	m.status = loadingToast("Tag created.")
-	telemetry.Log("app", "tag_create", map[string]string{
+	m.publish("app", "tag_create", map[string]string{
 		"name":   msg.Name,
 		"target": msg.Target,
 	})

@@ -46,7 +46,7 @@ func TestFetchTagsWritesSnapshotAndMarksProvenance(t *testing.T) {
 	}
 	runGit(t, fixture.root, "push", "origin", "v1.0.0")
 
-	msg := cmdResult(t, fetchTagsRepoState(fixture.repo, 40))
+	msg := cmdResult(t, fetchTagsRepoState(fixture.repo, 40, newTestTagStore(fixture.root)))
 	fetched, ok := msg.(fetchedMsg)
 	if !ok {
 		t.Fatalf("expected fetchedMsg, got %T", msg)
@@ -95,7 +95,7 @@ func TestFetchTagsDoesNotPruneRemoteBranches(t *testing.T) {
 	// remote-tracking ref. Refreshing tags must not prune that ref.
 	runGit(t, fixture.remote, "update-ref", "-d", "refs/heads/feature")
 
-	msg := cmdResult(t, fetchTagsRepoState(fixture.repo, 40))
+	msg := cmdResult(t, fetchTagsRepoState(fixture.repo, 40, newTestTagStore(fixture.root)))
 	fetched, ok := msg.(fetchedMsg)
 	if !ok {
 		t.Fatalf("expected fetchedMsg, got %T", msg)

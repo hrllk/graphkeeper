@@ -8,12 +8,21 @@ import (
 	"strings"
 	"time"
 
-	"hrllk/graphkeeper/internal/telemetry"
+	"hrllk/graphkeeper/internal/events"
 )
 
 type Repo struct {
-	root   string
-	runner Runner
+	root      string
+	runner    Runner
+	eventSink events.EventSink
+}
+
+// Root returns the immutable repository root used by composition adapters.
+func (r *Repo) Root() string {
+	if r == nil {
+		return ""
+	}
+	return r.root
 }
 
 type Status struct {
@@ -134,11 +143,25 @@ type BranchTracking struct {
 }
 
 func Open(root string) (*Repo, error) {
+	return open(root, nil)
+}
+
+func OpenWithEventSink(root string, sink events.EventSink) (*Repo, error) {
+	return open(root, sink)
+}
+
+func open(root string, sink events.EventSink) (*Repo, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
 	}
-	return &Repo{root: abs, runner: Runner{Timeout: 3 * time.Second, Dir: abs}}, nil
+	return &Repo{root: abs, runner: Runner{Timeout: 3 * time.Second, Dir: abs}, eventSink: sink}, nil
+}
+
+func (r *Repo) publish(source, name string, fields map[string]string) {
+	if r.eventSink != nil {
+		_ = r.eventSink.Publish(events.Event{Source: source, Name: name, Fields: fields})
+	}
 }
 
 func (r *Repo) Status(ctx context.Context, limit int) (Status, error) {
@@ -353,7 +376,7 @@ func (r *Repo) branchMetadata(ctx context.Context, currentBranch string) ([]stri
 	tracking := make(map[string]BranchTracking)
 	lines, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)|%(upstream:short)|%(upstream:track)", "refs/heads")
 	if err != nil {
-		telemetry.Log("git", "branch_metadata_error", map[string]string{"error": err.Error()})
+		r.publish("git", "branch_metadata_error", map[string]string{"error": err.Error()})
 		return branches, upstreams, tracking, false, false, err.Error(), false
 	}
 	trackingKnown, upstreamGone := false, false
@@ -386,7 +409,7 @@ func (r *Repo) branchTracking(ctx context.Context, localBranches, remoteBranches
 	tracking := make(map[string]BranchTracking, len(localBranches))
 	lines, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short) %(upstream:track)", "refs/heads")
 	if err != nil {
-		telemetry.Log("git", "branch_tracking_error", map[string]string{"error": err.Error()})
+		r.publish("git", "branch_tracking_error", map[string]string{"error": err.Error()})
 		return tracking
 	}
 	for _, line := range lines {
@@ -415,7 +438,7 @@ func (r *Repo) branchUpstreams(ctx context.Context) map[string]string {
 	upstreams := make(map[string]string)
 	lines, err := r.gitLines(ctx, "for-each-ref", "--format=%(refname:short)|%(upstream:short)|%(upstream:track)", "refs/heads")
 	if err != nil {
-		telemetry.Log("git", "branch_upstreams_error", map[string]string{"error": err.Error()})
+		r.publish("git", "branch_upstreams_error", map[string]string{"error": err.Error()})
 		return upstreams
 	}
 	for _, line := range lines {

@@ -2,72 +2,70 @@ package app
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
 	"hrllk/graphkeeper/internal/git"
 )
 
-type tagSyncSummary string
+// TagSyncSummary describes whether provenance has ever been synchronized.
+type TagSyncSummary string
 
 const (
-	tagSyncNeverSynced tagSyncSummary = "never_synced"
-	tagSyncSynced      tagSyncSummary = "synced"
+	TagSyncNeverSynced TagSyncSummary = "never_synced"
+	TagSyncSynced      TagSyncSummary = "synced"
 )
 
-type tagSnapshot struct {
-	LoadedAt   time.Time       `json:"loaded_at"`
-	Summary    tagSyncSummary  `json:"summary"`
-	OriginSeen map[string]bool `json:"origin_seen"`
+// TagProvenanceSnapshot is the application-owned provenance value. Persistence
+// details, including its on-disk location and encoding, belong to an adapter.
+type TagProvenanceSnapshot struct {
+	LoadedAt   time.Time
+	Summary    TagSyncSummary
+	OriginSeen map[string]bool
 }
 
-func tagSnapshotPath(repoRoot string) string {
-	return filepath.Join(repoRoot, ".git", "graphkeeper", "tag-provenance.json")
+// TagProvenanceStore persists tag provenance for the current repository.
+type TagProvenanceStore interface {
+	Load(context.Context) (TagProvenanceSnapshot, *ProvenanceError)
+	Save(context.Context, TagProvenanceSnapshot) *ProvenanceError
 }
 
-func loadTagSnapshot(repoRoot string) (tagSnapshot, error) {
-	data, err := os.ReadFile(tagSnapshotPath(repoRoot))
-	if err != nil {
-		return tagSnapshot{}, err
+type ProvenanceErrorKind string
+
+const (
+	ProvenanceNotFound    ProvenanceErrorKind = "not_found"
+	ProvenanceMalformed   ProvenanceErrorKind = "malformed"
+	ProvenanceUnavailable ProvenanceErrorKind = "unavailable"
+)
+
+type ProvenanceError struct{ Kind ProvenanceErrorKind }
+
+func (e *ProvenanceError) Error() string {
+	if e == nil {
+		return ""
 	}
-	var snapshot tagSnapshot
-	if err := json.Unmarshal(data, &snapshot); err != nil {
-		return tagSnapshot{}, err
-	}
-	if snapshot.OriginSeen == nil {
-		snapshot.OriginSeen = make(map[string]bool)
-	}
-	return snapshot, nil
+	return string(e.Kind)
 }
 
-func writeTagSnapshot(repoRoot string, snapshot tagSnapshot) error {
-	path := tagSnapshotPath(repoRoot)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(snapshot, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
-}
+// Keep the existing private names local to the tag policy and its tests.
+type tagSyncSummary = TagSyncSummary
 
-func buildTagSnapshot(entries []git.TagEntry, remoteTags map[string]bool, summary tagSyncSummary) tagSnapshot {
+const (
+	tagSyncNeverSynced = TagSyncNeverSynced
+	tagSyncSynced      = TagSyncSynced
+)
+
+type tagSnapshot = TagProvenanceSnapshot
+
+func buildTagSnapshot(entries []git.TagEntry, remoteTags map[string]bool, summary TagSyncSummary) TagProvenanceSnapshot {
 	originSeen := make(map[string]bool, len(entries))
 	for _, entry := range entries {
 		originSeen[entry.Name] = remoteTags[entry.Name]
 	}
-	return tagSnapshot{
-		LoadedAt:   time.Now(),
-		Summary:    summary,
-		OriginSeen: originSeen,
-	}
+	return TagProvenanceSnapshot{LoadedAt: time.Now().UTC(), Summary: summary, OriginSeen: originSeen}
 }
 
-func applyTagSnapshot(status git.Status, snapshot tagSnapshot) git.Status {
+func applyTagSnapshot(status git.Status, snapshot TagProvenanceSnapshot) git.Status {
 	status.TagProvenanceLoaded = true
 	status.TagSyncSummary = string(snapshot.Summary)
 	for i := range status.TagEntries {
@@ -81,7 +79,7 @@ func applyTagSnapshot(status git.Status, snapshot tagSnapshot) git.Status {
 
 func markTagOriginUnknown(status git.Status) git.Status {
 	status.TagProvenanceLoaded = false
-	status.TagSyncSummary = string(tagSyncNeverSynced)
+	status.TagSyncSummary = string(TagSyncNeverSynced)
 	for i := range status.TagEntries {
 		status.TagEntries[i].OriginKnown = false
 		status.TagEntries[i].OnOrigin = false
@@ -90,28 +88,24 @@ func markTagOriginUnknown(status git.Status) git.Status {
 }
 
 func tagSyncSummaryLabel(summary string) string {
-	switch tagSyncSummary(summary) {
-	case tagSyncSynced:
+	switch TagSyncSummary(summary) {
+	case TagSyncSynced:
 		return "synced"
-	case tagSyncNeverSynced:
-		fallthrough
 	default:
 		return "never synced"
 	}
 }
 
 func tagSyncSummaryHelp(summary string) string {
-	switch tagSyncSummary(summary) {
-	case tagSyncSynced:
+	switch TagSyncSummary(summary) {
+	case TagSyncSynced:
 		return "Press F to refresh tag provenance."
-	case tagSyncNeverSynced:
-		fallthrough
 	default:
 		return "Press F to sync tag provenance."
 	}
 }
 
-func loadLocalTagStatus(repo *git.Repo, status git.Status) (git.Status, error) {
+func loadLocalTagStatus(repo *git.Repo, status git.Status, stores ...TagProvenanceStore) (git.Status, error) {
 	tags, err := repo.LocalTagEntries(context.Background())
 	if err != nil {
 		return status, err
@@ -122,25 +116,24 @@ func loadLocalTagStatus(repo *git.Repo, status git.Status) (git.Status, error) {
 	for _, entry := range tags {
 		status.Tags = append(status.Tags, entry.Name)
 	}
-	snapshot, snapErr := loadTagSnapshot(status.Root)
-	if snapErr == nil {
-		status = applyTagSnapshot(status, snapshot)
-		return status, nil
-	}
-	if len(tags) > 0 {
+	if len(stores) == 0 || stores[0] == nil {
 		return markTagOriginUnknown(status), nil
 	}
-	status.TagProvenanceLoaded = false
-	status.TagSyncSummary = string(tagSyncNeverSynced)
-	return attachGraphTagEntries(status), nil
+	snapshot, snapErr := stores[0].Load(context.Background())
+	if snapErr == nil {
+		return applyTagSnapshot(status, snapshot), nil
+	}
+	// Not-found, malformed, and unavailable are deliberately non-fatal to the
+	// unrelated Git/tag read; all three preserve unknown provenance.
+	return markTagOriginUnknown(status), nil
 }
 
-func tagSnapshotFromRepo(repo *git.Repo, tags []git.TagEntry) (tagSnapshot, error) {
+func tagSnapshotFromRepo(repo *git.Repo, tags []git.TagEntry) (TagProvenanceSnapshot, error) {
 	remoteTags, err := repo.OriginTagSet(context.Background())
 	if err != nil {
-		return tagSnapshot{}, err
+		return TagProvenanceSnapshot{}, err
 	}
-	return buildTagSnapshot(tags, remoteTags, tagSyncSynced), nil
+	return buildTagSnapshot(tags, remoteTags, TagSyncSynced), nil
 }
 
 func attachGraphTagEntries(status git.Status) git.Status {
