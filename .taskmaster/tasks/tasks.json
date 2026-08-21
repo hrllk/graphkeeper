@@ -351,12 +351,13 @@
             "title": "ARCH-P2",
             "description": "[bounded-context port 분리] Graph neutral snapshot boundary",
             "details": "graph가 git.Status를 직접 소비하지 않도록 graph-owned snapshot과 mapper를 도입한다. Nodes, Rows, CurrentFocus와 virtual conflict handling을 neutral graph type으로 전환하고 graph production/test package에서 internal/git import를 제거한다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               4
             ],
             "parentTaskId": 2,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-21T09:01:53.268Z"
           },
           {
             "id": 7,
@@ -407,7 +408,7 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-21T09:01:00.323Z"
+        "updatedAt": "2026-08-21T09:01:53.268Z"
       },
       {
         "id": "3",
@@ -490,7 +491,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T09:01:00.323Z",
+      "lastModified": "2026-08-21T09:01:53.268Z",
       "taskCount": 5,
       "completedCount": 1,
       "tags": [
