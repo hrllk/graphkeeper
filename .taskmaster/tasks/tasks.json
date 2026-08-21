@@ -327,10 +327,11 @@
             "title": "ARCH-G0",
             "description": "[bounded-context infrastructure 분리] Architecture guardrails and characterization baseline",
             "details": "신규 boundary package의 forbidden import와 현재 legacy coupling baseline을 고정한다. 기존 go test/race/vet baseline을 유지하며 deliberate forbidden fixture가 guard 실패를 검증한다. 기존 internal/app legacy coupling은 baseline 예외로 기록하고 production behavior는 변경하지 않는다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 2,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-21T09:00:17.216Z"
           },
           {
             "id": 5,
@@ -405,7 +406,7 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-01T12:45:00.000Z"
+        "updatedAt": "2026-08-21T09:00:17.216Z"
       },
       {
         "id": "3",
@@ -488,7 +489,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T00:00:32.947Z",
+      "lastModified": "2026-08-21T09:00:17.216Z",
       "taskCount": 5,
       "completedCount": 1,
       "tags": [
