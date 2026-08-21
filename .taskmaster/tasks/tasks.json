@@ -364,12 +364,13 @@
             "title": "ARCH-P3",
             "description": "[bounded-context application 분리] Repository read snapshot port vertical flow",
             "details": "전체 app detox가 아니라 initial load/refresh와 graph projection 하나를 neutral read contract로 전환한다. fake snapshot output과 Git adapter translation/validity tests를 추가하고 미전환 workflow는 legacy path로 명시한다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               6
             ],
             "parentTaskId": 2,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-21T09:02:13.889Z"
           },
           {
             "id": 8,
@@ -408,7 +409,7 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-21T09:01:53.268Z"
+        "updatedAt": "2026-08-21T09:02:13.889Z"
       },
       {
         "id": "3",
@@ -491,7 +492,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T09:01:53.268Z",
+      "lastModified": "2026-08-21T09:02:13.890Z",
       "taskCount": 5,
       "completedCount": 1,
       "tags": [
