@@ -43,7 +43,7 @@ func (m model) handleTagPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.tagPopupOpen = false
-		m.status = loadingToast("Tagging commit...")
+		m.status = operationLoadingStatusFor(progressTagCommit, "Tagging commit...", state.ActionNone)
 		return m, executeCreateTag(m.repo, name, m.tagPopupTarget, m.commitLimit, m.tagProvenance)
 	case "backspace":
 		if len(m.tagPopupDraft) > 0 {

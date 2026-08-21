@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"hrllk/graphkeeper/internal/git"
+	"hrllk/graphkeeper/internal/state"
 )
 
 type stashPopupRow struct {
@@ -31,7 +32,7 @@ func (m model) handleStashMessageKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.stashMessageOpen = false
 		m.stashMessageDraft = ""
 		m.stashMessageError = ""
-		m.status = loadingToast("Stashing changes...")
+		m.status = operationLoadingStatusFor(progressStash, "Stashing changes...", state.ActionStash)
 		return m, executeStashAll(m.repo, m.commitLimit, message)
 	case "backspace":
 		if len(m.stashMessageDraft) > 0 {
@@ -96,7 +97,7 @@ func (m model) handleGraphStashPopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.graphStashPopOpen = false
 		m.graphStashPopMode = graphStashPopModePicker
-		m.status = loadingToast("Popping stash...")
+		m.status = operationLoadingStatusFor(progressStashPop, "Popping stash...", state.ActionStashPop)
 		return m, executeStashPop(m.repo, m.commitLimit, entry)
 	default:
 		return m, nil

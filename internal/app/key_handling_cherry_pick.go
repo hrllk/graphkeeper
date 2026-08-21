@@ -21,7 +21,7 @@ func (m model) handleCherryPickPickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No commits selected.", "Space toggles a commit into the cherry-pick queue.")
 			return m, nil
 		}
-		m.status = loadingToast("Cherry-picking...")
+		m.status = operationLoadingStatusFor(progressCherryPick, "Cherry-picking...", state.ActionCherryPick)
 		return m, executeCherryPick(m.repo, queue, m.commitLimit)
 	case "esc":
 		m.status = deriveStatus(m.repoStatus)

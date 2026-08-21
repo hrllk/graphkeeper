@@ -33,7 +33,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
 			return m, m.refreshCmd()
 		}
-		m.status = loadingToast("Pulling...")
+		m.status = operationLoadingStatusFor(progressPull, "Pulling...", state.ActionPull)
 		return m, executeValidatedPull(m.repo, m.commitLimit, *m.activePullRequest, msg.mode)
 	case pullWorkflowMsg:
 		if m.activePullRequest == nil || msg.result.OperationRequestID != m.activePullRequest.ID || msg.result.OperationEpoch != m.activePullRequest.Epoch {

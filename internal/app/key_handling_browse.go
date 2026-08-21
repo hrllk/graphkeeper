@@ -71,10 +71,10 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		m = switchBrowseSection(m, sectionTags)
 		return true, m, nil
 	case "f":
-		m.status = loadingToast("Fetching sources...")
+		m.status = operationLoadingStatusFor(progressFetchSources, "Fetching sources...", state.ActionNone)
 		return true, m, fetchRepoState(m.repo, m.commitLimit)
 	case "F":
-		m.status = loadingToast("Fetching tags...")
+		m.status = operationLoadingStatusFor(progressFetchTags, "Fetching tags...", state.ActionNone)
 		return true, m, fetchTagsRepoState(m.repo, m.commitLimit, m.tagProvenance)
 	case "P":
 		if m.activeSection == sectionTags {
@@ -83,13 +83,13 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 				m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No tag selected.", "Choose a tag row.")
 				return true, m, nil
 			}
-			m.status = loadingToast("Pushing tag...")
+			m.status = operationLoadingStatusFor(progressPushTag, "Pushing tag...", state.ActionPushTag)
 			return true, m, executePushTag(m.repo, item.Ref, m.commitLimit, m.tagProvenance)
 		}
 		if m.repoStatus.Root == "" || m.repoStatus.Detached || m.repoStatus.EmptyRepo {
 			return true, m, nil
 		}
-		m.status = loadingToast("Fetching for push...")
+		m.status = operationLoadingStatusFor(progressFetch, "Fetching for push...", state.ActionPush)
 		return true, m, executeFetchForPush(m.repo, m.commitLimit)
 	case "S":
 		m.stashPopupOpen = true
@@ -266,7 +266,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return m, nil
 		}
-		m.status = loadingToast("Analyzing graph target...")
+		m.status = operationLoadingStatusFor(progressGraphTargetAnalysis, "Analyzing graph target...", state.ActionMerge)
 		return m, checkGraphActionTarget(m.repo, state.ActionMerge, focus.Hash, m.repoStatus)
 	case "r":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
@@ -277,7 +277,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return m, nil
 		}
-		m.status = loadingToast("Analyzing graph target...")
+		m.status = operationLoadingStatusFor(progressGraphTargetAnalysis, "Analyzing graph target...", state.ActionRebase)
 		return m, checkGraphActionTarget(m.repo, state.ActionRebase, focus.Hash, m.repoStatus)
 	case "s":
 		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
@@ -285,7 +285,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "No reset target.", "Move to a commit line.")
 			return m, nil
 		}
-		m.status = loadingToast("Preparing reset...")
+		m.status = operationLoadingStatusFor(progressPrepareReset, "Preparing reset...", state.ActionReset)
 		return m, previewSelection(m.repo, m.repoStatus, state.ActionReset, focus.Hash)
 	case "space", " ":
 		targets := graphCheckoutTargets(m)
@@ -409,7 +409,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "a":
 		if m.activeSection == sectionCurrent && (m.repoStatus.MergeInProgress || m.repoStatus.RebaseInProgress) {
-			m.status = loadingToast("Aborting...")
+			m.status = operationLoadingStatusFor(progressAbort, "Aborting...", state.ActionAbort)
 			return m, executeAbort(m.repo, m.commitLimit)
 		}
 		return m, nil
@@ -417,7 +417,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activeSection == sectionCurrent {
 			if pullReady(m.repoStatus) {
 				request := beginPullRequest(&m)
-				m.status = loadingToast("Fetching upstream...")
+				m.status = operationLoadingStatusFor(progressFetch, "Fetching upstream...", state.ActionPull)
 				if m.pull != nil {
 					return m, startPullPreview(&m, request)
 				}
@@ -431,7 +431,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = actionPull(m.repoStatus)
 				return m, nil
 			}
-			m.status = loadingToast("Fetching upstream...")
+			m.status = operationLoadingStatusFor(progressFetch, "Fetching upstream...", state.ActionPull)
 			request := beginPullRequest(&m)
 			if m.pull != nil {
 				return m, startPullPreview(&m, request)

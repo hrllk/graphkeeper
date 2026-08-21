@@ -149,7 +149,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status.Title = titleMsg
 			return m, nil
 		}
-		m.status = loadingToast("Pushing...")
+		m.status = operationLoadingStatusFor(progressPush, "Pushing...", state.ActionPush)
 		return m, executePush(m.repo, msg.status.Branch, m.commitLimit)
 	case pullFetchedMsg:
 		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
@@ -198,7 +198,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.refreshCmd()
 		}
 		isFF := msg.snapshot.IsFastForward && msg.snapshot.FastForwardKnown
-		m.status = loadingToast("Analyzing pull...")
+		m.status = operationLoadingStatusFor(progressPull, "Analyzing pull...", state.ActionPull)
 		return m, loadPullPreviewCommits(m.repo, isFF, *m.activePullRequest)
 	case pullPreviewReadyMsg:
 		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) || !samePullSnapshotIdentity(m.activePullRequest.OperationBaseline, msg.baseline) {
@@ -231,9 +231,12 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			detailMsg = "Fast-forward to the target commit."
 			m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
 		} else {
-			titleMsg = "Choose pull mode"
-			detailMsg = "Branches diverged.\n\n" + formatPullImpact(msg.impact) + "\n\nm: merge\nr: rebase\nesc: cancel"
-			m.status = m.status.WithConfirm(state.ActionPull, titleMsg, detailMsg)
+			titleMsg = "Pull into " + msg.snapshot.CurrentRef + "?"
+			if !applyMergeConfirmProjection(&m, msg.snapshot, msg.impact, m.pullConfirmStale) {
+				m.activePullRequest = nil
+				m.status = state.New().WithBlocked(state.BlockUnknown, "Pull impact unavailable.", "Refresh before pulling again.")
+				return m, m.refreshCmd()
+			}
 		}
 		m.status.Title = titleMsg
 		return m, nil

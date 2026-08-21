@@ -35,11 +35,11 @@ func (m model) executeResetModePick(mode state.ResetMode) (tea.Model, tea.Cmd) {
 	m.status.ResetMode = mode
 	switch mode {
 	case state.ResetModeSoft:
-		m.status = loadingToast("Soft reset...")
+		m.status = operationLoadingStatusFor(progressReset, "Soft reset...", state.ActionReset)
 	case state.ResetModeMixed:
-		m.status = loadingToast("Mixed reset...")
+		m.status = operationLoadingStatusFor(progressReset, "Mixed reset...", state.ActionReset)
 	default:
-		m.status = loadingToast("Hard reset...")
+		m.status = operationLoadingStatusFor(progressReset, "Hard reset...", state.ActionReset)
 	}
 	m.status.ResetMode = mode
 	return m, executeReset(m.repo, target, mode, m.commitLimit)

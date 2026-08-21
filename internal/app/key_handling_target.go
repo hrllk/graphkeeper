@@ -56,7 +56,7 @@ func (m model) handleTargetPickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = deleteBranchConfirmStatus(selection)
 			return m, nil
 		}
-		m.status = loadingToast("Previewing...")
+		m.status = operationLoadingStatusFor(progressTargetPreview, "Previewing...", action)
 		return m, previewSelection(m.repo, m.repoStatus, action, target)
 	case "esc":
 		m.handshakeCommits = make(map[string]bool)

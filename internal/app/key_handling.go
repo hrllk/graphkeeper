@@ -35,6 +35,9 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.graphSearchOpen {
 		return m.handleGraphSearchKey(msg)
 	}
+	if operationInputLocked(m) {
+		return m, nil
+	}
 	switch m.status.Mode {
 	case state.ModeOperationResult:
 		return m.handleOperationResultKey(msg)

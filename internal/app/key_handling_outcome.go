@@ -27,7 +27,7 @@ func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 	if action == state.ActionPull && m.activePullRequest == nil {
 		return m, nil
 	}
-	m.status = loadingToast("Running...")
+	m.status = operationLoadingStatusFor(progressOutcomeExecution, "Running...", action)
 	switch action {
 	case state.ActionPull:
 		if m.pull != nil {
