@@ -12,27 +12,60 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
-func loadRepoState(repo *git.Repo, limit int, epochs ...uint64) tea.Cmd {
+func loadRepoState(repo *git.Repo, limit int, args ...interface{}) tea.Cmd {
 	var epoch uint64
-	if len(epochs) > 0 {
-		epoch = epochs[0]
+	var store TagProvenanceStore
+	for _, arg := range args {
+		switch value := arg.(type) {
+		case uint64:
+			epoch = value
+		case TagProvenanceStore:
+			store = value
+		}
 	}
 	return func() tea.Msg {
 		status, err := repo.Status(context.Background(), limit)
 		if err != nil {
-			return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0}
+			return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(args) > 0}
 		}
-		status, err = loadLocalTagStatus(repo, status)
+		status, err = loadLocalTagStatus(repo, status, store)
 		if err != nil {
-			return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0}
+			return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(args) > 0}
 		}
-		return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0}
+		return loadedMsg{status: status, err: err, epoch: epoch, epochSet: len(args) > 0}
+	}
+}
+
+func loadRepositorySnapshot(port RepositoryReadPort, limit int, epoch uint64) tea.Cmd {
+	return func() tea.Msg {
+		if port == nil {
+			return loadedSnapshotMsg{result: ReadSnapshotResult{RepositoryEpoch: epoch, ErrorKind: ReadErrorRepository}}
+		}
+		result, err := port.ReadSnapshot(context.Background(), ReadRequest{CommitLimit: int(limit), RequestID: 1, RepositoryEpoch: epoch})
+		if err != nil && result.ErrorKind == ReadErrorNone {
+			result.ErrorKind = ReadErrorRepository
+		}
+		return loadedSnapshotMsg{result: result}
 	}
 }
 
 func (m *model) refreshCmd() tea.Cmd {
 	m.refreshGeneration++
-	return refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch, m.refreshGeneration)
+	if m.repositoryRead != nil {
+		generation := m.refreshGeneration
+		epoch := m.repositoryEpoch
+		port := m.repositoryRead
+		limit := m.commitLimit
+		readCmd := func() tea.Msg {
+			result, err := port.ReadSnapshot(context.Background(), ReadRequest{CommitLimit: limit, RequestID: generation, RepositoryEpoch: epoch})
+			if err != nil && result.ErrorKind == ReadErrorNone {
+				result.ErrorKind = ReadErrorRepository
+			}
+			return refreshedSnapshotMsg{result: result, refreshGeneration: generation}
+		}
+		return readCmd
+	}
+	return refreshRepoState(m.repo, m.commitLimit, m.repositoryEpoch, m.refreshGeneration, m.tagProvenance)
 }
 
 func scheduleRefresh() tea.Cmd {
@@ -41,18 +74,27 @@ func scheduleRefresh() tea.Cmd {
 	})
 }
 
-func refreshRepoState(repo *git.Repo, limit int, epochs ...uint64) tea.Cmd {
-	var epoch uint64
-	if len(epochs) > 0 {
-		epoch = epochs[0]
-	}
-	var generation uint64
-	if len(epochs) > 1 {
-		generation = epochs[1]
+func refreshRepoState(repo *git.Repo, limit int, args ...interface{}) tea.Cmd {
+	var epoch, generation uint64
+	var store TagProvenanceStore
+	for _, arg := range args {
+		switch value := arg.(type) {
+		case uint64:
+			if epoch == 0 {
+				epoch = value
+			} else {
+				generation = value
+			}
+		case TagProvenanceStore:
+			store = value
+		}
 	}
 	return func() tea.Msg {
 		status, err := repo.Status(context.Background(), limit)
-		return refreshedMsg{status: status, err: err, epoch: epoch, epochSet: len(epochs) > 0, refreshGeneration: generation, generationSet: len(epochs) > 1}
+		if err == nil {
+			status, err = loadLocalTagStatus(repo, status, store)
+		}
+		return refreshedMsg{status: status, err: err, epoch: epoch, epochSet: len(args) > 0, refreshGeneration: generation, generationSet: len(args) > 1}
 	}
 }
 
@@ -95,7 +137,14 @@ func fetchRepoState(repo *git.Repo, limit int) tea.Cmd {
 	}
 }
 
-func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
+func firstTagStore(stores []TagProvenanceStore) TagProvenanceStore {
+	if len(stores) == 0 {
+		return nil
+	}
+	return stores[0]
+}
+
+func fetchTagsRepoState(repo *git.Repo, limit int, stores ...TagProvenanceStore) tea.Cmd {
 	return func() tea.Msg {
 		if err := repo.FetchTags(context.Background()); err != nil {
 			return fetchedMsg{err: err}
@@ -120,8 +169,10 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 		}
 		status = attachGraphTagEntries(status)
 		snapshot := buildTagSnapshot(tags, remoteTags, tagSyncSynced)
-		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
-			return fetchedMsg{status: status, err: err}
+		if len(stores) > 0 && stores[0] != nil {
+			if saveErr := stores[0].Save(context.Background(), snapshot); saveErr != nil {
+				return fetchedMsg{status: status, err: saveErr}
+			}
 		}
 		status = applyTagSnapshot(status, snapshot)
 		status.TagProvenanceLoaded = true
@@ -129,7 +180,7 @@ func fetchTagsRepoState(repo *git.Repo, limit int) tea.Cmd {
 	}
 }
 
-func executePushTag(repo *git.Repo, tag string, limit int) tea.Cmd {
+func executePushTag(repo *git.Repo, tag string, limit int, stores ...TagProvenanceStore) tea.Cmd {
 	return func() tea.Msg {
 		if tag == "" {
 			return executedMsg{action: state.ActionPushTag, err: fmt.Errorf("tag is empty")}
@@ -139,7 +190,7 @@ func executePushTag(repo *git.Repo, tag string, limit int) tea.Cmd {
 		if statusErr != nil {
 			return executedMsg{action: state.ActionPushTag, target: tag, err: statusErr}
 		}
-		status, statusErr = loadLocalTagStatus(repo, status)
+		status, statusErr = loadLocalTagStatus(repo, status, firstTagStore(stores))
 		if statusErr != nil {
 			return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: statusErr}
 		}
@@ -151,8 +202,10 @@ func executePushTag(repo *git.Repo, tag string, limit int) tea.Cmd {
 			return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: remoteErr}
 		}
 		snapshot := buildTagSnapshot(status.TagEntries, remoteTags, tagSyncSynced)
-		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
-			return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: err}
+		if store := firstTagStore(stores); store != nil {
+			if saveErr := store.Save(context.Background(), snapshot); saveErr != nil {
+				return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: saveErr}
+			}
 		}
 		status = applyTagSnapshot(status, snapshot)
 		return executedMsg{action: state.ActionPushTag, target: tag, status: status, err: err}
@@ -362,7 +415,7 @@ func executeDeleteBranch(repo *git.Repo, target string, remote bool, limit int) 
 	}
 }
 
-func executeDeleteTag(repo *git.Repo, target string, limit int) tea.Cmd {
+func executeDeleteTag(repo *git.Repo, target string, limit int, stores ...TagProvenanceStore) tea.Cmd {
 	return func() tea.Msg {
 		if target == "" {
 			return executedMsg{action: state.ActionDeleteTag, err: fmt.Errorf("target is empty")}
@@ -375,7 +428,7 @@ func executeDeleteTag(repo *git.Repo, target string, limit int) tea.Cmd {
 		if statusErr != nil {
 			return executedMsg{action: state.ActionDeleteTag, target: target, err: statusErr}
 		}
-		status, statusErr = loadLocalTagStatus(repo, status)
+		status, statusErr = loadLocalTagStatus(repo, status, firstTagStore(stores))
 		if statusErr != nil {
 			return executedMsg{action: state.ActionDeleteTag, target: target, status: status, err: statusErr}
 		}
@@ -383,7 +436,7 @@ func executeDeleteTag(repo *git.Repo, target string, limit int) tea.Cmd {
 	}
 }
 
-func executeDeleteRemoteTag(repo *git.Repo, target string, limit int) tea.Cmd {
+func executeDeleteRemoteTag(repo *git.Repo, target string, limit int, stores ...TagProvenanceStore) tea.Cmd {
 	return func() tea.Msg {
 		if target == "" {
 			return executedMsg{action: state.ActionDeleteRemoteTag, err: fmt.Errorf("target is empty")}
@@ -396,7 +449,7 @@ func executeDeleteRemoteTag(repo *git.Repo, target string, limit int) tea.Cmd {
 		if statusErr != nil {
 			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, err: statusErr}
 		}
-		status, statusErr = loadLocalTagStatus(repo, status)
+		status, statusErr = loadLocalTagStatus(repo, status, firstTagStore(stores))
 		if statusErr != nil {
 			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: statusErr}
 		}
@@ -405,8 +458,10 @@ func executeDeleteRemoteTag(repo *git.Repo, target string, limit int) tea.Cmd {
 			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: remoteErr}
 		}
 		snapshot := buildTagSnapshot(status.TagEntries, remoteTags, tagSyncSynced)
-		if err := writeTagSnapshot(status.Root, snapshot); err != nil {
-			return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: err}
+		if store := firstTagStore(stores); store != nil {
+			if saveErr := store.Save(context.Background(), snapshot); saveErr != nil {
+				return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: saveErr}
+			}
 		}
 		status = applyTagSnapshot(status, snapshot)
 		return executedMsg{action: state.ActionDeleteRemoteTag, target: target, status: status, err: err}

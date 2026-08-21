@@ -511,7 +511,7 @@ func TestExecutePushTagUpdatesRemoteSnapshot(t *testing.T) {
 	fixture := newCommandRepo(t)
 	runGit(t, fixture.root, "tag", "v1.0.0", fixture.initialHash)
 
-	got, ok := cmdResult(t, executePushTag(fixture.repo, "v1.0.0", 40)).(executedMsg)
+	got, ok := cmdResult(t, executePushTag(fixture.repo, "v1.0.0", 40, newTestTagStore(fixture.root))).(executedMsg)
 	if !ok {
 		t.Fatalf("expected executedMsg, got %T", cmdResult(t, executePushTag(fixture.repo, "v1.0.0", 40)))
 	}
@@ -631,7 +631,7 @@ func TestExecuteDeleteTagVariants(t *testing.T) {
 			t.Fatalf("CreateTag failed: %v", err)
 		}
 
-		got, ok := cmdResult(t, executeDeleteTag(fixture.repo, "v1.0.0", 40)).(executedMsg)
+		got, ok := cmdResult(t, executeDeleteTag(fixture.repo, "v1.0.0", 40, newTestTagStore(fixture.root))).(executedMsg)
 		if !ok {
 			t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeDeleteTag(fixture.repo, "v1.0.0", 40)))
 		}
@@ -831,7 +831,7 @@ func TestExecuteDeleteRemoteTagVariants(t *testing.T) {
 		}
 		runGit(t, fixture.root, "push", "origin", "v1.0.0")
 
-		got, ok := cmdResult(t, executeDeleteRemoteTag(fixture.repo, "v1.0.0", 40)).(executedMsg)
+		got, ok := cmdResult(t, executeDeleteRemoteTag(fixture.repo, "v1.0.0", 40, newTestTagStore(fixture.root))).(executedMsg)
 		if !ok {
 			t.Fatalf("expected executedMsg, got %T", cmdResult(t, executeDeleteRemoteTag(fixture.repo, "v1.0.0", 40)))
 		}

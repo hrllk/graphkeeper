@@ -4,13 +4,20 @@ import (
 	"context"
 	tea "github.com/charmbracelet/bubbletea"
 
+	commitinspector "hrllk/graphkeeper/internal/commitinspector"
+	"hrllk/graphkeeper/internal/events"
 	"hrllk/graphkeeper/internal/git"
+	"hrllk/graphkeeper/internal/graph"
 	"hrllk/graphkeeper/internal/state"
 )
 
 type model struct {
 	repo            *git.Repo
-	inspectorReader CommitInspectorReader
+	repositoryRead  RepositoryReadPort
+	pull            PullPort
+	inspectorReader commitinspector.CommitInspectorReader
+	tagProvenance   TagProvenanceStore
+	eventSink       events.EventSink
 	status          state.Status
 	repoStatus      git.Status
 
@@ -40,7 +47,7 @@ type model struct {
 
 	// Read-only Graph commit inspector.
 	commitInspectorOpen                bool
-	commitInspector                    git.CommitInspection
+	commitInspector                    CommitSnapshot
 	commitInspectorSnapshot            CommitSnapshot
 	commitInspectorDiffWindow          DiffWindow
 	commitInspectorWindowRequest       DiffWindowRequest
@@ -92,6 +99,7 @@ type model struct {
 	commitLimit        int
 	err                error
 	repoSnapshotLoaded bool
+	graphReadSnapshot  graph.Snapshot
 
 	// repositoryEpoch invalidates repository reads that started before a user
 	// operation. Bubble Tea commands run concurrently, so an older refresh
@@ -100,6 +108,7 @@ type model struct {
 	refreshGeneration         uint64
 	nextPullRequestID         uint64
 	activePullRequest         *pullRequest
+	pullCancel                context.CancelFunc
 	pullConfirmStale          bool
 	lastPullMode              PullMode
 	lastPullOperationBaseline PullSnapshotIdentity
@@ -122,10 +131,14 @@ const (
 	sectionTags
 )
 
-func New(repo *git.Repo) (tea.Model, error) {
+func NewWithDependencies(deps Dependencies) (tea.Model, error) {
 	m := model{
-		repo:            repo,
-		inspectorReader: newGitCommitInspectorReader(repo),
+		repo:            deps.Repo,
+		repositoryRead:  deps.RepositoryRead,
+		pull:            deps.Pull,
+		inspectorReader: deps.InspectorReader,
+		tagProvenance:   deps.TagProvenance,
+		eventSink:       deps.EventSink,
 		status:          loadingToast("Loading..."),
 		activeSection:   sectionGraph,
 		sectionCursor: map[graphSection]int{
@@ -143,6 +156,15 @@ func New(repo *git.Repo) (tea.Model, error) {
 	return m, nil
 }
 
+func (m model) publish(source, name string, fields map[string]string) {
+	if m.eventSink != nil {
+		_ = m.eventSink.Publish(events.Event{Source: source, Name: name, Fields: fields})
+	}
+}
+
 func (m model) Init() tea.Cmd {
-	return tea.Batch(loadRepoState(m.repo, m.commitLimit, m.repositoryEpoch), scheduleRefresh())
+	if m.repositoryRead != nil {
+		return tea.Batch(loadRepositorySnapshot(m.repositoryRead, m.commitLimit, m.repositoryEpoch), scheduleRefresh())
+	}
+	return tea.Batch(loadRepoState(m.repo, m.commitLimit, m.repositoryEpoch, m.tagProvenance), scheduleRefresh())
 }

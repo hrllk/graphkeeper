@@ -14,6 +14,8 @@ type loadedMsg struct {
 	epochSet bool
 }
 
+type loadedSnapshotMsg struct{ result ReadSnapshotResult }
+
 type tickMsg time.Time
 
 type stashLoadedMsg struct {
@@ -31,6 +33,11 @@ type refreshedMsg struct {
 	purpose           RefreshPurpose
 	operationRequest  uint64
 	operationEpoch    uint64
+}
+
+type refreshedSnapshotMsg struct {
+	result            ReadSnapshotResult
+	refreshGeneration uint64
 }
 
 type fetchedMsg struct {
@@ -136,6 +143,13 @@ type pullExecutionResultMsg struct {
 
 type pullToastDoneMsg struct {
 	requestID, requestEpoch uint64
+}
+
+type pullWorkflowMsg struct{ result PullWorkflowResult }
+
+type pullPortPreviewMsg struct {
+	result PullPreviewResult
+	err    error
 }
 
 type ContinuationRequested struct {
