@@ -16,11 +16,11 @@
             "title": "commit detail",
             "description": "Graph에서 선택한 커밋의 identity, 변경 파일 tree, unified diff를 독립 Inspector 화면으로 확인할 수 있는 read-only 흐름을 구현한다.",
             "details": "스펙 문서: ~/.gstack/graphkeeper/20260803-0001-graph-commit-inspector-spec.md. Graph에서 Enter로 기존 화면을 가리는 bordered Inspector를 열고, 4행 고정 header(commit/message/author/path), flat changed-files list, old/new line columns을 가진 unified diff, q/Esc/? footer를 제공한다. Header에는 선택 파일 full path를, 목록에는 ../../filename 축약 경로를 표시한다. MVP keymap은 j/k로 변경 파일을 탐색하고 Ctrl+U/D로 선택 파일 diff를 스크롤한다. 별도 pane focus, fold/unfold, h/l, Enter, Tab/m/r과 message footer는 포함하지 않는다. first-parent/root basis, rename/copy identity, binary/submodule/mode-only 상태, request/epoch stale 폐기, cancellation, bounded diff, ANSI/NO_COLOR semantic marker, narrow/wide frame matrix와 테스트를 포함한다. Tree-sitter grammar/query, word-level diff, 전체 message viewport와 Working Tree staging/commit은 후속 범위다.",
-            "status": "in-progress",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 1,
             "parentId": "undefined",
-            "updatedAt": "2026-08-21T00:00:32.947Z"
+            "updatedAt": "2026-08-21T09:36:35.048Z"
           },
           {
             "id": 2,
@@ -277,7 +277,7 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-21T00:00:32.947Z"
+        "updatedAt": "2026-08-21T09:36:35.048Z"
       },
       {
         "id": "2",
@@ -495,7 +495,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T09:03:22.911Z",
+      "lastModified": "2026-08-21T09:36:35.048Z",
       "taskCount": 5,
       "completedCount": 2,
       "tags": [
