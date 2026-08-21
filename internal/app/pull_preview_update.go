@@ -16,17 +16,31 @@ func handlePullPortPreview(m model, msg pullPortPreviewMsg) (tea.Model, tea.Cmd)
 	}
 	m.activePullRequest.OperationBaseline = msg.result.Baseline
 	m.activePullRequest.OperationBaselineSet = true
-	m.pullIsFastForward = msg.result.Impact.IsFastForward
+	local := pullSnapshotIdentity(m.repoStatus, m.activePullRequest.Epoch)
+	if !samePullSnapshotIdentity(local, msg.result.Baseline) {
+		m.activePullRequest = nil
+		m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+		return m, m.refreshCmd()
+	}
+	localSnapshot := pullImpactSnapshot(local, *m.activePullRequest)
+	localImpact := pullImpactSet(localSnapshot)
+	m.pullIsFastForward = local.Ahead == 0 && local.Behind > 0 && local.TrackingFresh && local.TrackingKnown
 	if len(msg.result.Commits) == 0 {
 		request := *m.activePullRequest
 		m.activePullRequest = nil
 		return completePullNoOp(m, m.repoStatus, request, PullModeNoOp)
 	}
-	m.status = state.New().WithConfirm(state.ActionPull, "Fast-forward pull?", msg.result.Impact.Summary)
-	m.status.Title = "Fast-forward pull?"
-	if !msg.result.Impact.IsFastForward {
-		m.status = m.status.WithConfirm(state.ActionPull, "Choose pull mode", msg.result.Impact.Summary+"\n\n m: merge\n r: rebase\n esc: cancel")
-		m.status.Title = "Choose pull mode"
+	if !localImpact.Valid {
+		m.activePullRequest = nil
+		m.status = state.New().WithBlocked(state.BlockUnknown, "Pull impact unavailable.", "Refresh before pulling again.")
+		return m, m.refreshCmd()
+	}
+	m.status = state.New().WithConfirm(state.ActionPull, "Pull?", localImpact.MergeSummary)
+	m.status.Title = "Pull into " + local.Branch + "?"
+	if !m.pullIsFastForward && !applyMergeConfirmProjection(&m, localSnapshot, localImpact, m.pullConfirmStale) {
+		m.activePullRequest = nil
+		m.status = state.New().WithBlocked(state.BlockUnknown, "Pull impact unavailable.", "Refresh before pulling again.")
+		return m, m.refreshCmd()
 	}
 	return m, nil
 }

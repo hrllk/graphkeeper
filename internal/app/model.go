@@ -110,6 +110,7 @@ type model struct {
 	activePullRequest         *pullRequest
 	pullCancel                context.CancelFunc
 	pullConfirmStale          bool
+	mergeConfirmView          *mergeConfirmViewModel
 	lastPullMode              PullMode
 	lastPullOperationBaseline PullSnapshotIdentity
 	operationResult           *OperationResultSummary
