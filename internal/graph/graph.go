@@ -3,9 +3,36 @@ package graph
 import (
 	"sort"
 	"strings"
-
-	"hrllk/graphkeeper/internal/git"
 )
+
+// Snapshot is the graph policy input. It deliberately contains only the
+// repository facts needed to calculate graph rows, lanes, and focus.
+type Snapshot struct {
+	Commits       []Commit
+	Branch        string
+	Head          string
+	LocalBranches []string
+	Conflict      ConflictState
+}
+
+type Commit struct {
+	Graph       string
+	Hash        string
+	Parents     []string
+	RelativeAge string
+	Author      string
+	Decorations []string
+	Subject     string
+	Tags        []string
+}
+
+type ConflictState struct {
+	Active           bool
+	MergeInProgress  bool
+	RebaseInProgress bool
+	Head             string
+	Target           string
+}
 
 type Node struct {
 	Hash        string
@@ -42,9 +69,9 @@ type Row struct {
 	Collapse     bool
 }
 
-func Nodes(rs git.Status) []Node {
-	items := make([]Node, 0, len(rs.GraphCommits))
-	for _, commit := range rs.GraphCommits {
+func Nodes(snapshot Snapshot) []Node {
+	items := make([]Node, 0, len(snapshot.Commits))
+	for _, commit := range snapshot.Commits {
 		items = append(items, Node{
 			Hash:        commit.Hash,
 			Parents:     append([]string(nil), commit.Parents...),
@@ -58,16 +85,16 @@ func Nodes(rs git.Status) []Node {
 	return items
 }
 
-func Rows(rs git.Status) []Row {
-	rs = injectVirtualConflictNode(rs)
-	if hasGraphPrefix(rs.GraphCommits) {
-		return rowsFromGitGraph(rs)
+func Rows(snapshot Snapshot) []Row {
+	snapshot = injectVirtualConflictNode(snapshot)
+	if hasGraphPrefix(snapshot.Commits) {
+		return rowsFromGraph(snapshot)
 	}
-	return rowsLegacy(rs)
+	return rowsLegacy(snapshot)
 }
 
-func CurrentFocus(rs git.Status, cursor int) Node {
-	items := Rows(rs)
+func CurrentFocus(snapshot Snapshot, cursor int) Node {
+	items := Rows(snapshot)
 	if cursor < 0 || cursor >= len(items) {
 		return Node{}
 	}
@@ -86,38 +113,38 @@ func FindRowByHash(rows []Row, hash string) int {
 	return -1
 }
 
-func injectVirtualConflictNode(rs git.Status) git.Status {
-	if !rs.MergeInProgress && !rs.RebaseInProgress {
-		return rs
+func injectVirtualConflictNode(snapshot Snapshot) Snapshot {
+	if !snapshot.Conflict.Active && !snapshot.Conflict.MergeInProgress && !snapshot.Conflict.RebaseInProgress {
+		return snapshot
 	}
 
-	newCommits := make([]git.GraphCommit, 0, len(rs.GraphCommits)+1)
+	newCommits := make([]Commit, 0, len(snapshot.Commits)+1)
 
-	vc := git.GraphCommit{
+	vc := Commit{
 		Hash:        "VIRTUAL_CONFLICT_HASH",
 		Subject:     "conflict",
 		RelativeAge: "now",
 		Author:      "You",
 	}
-	if rs.Head != "" {
-		vc.Parents = append(vc.Parents, rs.Head)
+	if snapshot.Conflict.Head != "" {
+		vc.Parents = append(vc.Parents, snapshot.Conflict.Head)
 	}
-	if rs.ConflictTarget != "" {
-		vc.Parents = append(vc.Parents, rs.ConflictTarget)
+	if snapshot.Conflict.Target != "" {
+		vc.Parents = append(vc.Parents, snapshot.Conflict.Target)
 	}
 
-	if hasGraphPrefix(rs.GraphCommits) {
-		if len(rs.GraphCommits) > 0 {
-			originalGraph := rs.GraphCommits[0].Graph
+	if hasGraphPrefix(snapshot.Commits) {
+		if len(snapshot.Commits) > 0 {
+			originalGraph := snapshot.Commits[0].Graph
 			vc.Graph = originalGraph
 
-			modifiedFirst := rs.GraphCommits[0]
+			modifiedFirst := snapshot.Commits[0]
 			modifiedFirst.Graph = strings.ReplaceAll(originalGraph, "*", "|")
 
 			newCommits = append(newCommits, vc)
 			newCommits = append(newCommits, modifiedFirst)
-			if len(rs.GraphCommits) > 1 {
-				newCommits = append(newCommits, rs.GraphCommits[1:]...)
+			if len(snapshot.Commits) > 1 {
+				newCommits = append(newCommits, snapshot.Commits[1:]...)
 			}
 		} else {
 			vc.Graph = "*"
@@ -125,18 +152,18 @@ func injectVirtualConflictNode(rs git.Status) git.Status {
 		}
 	} else {
 		newCommits = append(newCommits, vc)
-		newCommits = append(newCommits, rs.GraphCommits...)
+		newCommits = append(newCommits, snapshot.Commits...)
 	}
 
-	rs.GraphCommits = newCommits
-	return rs
+	snapshot.Commits = newCommits
+	return snapshot
 }
 
-func rowsFromGitGraph(rs git.Status) []Row {
-	commits := Nodes(rs)
+func rowsFromGraph(snapshot Snapshot) []Row {
+	commits := Nodes(snapshot)
 	rows := make([]Row, 0, len(commits))
 	children := buildChildrenMap(commits)
-	for _, commit := range rs.GraphCommits {
+	for _, commit := range snapshot.Commits {
 		if commit.Hash == "" && commit.Subject == "" && len(commit.Parents) == 0 && len(commit.Decorations) == 0 {
 			rows = append(rows, Row{
 				Graph:        commit.Graph,
@@ -156,22 +183,22 @@ func rowsFromGitGraph(rs git.Status) []Row {
 	return rows
 }
 
-func rowsLegacy(rs git.Status) []Row {
-	commits := Nodes(rs)
+func rowsLegacy(snapshot Snapshot) []Row {
+	commits := Nodes(snapshot)
 	rows := make([]Row, 0, len(commits))
 	children := buildChildrenMap(commits)
-	preferred := firstParentSet(commits, rs.Head)
-	active := initialGraphLanes(commits, rs)
+	preferred := firstParentSet(commits, snapshot.Head)
+	active := initialGraphLanes(commits, snapshot)
 	for _, commit := range commits {
 		matches := laneMatches(active, commit.Hash)
 		if len(matches) == 0 {
 			fallback := LaneRef{Hash: commit.Hash, Side: LaneOther}
-			active = ensureLaneSeeds(active, commit.Hash, []LaneRef{fallback}, preferred[commit.Hash], rs.Branch)
+			active = ensureLaneSeeds(active, commit.Hash, []LaneRef{fallback}, preferred[commit.Hash], snapshot.Branch)
 			matches = laneMatches(active, commit.Hash)
 		}
-		lane := chooseDisplayLane(active, matches, rs.Branch)
+		lane := chooseDisplayLane(active, matches, snapshot.Branch)
 		before := append([]LaneRef(nil), active...)
-		after := advanceGraphLanes(before, matches, commit, rs.Branch, nil, false)
+		after := advanceGraphLanes(before, matches, commit, snapshot.Branch, nil, false)
 		childRefs := append([]string(nil), children[commit.Hash]...)
 		row := Row{
 			Commit:       commit,
@@ -187,7 +214,7 @@ func rowsLegacy(rs git.Status) []Row {
 	return rows
 }
 
-func hasGraphPrefix(commits []git.GraphCommit) bool {
+func hasGraphPrefix(commits []Commit) bool {
 	for _, commit := range commits {
 		if commit.Graph != "" {
 			return true
@@ -196,15 +223,15 @@ func hasGraphPrefix(commits []git.GraphCommit) bool {
 	return false
 }
 
-func initialGraphLanes(commits []Node, rs git.Status) []LaneRef {
-	if rs.Branch == "" || rs.Head == "" {
+func initialGraphLanes(commits []Node, snapshot Snapshot) []LaneRef {
+	if snapshot.Branch == "" || snapshot.Head == "" {
 		return make([]LaneRef, 0, 8)
 	}
 	remoteTip := ""
-	remoteDecoration := "origin/" + rs.Branch
+	remoteDecoration := "origin/" + snapshot.Branch
 	headPresent := false
 	for _, commit := range commits {
-		if commit.Hash == rs.Head {
+		if commit.Hash == snapshot.Head {
 			headPresent = true
 		}
 		for _, decoration := range commit.Decorations {
@@ -216,16 +243,16 @@ func initialGraphLanes(commits []Node, rs git.Status) []LaneRef {
 	if !headPresent {
 		return make([]LaneRef, 0, 8)
 	}
-	lanes := []LaneRef{{Hash: rs.Head, Family: rs.Branch, Side: LaneLocal}}
-	if remoteTip != "" && remoteTip != rs.Head {
-		lanes = append(lanes, LaneRef{Hash: remoteTip, Family: rs.Branch, Side: LaneRemote})
+	lanes := []LaneRef{{Hash: snapshot.Head, Family: snapshot.Branch, Side: LaneLocal}}
+	if remoteTip != "" && remoteTip != snapshot.Head {
+		lanes = append(lanes, LaneRef{Hash: remoteTip, Family: snapshot.Branch, Side: LaneRemote})
 	}
 	return lanes
 }
 
-func buildLaneSeeds(commits []Node, rs git.Status) map[string][]LaneRef {
-	localSet := make(map[string]struct{}, len(rs.LocalBranches))
-	for _, branch := range rs.LocalBranches {
+func buildLaneSeeds(commits []Node, snapshot Snapshot) map[string][]LaneRef {
+	localSet := make(map[string]struct{}, len(snapshot.LocalBranches))
+	for _, branch := range snapshot.LocalBranches {
 		localSet[branch] = struct{}{}
 	}
 	seeds := make(map[string][]LaneRef, len(commits))
@@ -238,8 +265,8 @@ func buildLaneSeeds(commits []Node, rs git.Status) map[string][]LaneRef {
 			refs[i].Hash = commit.Hash
 		}
 		sort.SliceStable(refs, func(i, j int) bool {
-			left := laneRefScore(refs[i], rs.Branch)
-			right := laneRefScore(refs[j], rs.Branch)
+			left := laneRefScore(refs[i], snapshot.Branch)
+			right := laneRefScore(refs[j], snapshot.Branch)
 			if left != right {
 				return left > right
 			}
@@ -255,10 +282,10 @@ func buildLaneSeeds(commits []Node, rs git.Status) map[string][]LaneRef {
 	return seeds
 }
 
-func buildFamilyPriority(commits []Node, rs git.Status) map[string]int {
-	priority := make(map[string]int, len(rs.LocalBranches)+len(rs.RemoteBranches)+1)
-	if rs.Branch != "" {
-		priority[rs.Branch] = 0
+func buildFamilyPriority(commits []Node, snapshot Snapshot) map[string]int {
+	priority := make(map[string]int, len(snapshot.LocalBranches)+1)
+	if snapshot.Branch != "" {
+		priority[snapshot.Branch] = 0
 	}
 	return priority
 }

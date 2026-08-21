@@ -4,11 +4,10 @@ import (
 	"strings"
 
 	"hrllk/graphkeeper/internal/git"
-	"hrllk/graphkeeper/internal/graph"
 )
 
 func isLocalGraphPointer(rs git.Status, cursor int, laneCursor int) bool {
-	rows := graph.Rows(rs)
+	rows := graphRows(rs)
 	if cursor < 0 || cursor >= len(rows) {
 		return false
 	}

@@ -8,15 +8,15 @@ import (
 
 func syncBrowseStateFromGraph(m *model, rs git.Status) {
 	currentHash := ""
-	if rows := graph.Rows(m.repoStatus); m.sectionCursor[sectionGraph] >= 0 && m.sectionCursor[sectionGraph] < len(rows) {
+	if rows := graphRows(m.repoStatus); m.sectionCursor[sectionGraph] >= 0 && m.sectionCursor[sectionGraph] < len(rows) {
 		currentHash = rows[m.sectionCursor[sectionGraph]].Commit.Hash
 	}
-	rowCount := len(graph.Rows(rs))
+	rowCount := len(graphRows(rs))
 	m.graphScroll = clampScroll(m.graphScroll, rowCount, graphPageSize(m))
 	if rowCount == 0 {
 		return
 	}
-	rows := graph.Rows(rs)
+	rows := graphRows(rs)
 	row := graph.FindRowByHash(rows, currentHash)
 	if row < 0 {
 		row = clampCursor(m.sectionCursor[sectionGraph], len(rows))

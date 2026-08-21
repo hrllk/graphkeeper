@@ -63,12 +63,12 @@ func divergedSnapshotFromStatus(status git.Status, epoch uint64) DivergedSnapsho
 }
 
 type PullSnapshotIdentity struct {
-	Epoch                                                                  uint64
-	Branch, Head, Upstream, UpstreamOID                                    string
-	Ahead, Behind                                                          int
-	TrackingKnown, TrackingFresh                                           bool
-	WorktreeDirty, Detached, EmptyRepo, NoRemote, NoUpstream, UpstreamGone bool
-	MergeInProgress, RebaseInProgress, CherryPickInProgress                bool
+	Epoch                                                   uint64
+	Branch, Head, Upstream, UpstreamOID                     string
+	Ahead, Behind                                           int
+	TrackingKnown, TrackingFresh, WorktreeDirty, Detached   bool
+	EmptyRepo, NoRemote, NoUpstream, UpstreamGone           bool
+	MergeInProgress, RebaseInProgress, CherryPickInProgress bool
 }
 
 func pullSnapshotIdentity(status git.Status, epoch uint64) PullSnapshotIdentity {

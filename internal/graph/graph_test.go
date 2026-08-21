@@ -1,18 +1,12 @@
 package graph
 
-import (
-	"testing"
-
-	"hrllk/graphkeeper/internal/git"
-)
+import "testing"
 
 func TestRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
-	rows := Rows(git.Status{
-		GraphCommits: []git.GraphCommit{
-			{Graph: "*", Hash: "a1", Subject: "first"},
-			{Graph: "|", Hash: "b2", Subject: "second"},
-		},
-	})
+	rows := Rows(Snapshot{Commits: []Commit{
+		{Graph: "*", Hash: "a1", Subject: "first"},
+		{Graph: "|", Hash: "b2", Subject: "second"},
+	}})
 	if len(rows) != 2 {
 		t.Fatalf("expected 2 rows, got %d", len(rows))
 	}
@@ -25,10 +19,10 @@ func TestRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 }
 
 func TestRowsLegacyKeepsSiblingBranchesVisible(t *testing.T) {
-	rows := Rows(git.Status{
+	rows := Rows(Snapshot{
 		Branch: "main",
 		Head:   "a",
-		GraphCommits: []git.GraphCommit{
+		Commits: []Commit{
 			{Hash: "a", Parents: []string{"b"}, Decorations: []string{"HEAD -> main", "main"}, Subject: "tip"},
 			{Hash: "b", Parents: []string{"c"}, Decorations: []string{"origin/main"}, Subject: "next"},
 			{Hash: "c", Subject: "root"},
@@ -75,18 +69,16 @@ func TestCurrentFocusAndFindRowByHash(t *testing.T) {
 	if got := FindRowByHash(rows, "b2"); got != 1 {
 		t.Fatalf("expected row hash lookup to return 1, got %d", got)
 	}
-	focus := CurrentFocus(git.Status{GraphCommits: []git.GraphCommit{{Hash: "a1"}, {Hash: "b2"}}}, 1)
+	focus := CurrentFocus(Snapshot{Commits: []Commit{{Hash: "a1"}, {Hash: "b2"}}}, 1)
 	if focus.Hash != "b2" {
 		t.Fatalf("expected focus to resolve to b2, got %#v", focus)
 	}
 }
 
 func TestRowsInsertsVirtualConflictNodeDuringMerge(t *testing.T) {
-	rows := Rows(git.Status{
-		MergeInProgress: true,
-		Head:            "abc123",
-		ConflictTarget:  "def456",
-		GraphCommits:    []git.GraphCommit{{Hash: "abc123", Graph: "*", Subject: "tip"}},
+	rows := Rows(Snapshot{
+		Conflict: ConflictState{Active: true, MergeInProgress: true, Head: "abc123", Target: "def456"},
+		Commits:  []Commit{{Hash: "abc123", Graph: "*", Subject: "tip"}},
 	})
 	if len(rows) != 2 {
 		t.Fatalf("expected virtual conflict row plus original row, got %d", len(rows))
@@ -99,6 +91,22 @@ func TestRowsInsertsVirtualConflictNodeDuringMerge(t *testing.T) {
 	}
 	if rows[0].Commit.Parents[0] != "abc123" || rows[0].Commit.Parents[1] != "def456" {
 		t.Fatalf("expected conflict parents to include head and target, got %#v", rows[0].Commit.Parents)
+	}
+}
+
+func TestNodesProjectsEverySnapshotCommitField(t *testing.T) {
+	got := Nodes(Snapshot{Commits: []Commit{{
+		Graph: "*", Hash: "h", Parents: []string{"p"}, RelativeAge: "now", Author: "a",
+		Decorations: []string{"HEAD -> main"}, Subject: "subject", Tags: []string{"v1"},
+	}}})
+	if len(got) != 1 || got[0].Hash != "h" || got[0].RelativeAge != "now" || got[0].Author != "a" || got[0].Subject != "subject" || len(got[0].Parents) != 1 || got[0].Decorations[0] != "HEAD -> main" || got[0].Tags[0] != "v1" {
+		t.Fatalf("snapshot fields were not projected: %#v", got)
+	}
+}
+
+func TestRowsEmptySnapshotIsEmpty(t *testing.T) {
+	if got := Rows(Snapshot{}); len(got) != 0 {
+		t.Fatalf("expected empty graph, got %#v", got)
 	}
 }
 

@@ -10,11 +10,11 @@ import (
 )
 
 func graphNodes(rs git.Status) []graphNode {
-	return graph.Nodes(rs)
+	return graph.Nodes(graphSnapshot(rs))
 }
 
 func graphRows(rs git.Status) []graphRow {
-	return graph.Rows(rs)
+	return graph.Rows(graphSnapshot(rs))
 }
 
 func graphRowWidth(row graphRow) int {
@@ -25,8 +25,18 @@ func findGraphRowByHash(rows []graphRow, hash string) int {
 	return graph.FindRowByHash(rows, hash)
 }
 
+func graphRowsForModel(m *model) []graphRow {
+	if m.graphReadSnapshot.Commits != nil || m.graphReadSnapshot.Branch != "" || m.graphReadSnapshot.Head != "" {
+		return graph.Rows(m.graphReadSnapshot)
+	}
+	if m.repositoryRead != nil {
+		return nil
+	}
+	return graphRows(m.repoStatus)
+}
+
 func graphPageSize(m *model) int {
-	rows := graph.Rows(m.repoStatus)
+	rows := graphRowsForModel(m)
 	hint := repositoryStateHintForModel(m)
 	return graphPageSizeForRowsWithHint(m, rows, m.graphScroll, graphContentHeightForModel(m), hint != "")
 }
@@ -90,7 +100,39 @@ func graphPointerLane(row graphRow) int {
 }
 
 func currentGraphFocus(rs git.Status, cursor int) graphNode {
-	return graph.CurrentFocus(rs, cursor)
+	return graph.CurrentFocus(graphSnapshot(rs), cursor)
+}
+
+// graphSnapshot is retained only for legacy graph helpers and characterization
+// tests. The active initial-load/refresh projection uses graphReadSnapshot,
+// populated exclusively by the RepositoryReadPort adapter.
+func graphSnapshot(rs git.Status) graph.Snapshot {
+	snapshot := graph.Snapshot{
+		Branch:        rs.Branch,
+		Head:          rs.Head,
+		LocalBranches: append([]string(nil), rs.LocalBranches...),
+		Conflict: graph.ConflictState{
+			Active:           rs.MergeInProgress || rs.RebaseInProgress,
+			MergeInProgress:  rs.MergeInProgress,
+			RebaseInProgress: rs.RebaseInProgress,
+			Head:             rs.Head,
+			Target:           rs.ConflictTarget,
+		},
+		Commits: make([]graph.Commit, 0, len(rs.GraphCommits)),
+	}
+	for _, commit := range rs.GraphCommits {
+		snapshot.Commits = append(snapshot.Commits, graph.Commit{
+			Graph:       commit.Graph,
+			Hash:        commit.Hash,
+			Parents:     append([]string(nil), commit.Parents...),
+			RelativeAge: commit.RelativeAge,
+			Author:      commit.Author,
+			Decorations: append([]string(nil), commit.Decorations...),
+			Subject:     commit.Subject,
+			Tags:        append([]string(nil), commit.Tags...),
+		})
+	}
+	return snapshot
 }
 
 func graphCheckoutTarget(m model) (string, bool) {
@@ -182,7 +224,7 @@ func focusGraphHead(m *model, rs git.Status) {
 
 func focusGraphCommit(m *model, rs git.Status, hash string) bool {
 	m.activeSection = sectionGraph
-	rows := graph.Rows(rs)
+	rows := graphRows(rs)
 	if len(rows) == 0 {
 		m.sectionCursor[sectionGraph] = 0
 		m.graphScroll = 0
@@ -204,7 +246,7 @@ func focusGraphCommit(m *model, rs git.Status, hash string) bool {
 }
 
 func moveGraphBrowseCursor(m model, delta int) model {
-	rows := graph.Rows(m.repoStatus)
+	rows := graphRowsForModel(&m)
 	cursor := graph.MoveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)
 	m.sectionCursor[sectionGraph] = cursor
 	m.contextScroll = 0
@@ -221,7 +263,7 @@ func moveGraphBrowseCursor(m model, delta int) model {
 }
 
 func moveGraphLane(m model, delta int) model {
-	rows := graph.Rows(m.repoStatus)
+	rows := graphRowsForModel(&m)
 	if len(rows) == 0 {
 		return m
 	}
@@ -231,13 +273,13 @@ func moveGraphLane(m model, delta int) model {
 }
 
 func pageBrowseGraph(m model, pages int) model {
-	total := len(graph.Rows(m.repoStatus))
+	total := len(graphRowsForModel(&m))
 	if total == 0 {
 		return m
 	}
 	page := graphPageSize(&m)
 	delta := page * pages
-	rows := graph.Rows(m.repoStatus)
+	rows := graphRowsForModel(&m)
 	cursor := graph.MoveSelectableGraphPointer(m.sectionCursor[sectionGraph], rows, delta)
 	m.sectionCursor[sectionGraph] = cursor
 	m.contextScroll = 0
