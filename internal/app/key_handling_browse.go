@@ -13,7 +13,7 @@ import (
 func branchCreateBaseForActiveSection(m model) string {
 	switch m.activeSection {
 	case sectionGraph:
-		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return ""
 		}
@@ -75,7 +75,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		return true, m, fetchRepoState(m.repo, m.commitLimit)
 	case "F":
 		m.status = loadingToast("Fetching tags...")
-		return true, m, fetchTagsRepoState(m.repo, m.commitLimit)
+		return true, m, fetchTagsRepoState(m.repo, m.commitLimit, m.tagProvenance)
 	case "P":
 		if m.activeSection == sectionTags {
 			item, ok := activeSectionTargetItem(m)
@@ -84,7 +84,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 				return true, m, nil
 			}
 			m.status = loadingToast("Pushing tag...")
-			return true, m, executePushTag(m.repo, item.Ref, m.commitLimit)
+			return true, m, executePushTag(m.repo, item.Ref, m.commitLimit, m.tagProvenance)
 		}
 		if m.repoStatus.Root == "" || m.repoStatus.Detached || m.repoStatus.EmptyRepo {
 			return true, m, nil
@@ -139,7 +139,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 			if m.awaitingGoTop {
 				m.sectionCursor[sectionGraph] = 0
 				m.graphScroll = 0
-				rows := graph.Rows(m.repoStatus)
+				rows := graphRows(m.repoStatus)
 				if len(rows) > 0 {
 					m.graphLaneCursor = graph.PointerLane(rows[0])
 				}
@@ -151,7 +151,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		return true, m, nil
 	case "G":
 		if m.activeSection == sectionGraph {
-			rows := graph.Rows(m.repoStatus)
+			rows := graphRows(m.repoStatus)
 			if len(rows) > 0 {
 				last := len(rows) - 1
 				m.sectionCursor[sectionGraph] = last
@@ -164,7 +164,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		return true, m, nil
 	case "H":
 		if m.activeSection == sectionGraph {
-			rows := graph.Rows(m.repoStatus)
+			rows := graphRows(m.repoStatus)
 			rowIdx := graph.FindRowByHash(rows, m.repoStatus.Head)
 			if rowIdx >= 0 {
 				m.sectionCursor[sectionGraph] = rowIdx
@@ -199,7 +199,7 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return m, nil
 		}
@@ -233,7 +233,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "t":
-		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return m, nil
 		}
@@ -262,7 +262,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Merge unavailable.", "Select a local branch.")
 			return m, nil
 		}
-		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return m, nil
 		}
@@ -273,14 +273,14 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Rebase unavailable.", "Select a local branch.")
 			return m, nil
 		}
-		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
 			return m, nil
 		}
 		m.status = loadingToast("Analyzing graph target...")
 		return m, checkGraphActionTarget(m.repo, state.ActionRebase, focus.Hash, m.repoStatus)
 	case "s":
-		focus := graph.CurrentFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash == "" {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "No reset target.", "Move to a commit line.")
 			return m, nil
@@ -353,7 +353,7 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No tag selected.", "Move to a tag row.")
 			return m, nil
 		}
-		rows := graph.Rows(m.repoStatus)
+		rows := graphRows(m.repoStatus)
 		row := graph.FindRowByHash(rows, item.CommitHash)
 		if row < 0 {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Tag target is missing.", "Refresh the repo and try again.")
@@ -418,6 +418,9 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if pullReady(m.repoStatus) {
 				request := beginPullRequest(&m)
 				m.status = loadingToast("Fetching upstream...")
+				if m.pull != nil {
+					return m, startPullPreview(&m, request)
+				}
 				return m, executeFetchForPull(m.repo, m.commitLimit, request)
 			}
 			m.status = actionPull(m.repoStatus)
@@ -430,6 +433,9 @@ func (m model) handleBrowseSectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.status = loadingToast("Fetching upstream...")
 			request := beginPullRequest(&m)
+			if m.pull != nil {
+				return m, startPullPreview(&m, request)
+			}
 			return m, executeFetchForPull(m.repo, m.commitLimit, request)
 		}
 		return m, nil

@@ -30,6 +30,9 @@ func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 	m.status = loadingToast("Running...")
 	switch action {
 	case state.ActionPull:
+		if m.pull != nil {
+			return m, startPullWorkflow(&m, PullModeMerge)
+		}
 		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 	case state.ActionAbort:
 		return m, executeAbort(m.repo, m.commitLimit)
@@ -48,6 +51,10 @@ func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 func (m model) handleOutcomePreviewEscape() (tea.Model, tea.Cmd) {
 	switch {
 	case m.status.Action == state.ActionPull:
+		if m.pullCancel != nil {
+			m.pullCancel()
+			m.pullCancel = nil
+		}
 		m.activePullRequest = nil
 		m.nextPullRequestID++
 		m.status = deriveStatus(m.repoStatus)

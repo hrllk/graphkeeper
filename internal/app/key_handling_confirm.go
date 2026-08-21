@@ -17,6 +17,10 @@ func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		return m.handleConfirmPullRebase()
 	case "n", "esc":
+		if m.pullCancel != nil {
+			m.pullCancel()
+			m.pullCancel = nil
+		}
 		m.handshakeCommits = make(map[string]bool)
 		m.activePullRequest = nil
 		m.pullConfirmStale = false
@@ -38,7 +42,13 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 		}
 		if m.pullIsFastForward {
 			m.status = loadingToast("Pulling...")
+			if m.pull != nil {
+				return m, startPullWorkflow(&m, PullModeMerge)
+			}
 			return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
+		}
+		if m.pull != nil {
+			return m, startPullWorkflow(&m, PullModeMerge)
 		}
 		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 	case state.ActionSetUpstream:
@@ -55,11 +65,11 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 	case state.ActionDeleteTag:
 		target := m.status.Selected
 		m.status = loadingToast(deleteTagLoadingMessage())
-		return m, executeDeleteTag(m.repo, target, m.commitLimit)
+		return m, executeDeleteTag(m.repo, target, m.commitLimit, m.tagProvenance)
 	case state.ActionDeleteRemoteTag:
 		target := m.status.Selected
 		m.status = loadingToast(deleteRemoteTagLoadingMessage())
-		return m, executeDeleteRemoteTag(m.repo, target, m.commitLimit)
+		return m, executeDeleteRemoteTag(m.repo, target, m.commitLimit, m.tagProvenance)
 	case state.ActionStash:
 		m.status = loadingToast("Stashing changes...")
 		return m, executeStashAll(m.repo, m.commitLimit, "graphkeeper: local cleanup")
@@ -102,6 +112,9 @@ func (m model) handleConfirmPullMerge() (tea.Model, tea.Cmd) {
 		}
 		m.handshakeCommits = make(map[string]bool)
 		m.status = loadingToast("Merging pull...")
+		if m.pull != nil {
+			return m, startPullWorkflow(&m, PullModeMerge)
+		}
 		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 	}
 	return m, nil
@@ -114,6 +127,9 @@ func (m model) handleConfirmPullRebase() (tea.Model, tea.Cmd) {
 		}
 		m.handshakeCommits = make(map[string]bool)
 		m.status = loadingToast("Rebasing pull...")
+		if m.pull != nil {
+			return m, startPullWorkflow(&m, PullModeRebase)
+		}
 		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeRebase)
 	}
 	return m, nil

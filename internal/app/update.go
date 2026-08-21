@@ -9,7 +9,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return handleWindowSize(m, msg)
-	case loadedMsg, refreshedMsg, tickMsg:
+	case loadedMsg, refreshedMsg, loadedSnapshotMsg, refreshedSnapshotMsg, tickMsg:
 		return handleLifecycleUpdate(m, msg)
 	case stashLoadedMsg:
 		return handleStashUpdate(m, msg)
@@ -17,6 +17,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return handleTagUpdate(m, msg)
 	case fetchedMsg, preparedMsg, pullCheckedMsg, previewMsg, graphActionCheckMsg, pushFetchedMsg, pullFetchedMsg, pullPreviewReadyMsg, pullToastDoneMsg, branchToastDoneMsg:
 		return handleFetchUpdate(m, msg)
+	case pullPortPreviewMsg:
+		return handlePullPortPreview(m, msg)
 	case pullValidationMsg:
 		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
 			return m, nil
@@ -33,6 +35,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.status = loadingToast("Pulling...")
 		return m, executeValidatedPull(m.repo, m.commitLimit, *m.activePullRequest, msg.mode)
+	case pullWorkflowMsg:
+		if m.activePullRequest == nil || msg.result.OperationRequestID != m.activePullRequest.ID || msg.result.OperationEpoch != m.activePullRequest.Epoch {
+			return m, nil
+		}
+		m.pullCancel = nil
+		if msg.result.RefreshErrorKind != ReadErrorNone {
+			m.activePullRequest = nil
+			m.status = state.New()
+			m.status.Mode = state.ModeOperationResult
+			m.status.Action = state.ActionPull
+			m.status.Title = "PULL COMPLETED — STATE UNVERIFIED"
+			m.status.Message = m.status.Title
+			m.status.Detail = "Refresh failed. Press f to refresh repository state."
+			return m, nil
+		}
+		m.activePullRequest = nil
+		if msg.result.Execute.Reason != PullRejectNone || !msg.result.Execute.Succeeded {
+			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+			return m, m.refreshCmd()
+		}
+		if msg.result.Refresh.RequestID == msg.result.RefreshRequestID && msg.result.Refresh.RepositoryEpoch == msg.result.RefreshEpoch && (msg.result.Refresh.Snapshot.Graph.Commits != nil || msg.result.Refresh.Snapshot.Graph.Branch != "" || msg.result.Refresh.Snapshot.Graph.Head != "") {
+			m.graphReadSnapshot = msg.result.Refresh.Snapshot.Graph
+			m.repoSnapshotLoaded = true
+		}
+		m.status = state.New()
+		m.status.Mode = state.ModeOperationResult
+		m.status.Action = state.ActionPull
+		m.status.Title = "PULL COMPLETED"
+		m.status.Message = "PULL COMPLETED"
+		m.status.Detail = "Press q or Esc to return to the graph."
+		return m, nil
 	case pullExecutionResultMsg:
 		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
 			return m, nil
