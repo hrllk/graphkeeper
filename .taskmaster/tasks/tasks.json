@@ -285,7 +285,7 @@
         "description": "CLI 진입점과 애플리케이션 내부 구조를 현대적인 경계로 점진 개선한다.",
         "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리한 기반 위에 runtime state, screen state, workflow orchestration, Git adapter, renderer projection 경계를 단계적으로 정리한다. 구조개선 계획은 ~/.gstack/graphkeeper/20260731-0003-modern-architecture-boundary-improvement-plan.md를 따른다. T1 baseline과 T2 snapshot/operation epoch 계약을 먼저 완료하고, refresh 순서 역전과 파괴적 Git 작업의 stale target을 방지한다.",
         "testStrategy": "",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -403,15 +403,16 @@
             "title": "ARCH-P6",
             "description": "[bounded-context infrastructure 분리] Telemetry EventSink adapter",
             "details": "app/git의 concrete global telemetry 호출을 EventSink와 outbound adapter로 분리한다. fake/no-op sink와 JSONL adapter tests를 추가하고 best-effort delivery 및 process-local mutex 한계를 명시한다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               4
             ],
             "parentTaskId": 2,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-21T09:03:22.911Z"
           }
         ],
-        "updatedAt": "2026-08-21T09:03:01.362Z"
+        "updatedAt": "2026-08-21T09:03:22.911Z"
       },
       {
         "id": "3",
@@ -494,9 +495,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T09:03:01.362Z",
+      "lastModified": "2026-08-21T09:03:22.911Z",
       "taskCount": 5,
-      "completedCount": 1,
+      "completedCount": 2,
       "tags": [
         "master"
       ]
