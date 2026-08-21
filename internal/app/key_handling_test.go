@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/git"
-	"hrllk/graphkeeper/internal/graph"
 	"hrllk/graphkeeper/internal/state"
 )
 
@@ -317,7 +316,7 @@ func TestStashPopupEnterJumpsToBaseCommit(t *testing.T) {
 	if got.activeSection != sectionGraph {
 		t.Fatalf("expected enter to jump to graph section, got %v", got.activeSection)
 	}
-	wantRow := findGraphRowByHash(graph.Rows(status), "base1234")
+	wantRow := findGraphRowByHash(graphRows(status), "base1234")
 	if got.sectionCursor[sectionGraph] != wantRow {
 		t.Fatalf("expected graph cursor to jump to stash base row %d, got %d", wantRow, got.sectionCursor[sectionGraph])
 	}

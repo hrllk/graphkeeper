@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/state"
-	"hrllk/graphkeeper/internal/telemetry"
 )
 
 func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -27,7 +26,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError || m.status.Mode == state.ModeLoading {
 			m.status = deriveStatus(msg.status)
 		}
-		telemetry.Log("app", "fetch_repo", map[string]string{
+		m.publish("app", "fetch_repo", map[string]string{
 			"branch": msg.status.Branch,
 			"head":   msg.status.Head,
 		})
@@ -35,7 +34,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case preparedMsg:
 		if msg.err != nil {
 			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch failed.", msg.err.Error())
-			telemetry.Log("app", "prepare_failed", map[string]string{"action": string(msg.action), "error": msg.err.Error()})
+			m.publish("app", "prepare_failed", map[string]string{"action": string(msg.action), "error": msg.err.Error()})
 			return m, nil
 		}
 		msg.status = m.withCachedTagEntries(msg.status)
@@ -51,7 +50,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.status = deriveStatus(msg.status)
 		}
-		telemetry.Log("app", "prepare_action", map[string]string{
+		m.publish("app", "prepare_action", map[string]string{
 			"action": string(msg.action),
 			"branch": msg.status.Branch,
 		})
@@ -59,7 +58,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pullCheckedMsg:
 		if msg.err != nil {
 			m.status = state.New().WithBlocked(state.BlockFetchFailed, "Fetch failed.", msg.err.Error())
-			telemetry.Log("app", "pull_check_failed", map[string]string{"error": msg.err.Error()})
+			m.publish("app", "pull_check_failed", map[string]string{"error": msg.err.Error()})
 			return m, nil
 		}
 		msg.repo = m.withCachedTagEntries(msg.repo)
@@ -70,7 +69,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.storeTagEntries(msg.repo)
 		syncBrowseState(&m, msg.repo)
 		m.status = msg.status
-		telemetry.Log("app", "pull_check", map[string]string{
+		m.publish("app", "pull_check", map[string]string{
 			"upstream": msg.repo.Upstream,
 			"blocked":  string(msg.status.Block),
 		})
@@ -78,7 +77,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case previewMsg:
 		if msg.err != nil {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Preview failed.", msg.err.Error())
-			telemetry.Log("app", "preview_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
+			m.publish("app", "preview_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
 			return m, nil
 		}
 		msg.repo = m.withCachedTagEntries(msg.repo)
@@ -90,7 +89,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg.repo)
 		m.status = msg.status
 		m.status.Selected = msg.target
-		telemetry.Log("app", "preview_action", map[string]string{
+		m.publish("app", "preview_action", map[string]string{
 			"action": string(msg.action),
 			"target": msg.target,
 			"mode":   string(msg.status.Mode),
@@ -99,7 +98,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case graphActionCheckMsg:
 		if msg.err != nil {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Graph action check failed.", msg.err.Error())
-			telemetry.Log("app", "graph_action_check_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
+			m.publish("app", "graph_action_check_failed", map[string]string{"action": string(msg.action), "target": msg.target, "error": msg.err.Error()})
 			return m, nil
 		}
 		msg.repo = m.withCachedTagEntries(msg.repo)
@@ -122,7 +121,7 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = buildGraphActionReviewStatus(msg.action, msg.repo, msg.target, msg.base, msg.currentOnly, msg.targetOnly)
 			m.status.Selected = msg.target
 		}
-		telemetry.Log("app", "graph_action_check", map[string]string{
+		m.publish("app", "graph_action_check", map[string]string{
 			"action":      string(msg.action),
 			"target":      msg.target,
 			"base":        msg.base,

@@ -50,7 +50,7 @@ func TestGraphStatusTextUsesFixedSemanticValues(t *testing.T) {
 }
 
 func TestGraphStatusColumnKeepsTopologyPointer(t *testing.T) {
-	rows := graph.Rows(git.Status{
+	rows := graphRows(git.Status{
 		GraphCommits: []git.GraphCommit{{Hash: "abc1234", Subject: "Release", Tags: []string{"v1.0.0"}}},
 	})
 	if len(rows) != 1 {
@@ -557,7 +557,7 @@ func TestMoveGraphBrowseCursorUpdatesCursorScrollAndLane(t *testing.T) {
 			{Hash: "a1"},
 		},
 	}
-	rows := graph.Rows(status)
+	rows := graphRows(status)
 	m := model{
 		height:          80,
 		repoStatus:      status,
@@ -649,7 +649,7 @@ func TestSyncBrowseStateRestoresGraphSelectionAndClampsSections(t *testing.T) {
 	if m.sectionCursor[sectionGraph] != 1 {
 		t.Fatalf("expected graph cursor to stay on matching hash, got %d", m.sectionCursor[sectionGraph])
 	}
-	if m.graphLaneCursor != graph.PointerLane(graph.Rows(rs)[1]) {
+	if m.graphLaneCursor != graph.PointerLane(graphRows(rs)[1]) {
 		t.Fatalf("expected graph lane cursor to be restored, got %d", m.graphLaneCursor)
 	}
 	if m.sectionCursor[sectionCurrent] != 0 {
@@ -2525,7 +2525,7 @@ func TestCheckoutFocusesGraphHeadRow(t *testing.T) {
 	if got.activeSection != sectionGraph {
 		t.Fatalf("expected checkout to focus graph section, got %v", got.activeSection)
 	}
-	rows := graph.Rows(status)
+	rows := graphRows(status)
 	headRow := findGraphRowByHash(rows, status.Head)
 	if headRow < 0 {
 		t.Fatalf("expected head row for %q", status.Head)
@@ -2569,7 +2569,7 @@ func TestBranchCreateFocusesGraphHeadRow(t *testing.T) {
 	if got.activeSection != sectionGraph {
 		t.Fatalf("expected branch create to focus graph section, got %v", got.activeSection)
 	}
-	rows := graph.Rows(status)
+	rows := graphRows(status)
 	headRow := findGraphRowByHash(rows, status.Head)
 	if headRow < 0 {
 		t.Fatalf("expected head row for %q", status.Head)
@@ -2583,7 +2583,7 @@ func TestBranchCreateFocusesGraphHeadRow(t *testing.T) {
 }
 
 func TestGraphRowsExpandOnMerge(t *testing.T) {
-	rows := graph.Rows(git.Status{
+	rows := graphRows(git.Status{
 		GraphCommits: []git.GraphCommit{
 			{Hash: "c3", Parents: []string{"b2", "a2"}},
 			{Hash: "b2", Parents: []string{"a1"}},
@@ -2708,7 +2708,7 @@ func TestFindGraphRowByHash(t *testing.T) {
 }
 
 func TestGraphRowsKeepsSiblingBranchesVisible(t *testing.T) {
-	rows := graph.Rows(git.Status{
+	rows := graphRows(git.Status{
 		GraphCommits: []git.GraphCommit{
 			{Hash: "t3", Parents: []string{"base"}},
 			{Hash: "t2", Parents: []string{"base"}},
@@ -2728,7 +2728,7 @@ func TestGraphRowsKeepsSiblingBranchesVisible(t *testing.T) {
 }
 
 func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
-	rows := graph.Rows(git.Status{
+	rows := graphRows(git.Status{
 		GraphCommits: []git.GraphCommit{
 			{Graph: "*   ", Hash: "head", RelativeAge: "5 minutes ago", Author: "alexander", Subject: "Merge branch 'main' into develop", Decorations: []string{"HEAD -> main", "origin/main", "origin/HEAD", "develop"}},
 			{Graph: "|\\", Hash: ""},
@@ -2812,7 +2812,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 
 func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
 	forceTrueColorProfile(t)
-	rows := graph.Rows(git.Status{
+	rows := graphRows(git.Status{
 		LocalBranches: []string{"main"},
 		GraphCommits: []git.GraphCommit{
 			{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}},
@@ -3157,7 +3157,7 @@ func TestRenderTagPopupUsesSingleTitleStrip(t *testing.T) {
 }
 
 func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
-	rows := graph.Rows(git.Status{
+	rows := graphRows(git.Status{
 		Branch:        "main",
 		Head:          "a39d548",
 		LocalBranches: []string{"main", "develop"},
@@ -3182,7 +3182,7 @@ func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
 }
 
 func TestGraphRowsKeepsLocalAndOriginDivergedFamiliesSeparate(t *testing.T) {
-	rows := graph.Rows(git.Status{
+	rows := graphRows(git.Status{
 		Branch:         "tmp3",
 		Head:           "dee56f4",
 		LocalBranches:  []string{"tmp3"},
@@ -3297,7 +3297,7 @@ func TestRenderGraphConnectorLinesShowsParentShiftWithoutFullCollapse(t *testing
 }
 
 func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
-	rows := graph.Rows(git.Status{
+	rows := graphRows(git.Status{
 		Branch:         "tmp1",
 		Head:           "5df093e",
 		LocalBranches:  []string{"tmp1", "tmp2", "tmp3", "main", "develop"},

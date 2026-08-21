@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/state"
-	"hrllk/graphkeeper/internal/telemetry"
 )
 
 func handleBranchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -38,7 +37,7 @@ func handleBranchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				detail = "Choose a different branch name."
 			}
 			m.status = state.New().WithBlocked(reason, message, detail)
-			telemetry.Log("app", "branch_create_failed", map[string]string{"name": msg2.name, "base": msg2.base, "error": msg2.err.Error()})
+			m.publish("app", "branch_create_failed", map[string]string{"name": msg2.name, "base": msg2.base, "error": msg2.err.Error()})
 			return m, nil
 		}
 		m.branchOpen = false
@@ -49,7 +48,7 @@ func handleBranchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg2.status)
 		focusGraphHead(&m, msg2.status)
 		m.status = loadingToast("Branch created.")
-		telemetry.Log("app", "branch_create", map[string]string{"name": msg2.name, "base": msg2.base})
+		m.publish("app", "branch_create", map[string]string{"name": msg2.name, "base": msg2.base})
 		return m, tea.Tick(900*time.Millisecond, func(time.Time) tea.Msg {
 			return branchToastDoneMsg{}
 		})

@@ -8,7 +8,6 @@ import (
 
 	"hrllk/graphkeeper/internal/graph"
 	"hrllk/graphkeeper/internal/state"
-	"hrllk/graphkeeper/internal/telemetry"
 )
 
 func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -36,7 +35,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				message = "Working tree cleanup failed."
 			}
 			m.status = state.New().WithBlocked(reason, message, msg2.err.Error())
-			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
+			m.publish("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 			return m, nil
 		}
 
@@ -63,17 +62,17 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg2.action == state.ActionDeleteBranch && strings.Contains(msg2.err.Error(), "current branch cannot be deleted") {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Current branch cannot be deleted.", "Select a different local branch.")
-			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
+			m.publish("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 			return m, nil
 		}
 		if msg2.action == state.ActionDeleteTag && strings.Contains(strings.ToLower(msg2.err.Error()), "not found") {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Tag not found.", "Refresh the tag list and try again.")
-			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
+			m.publish("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 			return m, nil
 		}
 		if msg2.action == state.ActionDeleteRemoteTag && strings.Contains(strings.ToLower(msg2.err.Error()), "not found") {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Remote tag not found.", "Refresh tag provenance and try again.")
-			telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
+			m.publish("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 			return m, nil
 		}
 		if msg2.action == state.ActionStashPop {
@@ -84,7 +83,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				syncBrowseState(&m, msg2.status)
 			}
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Stash pop failed.", msg2.err.Error())
-			telemetry.Log("app", "execute_failed", map[string]string{
+			m.publish("app", "execute_failed", map[string]string{
 				"action": string(msg2.action),
 				"target": msg2.target,
 				"error":  msg2.err.Error(),
@@ -99,7 +98,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBrowse()
 			m.status.Message = "Pull conflicted."
 			m.status.Detail = "Press Enter to abort."
-			telemetry.Log("app", "execute_conflicted", map[string]string{
+			m.publish("app", "execute_conflicted", map[string]string{
 				"action": string(msg2.action),
 				"head":   msg2.status.Head,
 			})
@@ -113,7 +112,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBrowse()
 			m.status.Message = "Merge conflicted."
 			m.status.Detail = "Resolve conflicts, then abort or commit."
-			telemetry.Log("app", "execute_conflicted", map[string]string{
+			m.publish("app", "execute_conflicted", map[string]string{
 				"action": string(msg2.action),
 				"head":   msg2.status.Head,
 			})
@@ -127,7 +126,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBrowse()
 			m.status.Message = "Rebase conflicted."
 			m.status.Detail = "Resolve conflicts, then abort."
-			telemetry.Log("app", "execute_conflicted", map[string]string{
+			m.publish("app", "execute_conflicted", map[string]string{
 				"action": string(msg2.action),
 				"head":   msg2.status.Head,
 			})
@@ -141,7 +140,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = state.New().WithBrowse()
 			m.status.Message = "Cherry-pick conflicted."
 			m.status.Detail = "Resolve conflicts, then abort."
-			telemetry.Log("app", "execute_conflicted", map[string]string{
+			m.publish("app", "execute_conflicted", map[string]string{
 				"action": string(msg2.action),
 				"head":   msg2.status.Head,
 			})
@@ -176,7 +175,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.status = state.New().WithBlocked(reason, message, detail)
-		telemetry.Log("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
+		m.publish("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 		return m, nil
 	}
 	if msg2.action != state.ActionDeleteTag {
@@ -191,7 +190,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.status.Message = "Changes stashed."
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"head":   msg2.status.Head,
 		})
@@ -201,14 +200,14 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.status.Message = "Working tree cleaned."
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"head":   msg2.status.Head,
 		})
 		return m, nil
 	}
 	if msg2.action == state.ActionCherryPick {
-		rows := graph.Rows(msg2.status)
+		rows := graphRows(msg2.status)
 		rowIdx := graph.FindRowByHash(rows, msg2.status.Head)
 		if rowIdx >= 0 {
 			m.sectionCursor[sectionGraph] = rowIdx
@@ -217,7 +216,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.status.Message = "Cherry-pick complete."
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
 			"head":   msg2.status.Head,
@@ -235,7 +234,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status.Message = fmt.Sprintf("Push complete: %s.", msg2.target)
 		}
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"head":   msg2.status.Head,
 		})
@@ -249,7 +248,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status.Message = "Branch deleted."
 		}
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
 			"head":   msg2.status.Head,
@@ -261,7 +260,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.replaceTagEntries(msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.status.Message = "Tag deleted."
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
 			"head":   msg2.status.Head,
@@ -273,7 +272,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.replaceTagEntries(msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.status.Message = "Remote tag deleted."
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
 			"head":   msg2.status.Head,
@@ -284,7 +283,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.status.Message = "Stash popped."
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
 			"head":   msg2.status.Head,
@@ -296,7 +295,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg2.status)
 		focusGraphHead(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
 			"head":   msg2.status.Head,
@@ -306,7 +305,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg2.action == state.ActionPull {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"head":   msg2.status.Head,
 		})
@@ -316,14 +315,14 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handshakeCommits = make(map[string]bool)
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"head":   msg2.status.Head,
 		})
 		return m, nil
 	}
 	if msg2.action == state.ActionReset {
-		rows := graph.Rows(msg2.status)
+		rows := graphRows(msg2.status)
 		rowIdx := graph.FindRowByHash(rows, msg2.status.Head)
 		if rowIdx >= 0 {
 			m.sectionCursor[sectionGraph] = rowIdx
@@ -336,7 +335,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			mode = state.ResetModeHard
 		}
 		m.status.Message = fmt.Sprintf("%s reset complete: %s.", strings.Title(string(mode)), shorten(msg2.target, 7))
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
 			"head":   msg2.status.Head,
@@ -344,7 +343,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg2.action == state.ActionMerge || msg2.action == state.ActionRebase {
-		rows := graph.Rows(msg2.status)
+		rows := graphRows(msg2.status)
 		rowIdx := graph.FindRowByHash(rows, msg2.status.Head)
 		if rowIdx >= 0 {
 			m.sectionCursor[sectionGraph] = rowIdx
@@ -353,7 +352,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.status.Message = strings.TrimSuffix(executionDetail(msg2.action, msg2.target, msg2.status), ".")
-		telemetry.Log("app", "execute_action", map[string]string{
+		m.publish("app", "execute_action", map[string]string{
 			"action": string(msg2.action),
 			"target": msg2.target,
 			"head":   msg2.status.Head,
@@ -363,7 +362,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	syncBrowseState(&m, msg2.status)
 	m.status = state.New().WithOutcome(msg2.action, "Complete.", executionDetail(msg2.action, msg2.target, msg2.status), false)
 	m.status.Selected = msg2.target
-	telemetry.Log("app", "execute_action", map[string]string{
+	m.publish("app", "execute_action", map[string]string{
 		"action": string(msg2.action),
 		"target": msg2.target,
 		"head":   msg2.status.Head,

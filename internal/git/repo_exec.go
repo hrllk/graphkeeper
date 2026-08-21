@@ -30,6 +30,11 @@ func (r *Repo) Fetch(ctx context.Context) error {
 	return err
 }
 
+// FetchContext is the context-aware fetch entry point used by outbound
+// operation adapters. Fetch remains the compatibility name for callers that
+// already pass a context.
+func (r *Repo) FetchContext(ctx context.Context) error { return r.Fetch(ctx) }
+
 func (r *Repo) Push(ctx context.Context, branch string, force bool, setUpstream bool) (string, error) {
 	args := []string{"push"}
 	if force {
@@ -764,6 +769,11 @@ func (r *Repo) MergeBase(ctx context.Context, left, right string) (string, error
 
 func (r *Repo) Run(args ...string) (string, error) {
 	return r.runner.Run(args...)
+}
+
+// RunContext lets outbound adapters connect cancellation to the git process.
+func (r *Repo) RunContext(ctx context.Context, args ...string) (string, error) {
+	return r.runner.RunContext(ctx, args...)
 }
 
 func (r *Repo) currentBranch(ctx context.Context) (string, error) {
