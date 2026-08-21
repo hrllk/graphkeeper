@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"hrllk/graphkeeper/internal/graph"
+	"hrllk/graphkeeper/internal/state"
 )
 
 type fakeRepositoryRead struct {
@@ -52,5 +53,34 @@ func TestLifecycleAcceptsCurrentNeutralSnapshot(t *testing.T) {
 	}})
 	if got.(model).graphReadSnapshot.Head != "fresh" {
 		t.Fatal("current neutral snapshot was not projected")
+	}
+}
+
+func TestLifecycleStalePullDuringLoadingCancelsAndRefreshes(t *testing.T) {
+	cancelled := 0
+	read := &fakeRepositoryRead{}
+	m := model{
+		repositoryRead:    read,
+		repositoryEpoch:   4,
+		refreshGeneration: 9,
+		status: func() state.Status {
+			s := state.New().WithLoading("Analyzing pull...")
+			s.Action = state.ActionPull
+			return s
+		}(),
+		activePullRequest: &pullRequest{ID: 10, Epoch: 4},
+		pullCancel:        func() { cancelled++ },
+		nextPullRequestID: 10,
+	}
+	got, cmd := handleLifecycleUpdate(m, refreshedSnapshotMsg{
+		refreshGeneration: 8,
+		result:            ReadSnapshotResult{RepositoryEpoch: 3},
+	})
+	modelGot := got.(model)
+	if cancelled != 1 || modelGot.pullCancel != nil || modelGot.activePullRequest != nil || modelGot.pullConfirmStale {
+		t.Fatalf("stale loading pull was not invalidated: cancelled=%d model=%#v", cancelled, modelGot)
+	}
+	if modelGot.nextPullRequestID != 11 || modelGot.status.Block != state.BlockStaleSnapshot || cmd == nil {
+		t.Fatalf("unexpected stale transition: next=%d status=%#v cmd=%v", modelGot.nextPullRequestID, modelGot.status, cmd)
 	}
 }

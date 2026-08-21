@@ -1809,11 +1809,18 @@ func TestConfirmPullShortcutVariants(t *testing.T) {
 	m.activePullRequest = &pullRequest{ID: 7, Epoch: 3}
 	gotModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	got = gotModel.(model)
-	if cmd == nil {
-		t.Fatal("expected rebase-pull command for an existing request")
-	}
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Rebasing pull..." {
 		t.Fatalf("expected rebase-pull loading state, got %+v", got.status)
+	}
+
+	m = testKeyHandlingModel(fixture.repo, git.Status{Root: fixture.root, Branch: "main", Head: fixture.initialHash})
+	m.status = state.New().WithConfirm(state.ActionPull, "Pull?", "Detail")
+	m.pullIsFastForward = false
+	m.activePullRequest = &pullRequest{ID: 8, Epoch: 4}
+	gotModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = gotModel.(model)
+	if cmd == nil || got.status.Mode != state.ModeLoading || got.status.Message != "Pulling..." {
+		t.Fatalf("expected divergent enter to enter pull loading state, got status=%+v cmd=%v", got.status, cmd)
 	}
 }
 

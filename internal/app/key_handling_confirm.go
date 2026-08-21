@@ -9,14 +9,18 @@ import (
 )
 
 func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "y", "enter":
+	result := classifyConfirmKey(confirmView(m), msg.String())
+	switch result.Decision {
+	case decisionAccept:
 		return m.handleConfirmAccept()
-	case "m":
-		return m.handleConfirmPullMerge()
-	case "r":
-		return m.handleConfirmPullRebase()
-	case "n", "esc":
+	case decisionChoice:
+		switch result.ChoiceKey {
+		case choiceMerge:
+			return m.handleConfirmPullMerge()
+		case choiceRebase:
+			return m.handleConfirmPullRebase()
+		}
+	case decisionCancel:
 		if m.pullCancel != nil {
 			m.pullCancel()
 			m.pullCancel = nil
@@ -26,10 +30,8 @@ func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pullConfirmStale = false
 		m.nextPullRequestID++
 		m.status = deriveStatus(m.repoStatus)
-		return m, nil
-	default:
-		return m, nil
 	}
+	return m, nil
 }
 
 func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
@@ -41,40 +43,41 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.pullIsFastForward {
-			m.status = loadingToast("Pulling...")
+			m.status = operationLoadingStatusFor(progressPull, "Pulling...", state.ActionPull)
 			if m.pull != nil {
 				return m, startPullWorkflow(&m, PullModeMerge)
 			}
 			return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 		}
+		m.status = operationLoadingStatusFor(progressPull, "Pulling...", state.ActionPull)
 		if m.pull != nil {
 			return m, startPullWorkflow(&m, PullModeMerge)
 		}
 		return m, validateAndExecutePull(m.repo, m.commitLimit, *m.activePullRequest, PullModeMerge)
 	case state.ActionSetUpstream:
-		m.status = loadingToast("Pushing and tracking...")
+		m.status = operationLoadingStatusFor(progressPush, "Pushing and tracking...", state.ActionSetUpstream)
 		return m, executePushSetUpstream(m.repo, m.repoStatus.Branch, m.commitLimit)
 	case state.ActionForcePush:
-		m.status = loadingToast("Force pushing...")
+		m.status = operationLoadingStatusFor(progressPush, "Force pushing...", state.ActionForcePush)
 		return m, executeForcePush(m.repo, m.repoStatus.Branch, m.commitLimit)
 	case state.ActionDeleteBranch:
 		target := m.status.Selected
 		remote := m.status.DeleteRemote
-		m.status = loadingToast(deleteBranchLoadingMessage(remote))
+		m.status = operationLoadingStatusFor(progressDeleteBranch, deleteBranchLoadingMessage(remote), state.ActionDeleteBranch)
 		return m, executeDeleteBranch(m.repo, target, remote, m.commitLimit)
 	case state.ActionDeleteTag:
 		target := m.status.Selected
-		m.status = loadingToast(deleteTagLoadingMessage())
+		m.status = operationLoadingStatusFor(progressDeleteTag, deleteTagLoadingMessage(), state.ActionDeleteTag)
 		return m, executeDeleteTag(m.repo, target, m.commitLimit, m.tagProvenance)
 	case state.ActionDeleteRemoteTag:
 		target := m.status.Selected
-		m.status = loadingToast(deleteRemoteTagLoadingMessage())
+		m.status = operationLoadingStatusFor(progressDeleteRemoteTag, deleteRemoteTagLoadingMessage(), state.ActionDeleteRemoteTag)
 		return m, executeDeleteRemoteTag(m.repo, target, m.commitLimit, m.tagProvenance)
 	case state.ActionStash:
-		m.status = loadingToast("Stashing changes...")
+		m.status = operationLoadingStatusFor(progressStash, "Stashing changes...", state.ActionStash)
 		return m, executeStashAll(m.repo, m.commitLimit, "graphkeeper: local cleanup")
 	case state.ActionCleanWorkingTree:
-		m.status = loadingToast("Cleaning working tree...")
+		m.status = operationLoadingStatusFor(progressClean, "Cleaning working tree...", state.ActionCleanWorkingTree)
 		return m, executeCleanWorkingTree(m.repo, m.commitLimit, false)
 	case state.ActionCheckout:
 		target := m.status.Selected
@@ -82,7 +85,7 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 			m.status = deriveStatus(m.repoStatus)
 			return m, nil
 		}
-		m.status = loadingToast("Checking out...")
+		m.status = operationLoadingStatusFor(progressCheckout, "Checking out...", state.ActionCheckout)
 		return m, executeCheckout(m.repo, target, m.commitLimit)
 	case state.ActionReset, state.ActionMerge, state.ActionRebase:
 		target := m.status.Selected
@@ -91,12 +94,12 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 			if mode == "" {
 				mode = state.ResetModeHard
 			}
-			m.status = loadingToast(strings.Title(string(mode)) + " reset...")
+			m.status = operationLoadingStatusFor(progressReset, strings.Title(string(mode))+" reset...", state.ActionReset)
 			return m, executeReset(m.repo, target, mode, m.commitLimit)
 		} else if action == state.ActionMerge {
-			m.status = loadingToast("Merging...")
+			m.status = operationLoadingStatusFor(progressMerge, "Merging...", state.ActionMerge)
 		} else {
-			m.status = loadingToast("Rebasing...")
+			m.status = operationLoadingStatusFor(progressRebase, "Rebasing...", state.ActionRebase)
 		}
 		return m, executeAction(m.repo, action, target, m.commitLimit)
 	default:
@@ -111,7 +114,7 @@ func (m model) handleConfirmPullMerge() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.handshakeCommits = make(map[string]bool)
-		m.status = loadingToast("Merging pull...")
+		m.status = operationLoadingStatusFor(progressMerge, "Merging pull...", state.ActionMerge)
 		if m.pull != nil {
 			return m, startPullWorkflow(&m, PullModeMerge)
 		}
@@ -126,7 +129,7 @@ func (m model) handleConfirmPullRebase() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.handshakeCommits = make(map[string]bool)
-		m.status = loadingToast("Rebasing pull...")
+		m.status = operationLoadingStatusFor(progressRebase, "Rebasing pull...", state.ActionRebase)
 		if m.pull != nil {
 			return m, startPullWorkflow(&m, PullModeRebase)
 		}

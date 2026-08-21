@@ -14,6 +14,27 @@ func handleWindowSize(m model, msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func markPullStale(m model) (model, tea.Cmd) {
+	if m.activePullRequest == nil || m.status.Action != state.ActionPull {
+		return m, nil
+	}
+	if m.status.Mode == state.ModeLoading {
+		if m.pullCancel != nil {
+			m.pullCancel()
+			m.pullCancel = nil
+		}
+		m.activePullRequest = nil
+		m.pullConfirmStale = false
+		m.nextPullRequestID++
+		m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+		return m, m.refreshCmd()
+	}
+	if m.status.Mode == state.ModeReview || m.status.Mode == state.ModeConfirm {
+		m.pullConfirmStale = true
+	}
+	return m, nil
+}
+
 func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case loadedSnapshotMsg:
@@ -27,7 +48,7 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case refreshedSnapshotMsg:
 		if msg.refreshGeneration != m.refreshGeneration || msg.result.RepositoryEpoch != m.repositoryEpoch {
-			return m, nil
+			return markPullStale(m)
 		}
 		if msg.result.ErrorKind == ReadErrorInvalid || msg.result.ErrorKind == ReadErrorRepository || msg.result.ErrorKind == ReadErrorCanceled {
 			return m, nil
@@ -75,14 +96,12 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		generationMismatch := msg.generationSet && msg.refreshGeneration != m.refreshGeneration
 		if (msg.epochSet && msg.epoch != m.repositoryEpoch) || generationMismatch {
-			if m.activePullRequest != nil && (m.status.Mode == state.ModeReview || m.status.Mode == state.ModeConfirm || m.status.Action == state.ActionPull) {
-				m.pullConfirmStale = true
-			}
+			m, staleCmd := markPullStale(m)
 			m.publish("app", "discard_stale_refresh", map[string]string{
 				"expected_epoch": fmt.Sprintf("%d", m.repositoryEpoch),
 				"received_epoch": fmt.Sprintf("%d", msg.epoch),
 			})
-			return m, nil
+			return m, staleCmd
 		}
 		if msg.epochSet && msg.epoch > m.commitInspectorEpoch {
 			m = invalidateCommitInspectorForEpoch(m)

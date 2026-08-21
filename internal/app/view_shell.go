@@ -107,6 +107,21 @@ func renderPopupFooter(width int) string {
 	return centerReviewLineInWidth(popupHelp.Render("q: close"), width)
 }
 
+func renderMergeConfirmPopup(view mergeConfirmViewModel, bodyWidth int) string {
+	width := popupWidthForBody(bodyWidth, 36, 42)
+	popupBox := popupBorder.Padding(1, 2).Width(width).Align(lipgloss.Center)
+	title := "Pull into " + view.CurrentBranch + "?"
+	body := mergeConfirmBody(view, width-4)
+	footer := "m/enter: merge · r: rebase · n/esc: cancel"
+	if view.Disabled {
+		footer = "n: close · esc: close"
+	} else if width < 54 {
+		footer = "m/enter: merge\nr: rebase · n/esc: cancel"
+	}
+	body = joinLayoutSections(body, popupHelp.Render(footer), renderPopupFooter(width-4))
+	return renderFloatingTitlePopup(popupBox, title, centerReviewFooterLine(body, width-4), width)
+}
+
 func renderConfirmPopup(m model, bodyWidth int) string {
 	descStyle := popupBody
 	helpStyle := popupHelp
@@ -116,30 +131,29 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 		Padding(1, 2).
 		Width(width).
 		Align(align)
-	popupTitle := m.status.Title
+	view := confirmView(m)
+	if view.Kind == confirmChoiceKind && m.mergeConfirmView != nil {
+		mergeView := *m.mergeConfirmView
+		if m.pullConfirmStale {
+			mergeView.Disabled = true
+			mergeView.DisabledText = "Pull preview is stale.\nRefresh before continuing."
+		}
+		return renderMergeConfirmPopup(mergeView, bodyWidth)
+	}
+	popupTitle := view.Title
 	if popupTitle == "" || popupTitle == "Confirm" {
 		popupTitle = "Continue?"
 	}
-	helpText := "y: yes  •  n: no"
-	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
-		helpText = "m: merge  •  r: rebase"
-	} else if m.status.Message == "Fast-forward available." {
-		helpText = "enter: fast-forward"
-	} else if m.status.Action == state.ActionDeleteBranch {
-		helpText = "y: delete  •  n: cancel"
-	} else if m.status.Action == state.ActionDeleteTag {
-		helpText = "y: delete  •  n: cancel"
-	} else if m.status.Action == state.ActionStash {
-		helpText = "y: stash  •  n: cancel"
-	} else if m.status.Action == state.ActionCleanWorkingTree {
-		helpText = "y: clean  •  n: cancel"
+	detail := view.Detail
+	if view.Disabled {
+		detail = joinLayoutSections(detail, view.DisabledText)
 	}
 	return renderFloatingTitlePopup(
 		popupBox,
 		popupTitle,
 		centerReviewFooterLine(joinLayoutSections(
-			descStyle.Render(m.status.Detail),
-			helpStyle.Render(helpText),
+			descStyle.Render(detail),
+			helpStyle.Render(view.FooterText),
 			renderPopupFooter(width-4),
 		), width-4),
 		width,
