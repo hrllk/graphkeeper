@@ -377,12 +377,13 @@
             "title": "ARCH-P4",
             "description": "[bounded-context application 분리] Pull operation port vertical flow",
             "details": "pull 하나의 preview-validation-execution-result-refresh lifecycle을 neutral operation port로 전환한다. fake validation/execution tests, exact Git argument mapping, mutation 직전 target/baseline 재검증을 추가하며 기존 UI 흐름을 유지한다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               7
             ],
             "parentTaskId": 2,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-21T09:02:34.887Z"
           },
           {
             "id": 9,
@@ -409,7 +410,7 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-21T09:02:13.889Z"
+        "updatedAt": "2026-08-21T09:02:34.887Z"
       },
       {
         "id": "3",
@@ -492,7 +493,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T09:02:13.890Z",
+      "lastModified": "2026-08-21T09:02:34.887Z",
       "taskCount": 5,
       "completedCount": 1,
       "tags": [
