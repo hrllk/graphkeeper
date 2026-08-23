@@ -10,7 +10,7 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.commitInspectorOpen {
 		return m.handleCommitInspectorKey(msg)
 	}
-	if msg.String() == "q" && m.overlayOpen() {
+	if msg.String() == "q" && m.independentOverlayOpen() {
 		// q is the modal equivalent of esc. Browse keeps q as application quit.
 		msg = tea.KeyMsg{Type: tea.KeyEsc}
 	}
@@ -34,6 +34,9 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.graphSearchOpen {
 		return m.handleGraphSearchKey(msg)
+	}
+	if (m.startupReadPending || m.startupFailed) && (msg.String() == "q" || msg.String() == "ctrl+c") {
+		return m, tea.Quit
 	}
 	if operationInputLocked(m) {
 		return m, nil
@@ -73,6 +76,11 @@ func (m model) handleOperationResultKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+func (m model) independentOverlayOpen() bool {
+	return m.graphStashPopOpen || m.stashMessageOpen || m.tagPopupOpen || m.stashPopupOpen ||
+		m.branchOpen || m.hiddenHotkeysOpen || m.graphSearchOpen
 }
 
 func (m model) overlayOpen() bool {

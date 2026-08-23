@@ -85,7 +85,7 @@ func TestTagShortcutOpensPopupFromGraph(t *testing.T) {
 }
 
 func TestTagPopupValidationAndEditing(t *testing.T) {
-	m := model{status: state.New().WithBrowse(), tagPopupOpen: true, tagPopupTarget: "aaa1111"}
+	m := model{status: state.New().WithBrowse(), overlayState: overlayState{tagPopupOpen: true, tagPopupTarget: "aaa1111"}}
 
 	gotModel, cmd := m.handleTagPopupKey(tea.KeyMsg{Type: tea.KeyEnter})
 	got := gotModel.(model)

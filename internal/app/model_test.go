@@ -368,7 +368,11 @@ func TestSplitThreeHeightsUseStackedLayout(t *testing.T) {
 }
 
 func TestShellLayoutUsesFullHeightForGraphAndRightRail(t *testing.T) {
-	m := model{width: 140, height: 60}
+	m := model{
+		navigationState: navigationState{
+			width:  140,
+			height: 60,
+		}}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 	graphHeight := graphBoxHeightForModel(&m)
@@ -382,7 +386,11 @@ func TestShellLayoutUsesFullHeightForGraphAndRightRail(t *testing.T) {
 }
 
 func TestGraphRailMatchesFourStackedPanelHeight(t *testing.T) {
-	m := model{width: 140, height: 60}
+	m := model{
+		navigationState: navigationState{
+			width:  140,
+			height: 60,
+		}}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	_, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 	detailsHeight, localHeight, remoteHeight, tagsHeight := splitFourHeights(bodyHeight)
@@ -408,7 +416,11 @@ func TestSplitFourHeightsDistributesSmallRemainders(t *testing.T) {
 }
 
 func TestGraphContentMatchesStackedSideRailContent(t *testing.T) {
-	m := model{width: 140, height: 60}
+	m := model{
+		navigationState: navigationState{
+			width:  140,
+			height: 60,
+		}}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	_, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 	want := bodyHeight - 2
@@ -466,7 +478,11 @@ func TestRenderFloatingTitlePopupPlacesTitleOnBorder(t *testing.T) {
 }
 
 func TestShellLayoutUsesTwelvePercentMargins(t *testing.T) {
-	m := model{width: 140, height: 60}
+	m := model{
+		navigationState: navigationState{
+			width:  140,
+			height: 60,
+		}}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	if hMargin != 14 {
 		t.Fatalf("expected horizontal margin to use 10%% of width, got %d", hMargin)
@@ -480,7 +496,10 @@ func TestShellLayoutUsesTwelvePercentMargins(t *testing.T) {
 }
 
 func TestGraphPageSizeAccountsForConnectorBudget(t *testing.T) {
-	m := model{height: 24}
+	m := model{
+		navigationState: navigationState{
+			height: 24,
+		}}
 	rows := []graphRow{
 		{
 			Commit:       graphNode{Hash: "c10"},
@@ -526,8 +545,10 @@ func TestGraphPageSizeAccountsForConnectorBudget(t *testing.T) {
 
 func TestRenderAppViewKeepsShellPlacementFullWidth(t *testing.T) {
 	m := model{
-		width:  140,
-		height: 60,
+		navigationState: navigationState{
+			width:  140,
+			height: 60,
+		},
 		status: state.New().WithBrowse(),
 	}
 	got := ansi.Strip(renderAppView(m))
@@ -559,13 +580,17 @@ func TestMoveGraphBrowseCursorUpdatesCursorScrollAndLane(t *testing.T) {
 	}
 	rows := graphRows(status)
 	m := model{
-		height:          80,
-		repoStatus:      status,
-		activeSection:   sectionGraph,
-		sectionCursor:   map[graphSection]int{sectionGraph: 0},
-		graphLaneCursor: 0,
-		graphScroll:     0,
-	}
+		navigationState: navigationState{
+			height:          80,
+			activeSection:   sectionGraph,
+			sectionCursor:   map[graphSection]int{sectionGraph: 0},
+			graphLaneCursor: 0,
+			graphScroll:     0,
+		},
+		repositoryState: repositoryState{
+			repoStatus: status,
+		},
+		pullState: pullState{}}
 	got := moveGraphBrowseCursor(m, 1)
 	if got.sectionCursor[sectionGraph] != 1 {
 		t.Fatalf("expected cursor to move to next selectable row, got %d", got.sectionCursor[sectionGraph])
@@ -580,19 +605,23 @@ func TestMoveGraphBrowseCursorUpdatesCursorScrollAndLane(t *testing.T) {
 
 func TestMoveSectionBrowseCursorWraps(t *testing.T) {
 	m := model{
-		repoStatus: git.Status{
-			Branch:         "main",
-			LocalBranches:  []string{"main", "feature"},
-			RemoteBranches: []string{"origin/main", "origin/dev"},
-			Tags:           []string{"v1"},
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+			sectionCursor: map[graphSection]int{
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		activeSection: sectionCurrent,
-		sectionCursor: map[graphSection]int{
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:         "main",
+				LocalBranches:  []string{"main", "feature"},
+				RemoteBranches: []string{"origin/main", "origin/dev"},
+				Tags:           []string{"v1"},
+			},
 		},
-	}
+		pullState: pullState{}}
 	got := moveSectionBrowseCursor(m, 1)
 	if got.sectionCursor[sectionCurrent] != 1 {
 		t.Fatalf("expected current section cursor to move forward, got %d", got.sectionCursor[sectionCurrent])
@@ -610,27 +639,30 @@ func TestMoveSectionBrowseCursorWraps(t *testing.T) {
 
 func TestSyncBrowseStateRestoresGraphSelectionAndClampsSections(t *testing.T) {
 	m := model{
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{Hash: "c3", Parents: []string{"b2"}},
-				{Hash: "b2", Parents: []string{"a1"}},
-				{Hash: "a1"},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   1,
+				sectionCurrent: 1,
+				sectionRemote:  0,
+				sectionTags:    1,
 			},
-			Branch:          "main",
-			LocalBranches:   []string{"main", "feature"},
-			RemoteBranches:  []string{"origin/main"},
-			Tags:            []string{"v1", "v2"},
-			BranchUpstreams: map[string]string{"main": "origin/main", "feature": ""},
+			graphScroll:     2,
+			graphLaneCursor: 1,
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   1,
-			sectionCurrent: 1,
-			sectionRemote:  0,
-			sectionTags:    1,
-		},
-		graphScroll:     2,
-		graphLaneCursor: 1,
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{Hash: "c3", Parents: []string{"b2"}},
+					{Hash: "b2", Parents: []string{"a1"}},
+					{Hash: "a1"},
+				},
+				Branch:          "main",
+				LocalBranches:   []string{"main", "feature"},
+				RemoteBranches:  []string{"origin/main"},
+				Tags:            []string{"v1", "v2"},
+				BranchUpstreams: map[string]string{"main": "origin/main", "feature": ""},
+			},
+		}}
 	rs := git.Status{
 		GraphCommits: []git.GraphCommit{
 			{Hash: "c3", Parents: []string{"b2"}},
@@ -662,15 +694,18 @@ func TestSyncBrowseStateRestoresGraphSelectionAndClampsSections(t *testing.T) {
 
 func TestSyncBrowseStatePreservesCurrentSectionBranchByRef(t *testing.T) {
 	m := model{
-		repoStatus: git.Status{
-			Branch:          "tmp2",
-			LocalBranches:   []string{"tmp2", "tmp1"},
-			BranchUpstreams: map[string]string{"tmp2": "origin/tmp2", "tmp1": "origin/tmp1"},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionCurrent: 1,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionCurrent: 1,
-		},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:          "tmp2",
+				LocalBranches:   []string{"tmp2", "tmp1"},
+				BranchUpstreams: map[string]string{"tmp2": "origin/tmp2", "tmp1": "origin/tmp1"},
+			},
+		}}
 	rs := git.Status{
 		Branch:          "tmp2",
 		LocalBranches:   []string{"tmp2", "tmp1"},
@@ -686,14 +721,15 @@ func TestSyncBrowseStatePreservesCurrentSectionBranchByRef(t *testing.T) {
 
 func TestRenderGraphContentFixedHeight(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{Hash: "c2", Parents: []string{"c1"}},
-				{Hash: "c1"},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{Hash: "c2", Parents: []string{"c1"}},
+					{Hash: "c1"},
+				},
 			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	got := m.renderGraphContent(40, 6)
 	if lines := strings.Split(got, "\n"); len(lines) != 6 {
 		t.Fatalf("expected graph content to fit fixed height, got %d lines: %q", len(lines), got)
@@ -702,11 +738,12 @@ func TestRenderGraphContentFixedHeight(t *testing.T) {
 
 func TestRenderGraphContentShowsStatusLegendWhenItFits(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{{Hash: "c1", Subject: "Initial"}},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{{Hash: "c1", Subject: "Initial"}},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	got := ansi.Strip(m.renderGraphContent(80, 4))
 	if !strings.Contains(got, "S stash · T tag") {
 		t.Fatalf("expected graph page line to include status legend, got %q", got)
@@ -722,11 +759,12 @@ func TestRenderGraphContentShowsStatusLegendWhenItFits(t *testing.T) {
 
 func TestRenderGraphContentHidesLegendBeforeGraphDataOnNarrowWidth(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{{Hash: "c1", Subject: "Initial"}},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{{Hash: "c1", Subject: "Initial"}},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	got := ansi.Strip(m.renderGraphContent(28, 4))
 	if strings.Contains(got, "S stash") {
 		t.Fatalf("expected narrow graph page to preserve data before legend, got %q", got)
@@ -750,22 +788,26 @@ func TestRenderGraphProjectionDoesNotRepeatHotkeyHint(t *testing.T) {
 
 func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{
-					Hash:        "c2",
-					Subject:     "Merge branch 'main' into develop with a longer title",
-					Author:      "alexander",
-					Parents:     []string{"c1"},
-					Decorations: []string{"HEAD -> main"},
-					RelativeAge: "5 minutes ago",
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{
+						Hash:        "c2",
+						Subject:     "Merge branch 'main' into develop with a longer title",
+						Author:      "alexander",
+						Parents:     []string{"c1"},
+						Decorations: []string{"HEAD -> main"},
+						RelativeAge: "5 minutes ago",
+					},
 				},
 			},
 		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := m.renderGraphContent(88, 6)
 	if strings.Contains(got, "date") {
 		t.Fatalf("expected graph header to omit date label, got %q", got)
@@ -787,22 +829,26 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 
 func TestRenderGraphContentHidesAuthorHeaderWhenSpaceIsTight(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{
-					Hash:        "c2",
-					Subject:     "Merge branch 'main' into develop",
-					Author:      "hrllk",
-					Parents:     []string{"c1"},
-					Decorations: []string{"HEAD -> main"},
-					RelativeAge: "5 minutes ago",
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{
+						Hash:        "c2",
+						Subject:     "Merge branch 'main' into develop",
+						Author:      "hrllk",
+						Parents:     []string{"c1"},
+						Decorations: []string{"HEAD -> main"},
+						RelativeAge: "5 minutes ago",
+					},
 				},
 			},
 		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := m.renderGraphContent(70, 6)
 	if strings.Contains(got, "author") {
 		t.Fatalf("expected author header to disappear on narrow rows, got %q", got)
@@ -814,15 +860,19 @@ func TestRenderGraphContentHidesAuthorHeaderWhenSpaceIsTight(t *testing.T) {
 
 func TestRenderGraphContentStartsAtLeftEdge(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{Hash: "c2", Parents: []string{"c1"}},
-				{Hash: "c1"},
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{Hash: "c2", Parents: []string{"c1"}},
+					{Hash: "c1"},
+				},
 			},
 		},
-		activeSection: sectionCurrent,
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := ansi.Strip(m.renderGraphContent(40, 6))
 	lines := strings.Split(got, "\n")
 	if len(lines) == 0 {
@@ -835,17 +885,21 @@ func TestRenderGraphContentStartsAtLeftEdge(t *testing.T) {
 
 func TestRenderGraphContentOmitsSelectionArrow(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{Hash: "c2", Parents: []string{"c1"}},
-				{Hash: "c1"},
+		navigationState: navigationState{
+			activeSection:   sectionGraph,
+			sectionCursor:   map[graphSection]int{sectionGraph: 0},
+			graphLaneCursor: 0,
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{Hash: "c2", Parents: []string{"c1"}},
+					{Hash: "c1"},
+				},
 			},
 		},
-		activeSection:   sectionGraph,
-		sectionCursor:   map[graphSection]int{sectionGraph: 0},
-		graphLaneCursor: 0,
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := ansi.Strip(m.renderGraphContent(40, 6))
 	if strings.Contains(got, ">") {
 		t.Fatalf("expected graph content to omit selection arrow, got %q", got)
@@ -854,26 +908,30 @@ func TestRenderGraphContentOmitsSelectionArrow(t *testing.T) {
 
 func TestRenderDetailContentFixedHeight(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Root:     "/repo",
-			Branch:   "main",
-			Head:     "abc1234",
-			Upstream: "origin/main",
-			Remote:   "origin",
-			GraphCommits: []git.GraphCommit{
-				{
-					Hash:        "abc1234",
-					Parents:     []string{"def56789abcdef", "9876543210fedcba"},
-					Decorations: []string{"HEAD -> main", "origin/main"},
-				},
-			},
-			LocalBranches:      []string{"main"},
-			LocalBranchesKnown: true,
-			LocalBranchesFresh: true,
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
 		},
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:     "/repo",
+				Branch:   "main",
+				Head:     "abc1234",
+				Upstream: "origin/main",
+				Remote:   "origin",
+				GraphCommits: []git.GraphCommit{
+					{
+						Hash:        "abc1234",
+						Parents:     []string{"def56789abcdef", "9876543210fedcba"},
+						Decorations: []string{"HEAD -> main", "origin/main"},
+					},
+				},
+				LocalBranches:      []string{"main"},
+				LocalBranchesKnown: true,
+				LocalBranchesFresh: true,
+			},
+		},
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := m.renderDetailContent(40, 16)
 	if lines := strings.Split(got, "\n"); len(lines) != 16 {
 		t.Fatalf("expected detail content to fit fixed height, got %d lines: %q", len(lines), got)
@@ -897,26 +955,30 @@ func TestRenderDetailContentFixedHeight(t *testing.T) {
 
 func TestRenderDetailContentShowsGraphOptionalMetadata(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{
-					Hash:        "abc1234",
-					Parents:     []string{"def5678"},
-					Decorations: []string{"HEAD -> main", "feature/topic"},
-					Tags:        []string{"v1.0.0", "v1.1.0"},
-					Subject:     "commit subject",
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{
+						Hash:        "abc1234",
+						Parents:     []string{"def5678"},
+						Decorations: []string{"HEAD -> main", "feature/topic"},
+						Tags:        []string{"v1.0.0", "v1.1.0"},
+						Subject:     "commit subject",
+					},
 				},
+				LocalBranches:      []string{"main", "feature/topic"},
+				LocalBranchesKnown: true,
+				LocalBranchesFresh: true,
 			},
-			LocalBranches:      []string{"main", "feature/topic"},
-			LocalBranchesKnown: true,
-			LocalBranchesFresh: true,
+			stashByBase: map[string][]git.StashEntry{
+				"abc1234": []git.StashEntry{{Ref: "stash@{0}", Subject: "wip", BaseHash: "abc1234"}},
+			},
 		},
-		stashByBase: map[string][]git.StashEntry{
-			"abc1234": []git.StashEntry{{Ref: "stash@{0}", Subject: "wip", BaseHash: "abc1234"}},
-		},
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 
 	got := ansi.Strip(m.renderDetailContent(60, 14))
 	for _, want := range []string{"branches:", "stashes:", "tags:"} {
@@ -977,25 +1039,28 @@ func TestFormatBranchSummaryDecorationUsesLocalAndRemotePrefixes(t *testing.T) {
 
 func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch:        "main",
-			Head:          "abc1234",
-			Upstream:      "origin/main",
-			Remote:        "origin",
-			WorktreeDirty: true,
-			LocalBranches: []string{"main"},
-			Tracking: map[string]git.BranchTracking{
-				"main": {Behind: 1, Ahead: 2},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
 			},
-			TrackingKnown: true,
-			TrackingFresh: true,
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				Head:          "abc1234",
+				Upstream:      "origin/main",
+				Remote:        "origin",
+				WorktreeDirty: true,
+				LocalBranches: []string{"main"},
+				Tracking: map[string]git.BranchTracking{
+					"main": {Behind: 1, Ahead: 2},
+				},
+				TrackingKnown: true,
+				TrackingFresh: true,
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	m.activeSection = sectionCurrent
 	m.status.WorktreeState = state.WorktreeStateDirty
 
@@ -1015,20 +1080,24 @@ func TestRenderContextContentShowsCurrentBranchState(t *testing.T) {
 
 func TestRenderContextContentShowsMissingUpstreamAsNone(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch:        "main",
-			Head:          "abc1234",
-			LocalBranches: []string{"main"},
-			BranchUpstreams: map[string]string{
-				"main": "",
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+			sectionCursor: map[graphSection]int{
+				sectionCurrent: 0,
 			},
 		},
-		activeSection: sectionCurrent,
-		sectionCursor: map[graphSection]int{
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				Head:          "abc1234",
+				LocalBranches: []string{"main"},
+				BranchUpstreams: map[string]string{
+					"main": "",
+				},
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := ansi.Strip(m.renderContextContent(80, 12))
 	if !strings.Contains(got, "upstream: (none)") {
 		t.Fatalf("expected missing upstream to render as none, got %q", got)
@@ -1037,22 +1106,26 @@ func TestRenderContextContentShowsMissingUpstreamAsNone(t *testing.T) {
 
 func TestRenderContextContentDoesNotTreatMissingTrackingAsEqual(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch:        "main",
-			Head:          "abc1234",
-			Upstream:      "origin/main",
-			Remote:        "origin",
-			LocalBranches: []string{"main"},
-			BranchUpstreams: map[string]string{
-				"main": "origin/main",
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+			sectionCursor: map[graphSection]int{
+				sectionCurrent: 0,
 			},
 		},
-		activeSection: sectionCurrent,
-		sectionCursor: map[graphSection]int{
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				Head:          "abc1234",
+				Upstream:      "origin/main",
+				Remote:        "origin",
+				LocalBranches: []string{"main"},
+				BranchUpstreams: map[string]string{
+					"main": "origin/main",
+				},
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := ansi.Strip(m.renderContextContent(80, 12))
 	for _, unwanted := range []string{"ahead: 0", "behind: 0", "divergence: equal"} {
 		if strings.Contains(got, unwanted) {
@@ -1063,18 +1136,22 @@ func TestRenderContextContentDoesNotTreatMissingTrackingAsEqual(t *testing.T) {
 
 func TestRenderContextContentClipsToWidth(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch:        "main",
-			Head:          "abc1234",
-			Remote:        "origin",
-			WorktreeDirty: true,
-			LocalBranches: []string{"main", "feature/this-is-an-extremely-long-branch-name"},
-			Tags:          []string{"v1.0.0"},
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+			sectionCursor: map[graphSection]int{sectionCurrent: 0},
 		},
-		activeSection: sectionCurrent,
-		sectionCursor: map[graphSection]int{sectionCurrent: 0},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				Head:          "abc1234",
+				Remote:        "origin",
+				WorktreeDirty: true,
+				LocalBranches: []string{"main", "feature/this-is-an-extremely-long-branch-name"},
+				Tags:          []string{"v1.0.0"},
+			},
+		},
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := m.renderContextContent(28, 18)
 	for i, line := range strings.Split(got, "\n") {
 		if width := lipgloss.Width(line); width > 28 {
@@ -1097,16 +1174,20 @@ func TestRenderContextViewportShowsOverflowIndicatorAndScrolls(t *testing.T) {
 
 func TestRenderContextContentShowsTagTitleAndTarget(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			TagEntries: []git.TagEntry{
-				{Name: "v1.0.0", CommitHash: "abc1234", RelativeAge: "2 weeks ago", Message: "release title", OriginKnown: true, OnOrigin: true},
-			},
-			TagProvenanceLoaded: true,
+		navigationState: navigationState{
+			activeSection: sectionTags,
+			sectionCursor: map[graphSection]int{sectionTags: 0},
 		},
-		activeSection: sectionTags,
-		sectionCursor: map[graphSection]int{sectionTags: 0},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				TagEntries: []git.TagEntry{
+					{Name: "v1.0.0", CommitHash: "abc1234", RelativeAge: "2 weeks ago", Message: "release title", OriginKnown: true, OnOrigin: true},
+				},
+				TagProvenanceLoaded: true,
+			},
+		},
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 
 	got := ansi.Strip(m.renderContextContent(80, 18))
 	for _, want := range []string{"title: v1.0.0", "target: abc1234", "age: 2w", "message: release title", "provenance: (origin)"} {
@@ -1118,24 +1199,28 @@ func TestRenderContextContentShowsTagTitleAndTarget(t *testing.T) {
 
 func TestRenderDetailContentClipsToWidth(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch: "main",
-			Head:   "abc1234",
-			Remote: "origin",
-			GraphCommits: []git.GraphCommit{
-				{
-					Hash:        "abc1234",
-					Parents:     []string{"def5678", "9876543"},
-					Decorations: []string{"HEAD -> main", "origin/main"},
-				},
-			},
-			LocalBranches:      []string{"main"},
-			LocalBranchesKnown: true,
-			LocalBranchesFresh: true,
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
 		},
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch: "main",
+				Head:   "abc1234",
+				Remote: "origin",
+				GraphCommits: []git.GraphCommit{
+					{
+						Hash:        "abc1234",
+						Parents:     []string{"def5678", "9876543"},
+						Decorations: []string{"HEAD -> main", "origin/main"},
+					},
+				},
+				LocalBranches:      []string{"main"},
+				LocalBranchesKnown: true,
+				LocalBranchesFresh: true,
+			},
+		},
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := m.renderDetailContent(28, 18)
 	for i, line := range strings.Split(got, "\n") {
 		if width := lipgloss.Width(line); width > 28 {
@@ -1146,23 +1231,26 @@ func TestRenderDetailContentClipsToWidth(t *testing.T) {
 
 func TestRenderContextContentSplitsInfoAndActions(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch:        "main",
-			Head:          "abc1234",
-			Upstream:      "origin/main",
-			Remote:        "origin",
-			WorktreeDirty: true,
-			LocalBranches: []string{"main"},
-			Tracking: map[string]git.BranchTracking{
-				"main": {Behind: 1, Ahead: 2},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
 			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				Head:          "abc1234",
+				Upstream:      "origin/main",
+				Remote:        "origin",
+				WorktreeDirty: true,
+				LocalBranches: []string{"main"},
+				Tracking: map[string]git.BranchTracking{
+					"main": {Behind: 1, Ahead: 2},
+				},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	m.activeSection = sectionCurrent
 	m.status.WorktreeState = state.WorktreeStateDirty
 
@@ -1187,17 +1275,20 @@ func TestRenderContextContentSplitsInfoAndActions(t *testing.T) {
 
 func TestRenderContextContentAddsGraphActionsLeftMargin(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{Hash: "abc1234", Subject: "Commit 1"},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
 			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{Hash: "abc1234", Subject: "Commit 1"},
+				},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	m.activeSection = sectionGraph
 
 	got := ansi.Strip(m.renderContextContent(50, 12))
@@ -1208,22 +1299,25 @@ func TestRenderContextContentAddsGraphActionsLeftMargin(t *testing.T) {
 
 func TestRenderContextContentKeepsSplitLayoutOnNarrowWidth(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch:        "main",
-			Head:          "abc1234",
-			Upstream:      "origin/main",
-			Remote:        "origin",
-			LocalBranches: []string{"main"},
-			GraphCommits: []git.GraphCommit{
-				{Hash: "abc1234", Subject: "Commit 1"},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
 			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				Head:          "abc1234",
+				Upstream:      "origin/main",
+				Remote:        "origin",
+				LocalBranches: []string{"main"},
+				GraphCommits: []git.GraphCommit{
+					{Hash: "abc1234", Subject: "Commit 1"},
+				},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	m.activeSection = sectionGraph
 
 	got := ansi.Strip(m.renderContextContent(22, 8))
@@ -1251,22 +1345,25 @@ func TestRenderContextContentUsesSectionNameInHeaders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := model{
-				status: state.New().WithBrowse(),
-				repoStatus: git.Status{
-					Branch:        "main",
-					Head:          "abc1234",
-					Upstream:      "origin/main",
-					Remote:        "origin",
-					LocalBranches: []string{"main"},
-					GraphCommits: []git.GraphCommit{
-						{Hash: "abc1234", Subject: "Commit 1"},
+				navigationState: navigationState{
+					sectionCursor: map[graphSection]int{
+						sectionGraph:   0,
+						sectionCurrent: 0,
 					},
 				},
-				sectionCursor: map[graphSection]int{
-					sectionGraph:   0,
-					sectionCurrent: 0,
+				repositoryState: repositoryState{
+					repoStatus: git.Status{
+						Branch:        "main",
+						Head:          "abc1234",
+						Upstream:      "origin/main",
+						Remote:        "origin",
+						LocalBranches: []string{"main"},
+						GraphCommits: []git.GraphCommit{
+							{Hash: "abc1234", Subject: "Commit 1"},
+						},
+					},
 				},
-			}
+				status: state.New().WithBrowse()}
 			m.activeSection = tt.active
 
 			got := ansi.Strip(m.renderContextContent(60, 12))
@@ -1335,15 +1432,18 @@ func TestRenderContextContentSplitsAllSections(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := model{
-				status:     state.New().WithBrowse(),
-				repoStatus: tt.repoStatus,
-				sectionCursor: map[graphSection]int{
-					sectionGraph:   0,
-					sectionCurrent: 0,
-					sectionRemote:  0,
-					sectionTags:    0,
+				navigationState: navigationState{
+					sectionCursor: map[graphSection]int{
+						sectionGraph:   0,
+						sectionCurrent: 0,
+						sectionRemote:  0,
+						sectionTags:    0,
+					},
 				},
-			}
+				repositoryState: repositoryState{
+					repoStatus: tt.repoStatus,
+				},
+				status: state.New().WithBrowse()}
 			m.activeSection = tt.active
 			got := ansi.Strip(m.renderContextContent(48, 10))
 			if !strings.Contains(got, "│") {
@@ -1361,30 +1461,33 @@ func TestRenderContextContentSplitsAllSections(t *testing.T) {
 
 func TestRenderAppViewUsesCenteredHeaderAndMainLayout(t *testing.T) {
 	m := model{
-		width:  140,
-		height: 60,
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Root:           "/repo",
-			Branch:         "main",
-			Head:           "abc1234",
-			Upstream:       "origin/main",
-			Remote:         "origin",
-			LocalBranches:  []string{"main", "feature"},
-			RemoteBranches: []string{"origin/main", "origin/dev"},
-			Tags:           []string{"v1.0.0"},
-			GraphCommits: []git.GraphCommit{
-				{Hash: "abc1234", Parents: []string{"def5678"}, Decorations: []string{"HEAD -> main", "origin/main"}},
-				{Hash: "def5678"},
+		navigationState: navigationState{
+			width:  140,
+			height: 60,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
 			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:           "/repo",
+				Branch:         "main",
+				Head:           "abc1234",
+				Upstream:       "origin/main",
+				Remote:         "origin",
+				LocalBranches:  []string{"main", "feature"},
+				RemoteBranches: []string{"origin/main", "origin/dev"},
+				Tags:           []string{"v1.0.0"},
+				GraphCommits: []git.GraphCommit{
+					{Hash: "abc1234", Parents: []string{"def5678"}, Decorations: []string{"HEAD -> main", "origin/main"}},
+					{Hash: "def5678"},
+				},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 
 	got := renderAppView(m)
 	for _, want := range []string{"Graph Details", "Graph", "Local", "Remote", "Tags"} {
@@ -1406,13 +1509,14 @@ func TestRenderAppViewUsesCenteredHeaderAndMainLayout(t *testing.T) {
 
 func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch: "main",
-			Head:   "abc1234",
-			Remote: "origin",
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch: "main",
+				Head:   "abc1234",
+				Remote: "origin",
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	got := ansi.Strip(m.renderGlobalContent(40, 14))
 	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j/k: move", "f: fetch", "F: fetch tags", "S: stash list", "q: quit", "?: show hidden hotkeys"} {
 		if !strings.Contains(got, want) {
@@ -1428,23 +1532,26 @@ func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
 
 func TestRenderLoadingShowsProgressToastOverlay(t *testing.T) {
 	m := model{
-		width:  120,
-		height: 40,
-		status: loadingToast("Fetching upstream..."),
-		repoStatus: git.Status{
-			Root:     "/repo",
-			Branch:   "main",
-			Head:     "abc1234",
-			Upstream: "origin/main",
-			Remote:   "origin",
+		navigationState: navigationState{
+			width:  120,
+			height: 40,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:     "/repo",
+				Branch:   "main",
+				Head:     "abc1234",
+				Upstream: "origin/main",
+				Remote:   "origin",
+			},
 		},
-	}
+		status: loadingToast("Fetching upstream...")}
 
 	got := renderAppView(m)
 	if strings.Contains(got, "Mode: Loading") || strings.Contains(got, "Loading | Fetching upstream...") {
@@ -1457,21 +1564,24 @@ func TestRenderLoadingShowsProgressToastOverlay(t *testing.T) {
 
 func TestRenderBlockedShowsAlertOverlay(t *testing.T) {
 	m := model{
-		width:  120,
-		height: 40,
-		status: state.New().WithBlocked(state.BlockUnknown, "Select a local branch.", "Move to a branch line."),
-		repoStatus: git.Status{
-			Root:   "/repo",
-			Branch: "main",
-			Head:   "abc1234",
+		navigationState: navigationState{
+			width:  120,
+			height: 40,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:   "/repo",
+				Branch: "main",
+				Head:   "abc1234",
+			},
 		},
-	}
+		status: state.New().WithBlocked(state.BlockUnknown, "Select a local branch.", "Move to a branch line.")}
 
 	got := renderAppView(m)
 	if strings.Contains(got, "Mode: Blocked") || strings.Contains(got, "Blocked | Select a local branch.") {
@@ -1487,21 +1597,24 @@ func TestRenderBlockedShowsAlertOverlay(t *testing.T) {
 
 func TestRenderFastForwardConfirmShowsConciseHelp(t *testing.T) {
 	m := model{
-		width:  120,
-		height: 40,
-		status: state.New().WithConfirm(state.ActionMerge, "Fast-forward available.", "HEAD can move to feature."),
-		repoStatus: git.Status{
-			Root:   "/repo",
-			Branch: "main",
-			Head:   "abc1234",
+		navigationState: navigationState{
+			width:  120,
+			height: 40,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:   "/repo",
+				Branch: "main",
+				Head:   "abc1234",
+			},
 		},
-	}
+		status: state.New().WithConfirm(state.ActionMerge, "Fast-forward available.", "HEAD can move to feature.")}
 	m.status.Selected = "feature"
 
 	got := renderAppView(m)
@@ -1515,20 +1628,24 @@ func TestRenderFastForwardConfirmShowsConciseHelp(t *testing.T) {
 
 func TestRefreshedMsgDoesNotClearBlockedAlert(t *testing.T) {
 	m := model{
-		status: state.New().WithBlocked(state.BlockUnknown, "Select a local branch.", "Move to a branch line."),
-		repoStatus: git.Status{
-			Root:   "/repo",
-			Branch: "main",
-			Head:   "abc1234",
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:   "/repo",
+				Branch: "main",
+				Head:   "abc1234",
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBlocked(state.BlockUnknown, "Select a local branch.", "Move to a branch line.")}
 
 	gotModel, _ := m.Update(refreshedMsg{status: git.Status{Root: "/repo", Branch: "main", Head: "def5678"}})
 	got := gotModel.(model)
@@ -1542,20 +1659,24 @@ func TestRefreshedMsgDoesNotClearBlockedAlert(t *testing.T) {
 
 func TestFetchedMsgDoesNotClearBlockedAlert(t *testing.T) {
 	m := model{
-		status: state.New().WithBlocked(state.BlockUnknown, "Select a local branch.", "Move to a branch line."),
-		repoStatus: git.Status{
-			Root:   "/repo",
-			Branch: "main",
-			Head:   "abc1234",
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:   "/repo",
+				Branch: "main",
+				Head:   "abc1234",
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBlocked(state.BlockUnknown, "Select a local branch.", "Move to a branch line.")}
 
 	gotModel, cmd := m.Update(fetchedMsg{status: git.Status{Root: "/repo", Branch: "main", Head: "def5678"}})
 	got := gotModel.(model)
@@ -1572,25 +1693,27 @@ func TestFetchedMsgDoesNotClearBlockedAlert(t *testing.T) {
 
 func TestRenderBranchOpenShowsCenteredPopupOverlay(t *testing.T) {
 	m := model{
-		width:       120,
-		height:      40,
-		branchOpen:  true,
-		branchDraft: "feature/new-flow",
-		branchBase:  "abc1234",
-		branchError: "Branch name already exists.",
-		status:      loadingToast("Enter a branch name."),
-		repoStatus: git.Status{
-			Root:   "/repo",
-			Branch: "main",
-			Head:   "abc1234",
+		navigationState: navigationState{
+			width:  120,
+			height: 40,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:   "/repo",
+				Branch: "main",
+				Head:   "abc1234",
+			},
 		},
-	}
+		pullState:    pullState{},
+		overlayState: overlayState{branchOpen: true, branchDraft: "feature/new-flow", branchBase: "abc1234", branchError: "Branch name already exists."},
+
+		status: loadingToast("Enter a branch name.")}
 
 	got := renderAppView(m)
 	if strings.Contains(got, "Mode: Loading") || strings.Contains(got, "Loading | Enter a branch name.") {
@@ -1617,21 +1740,26 @@ func TestPullFetchWithoutIncomingCommitsShowsVerifiedResultSummary(t *testing.T)
 		TrackingFresh: true,
 	}
 	m := model{
-		status:          state.New().WithBrowse(),
-		repoStatus:      repoStatus,
-		repositoryEpoch: 3,
-		activePullRequest: &pullRequest{
-			ID:                9,
-			Epoch:             3,
-			OperationBaseline: pullSnapshotIdentity(repoStatus, 3),
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus:      repoStatus,
+			repositoryEpoch: 3,
 		},
-	}
+		pullState: pullState{
+			activePullRequest: &pullRequest{
+				ID:                9,
+				Epoch:             3,
+				OperationBaseline: pullSnapshotIdentity(repoStatus, 3),
+			},
+		},
+		status: state.New().WithBrowse()}
 
 	gotModel, cmd := m.Update(pullFetchedMsg{
 		status:               repoStatus,
@@ -1658,7 +1786,9 @@ func TestPullFetchWithoutIncomingCommitsShowsVerifiedResultSummary(t *testing.T)
 
 func TestZeroIdentityPullFetchedMessageIsIgnored(t *testing.T) {
 	original := git.Status{Root: "/repo", Branch: "main", Head: "old"}
-	m := model{status: state.New().WithBrowse(), repoStatus: original}
+	m := model{
+		repositoryState: repositoryState{repoStatus: original},
+		pullState:       pullState{}, status: state.New().WithBrowse()}
 
 	next, cmd := m.Update(pullFetchedMsg{status: git.Status{Root: "/repo", Branch: "other", Head: "new"}})
 	got := next.(model)
@@ -1708,26 +1838,29 @@ func TestSectionNameUsesContextLabel(t *testing.T) {
 
 func TestRenderAppViewUsesOuterMargins(t *testing.T) {
 	m := model{
-		width:  140,
-		height: 60,
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Root:     "/repo",
-			Branch:   "main",
-			Head:     "abc1234",
-			Upstream: "origin/main",
-			Remote:   "origin",
-			GraphCommits: []git.GraphCommit{
-				{Hash: "abc1234", Subject: "Commit 1"},
+		navigationState: navigationState{
+			width:  140,
+			height: 60,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
 			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:     "/repo",
+				Branch:   "main",
+				Head:     "abc1234",
+				Upstream: "origin/main",
+				Remote:   "origin",
+				GraphCommits: []git.GraphCommit{
+					{Hash: "abc1234", Subject: "Commit 1"},
+				},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 
 	got := renderAppView(m)
 	lines := strings.Split(got, "\n")
@@ -1755,26 +1888,29 @@ func TestRenderAppViewUsesOuterMargins(t *testing.T) {
 
 func TestRenderAppViewKeepsHeaderVisibleOnCompactScreens(t *testing.T) {
 	m := model{
-		width:  120,
-		height: 24,
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Root:     "/repo",
-			Branch:   "main",
-			Head:     "abc1234",
-			Upstream: "origin/main",
-			Remote:   "origin",
-			GraphCommits: []git.GraphCommit{
-				{Hash: "abc1234", Subject: "Commit 1"},
+		navigationState: navigationState{
+			width:  120,
+			height: 24,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
 			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:     "/repo",
+				Branch:   "main",
+				Head:     "abc1234",
+				Upstream: "origin/main",
+				Remote:   "origin",
+				GraphCommits: []git.GraphCommit{
+					{Hash: "abc1234", Subject: "Commit 1"},
+				},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 
 	got := renderAppView(m)
 	if !strings.Contains(got, "Graph") || !strings.Contains(got, "Graph Details") {
@@ -1784,21 +1920,25 @@ func TestRenderAppViewKeepsHeaderVisibleOnCompactScreens(t *testing.T) {
 
 func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	graph := renderActionHelpLines(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{{
-				Graph:       "*",
-				Hash:        "abc1234",
-				Parents:     []string{"def5678"},
-				Decorations: []string{"HEAD -> main"},
-			}},
-			LocalBranches: []string{"main"},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph: 0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{{
+					Graph:       "*",
+					Hash:        "abc1234",
+					Parents:     []string{"def5678"},
+					Decorations: []string{"HEAD -> main"},
+				}},
+				LocalBranches: []string{"main"},
+			},
 		},
-	})
+		pullState: pullState{},
+		status:    state.New().WithBrowse()})
 	graphJoined := ansi.Strip(strings.Join(graph, " "))
 	if len(graph) != 4 {
 		t.Fatalf("expected graph actions to stay at four visible lines, got %v", graph)
@@ -1814,16 +1954,20 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 		}
 	}
 	current := renderActionHelpLines(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionCurrent,
-		repoStatus: git.Status{
-			Branch:        "main",
-			LocalBranches: []string{"main", "feature"},
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+			sectionCursor: map[graphSection]int{
+				sectionCurrent: 0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				LocalBranches: []string{"main", "feature"},
+			},
 		},
-	})
+		pullState: pullState{},
+		status:    state.New().WithBrowse()})
 	currentJoined := ansi.Strip(strings.Join(current, " "))
 	if !strings.Contains(currentJoined, "d: delete branch") {
 		t.Fatalf("expected current actions to include delete branch, got %v", current)
@@ -1833,8 +1977,10 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 	}
 
 	remote := renderActionHelpLines(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionRemote,
+		navigationState: navigationState{
+			activeSection: sectionRemote,
+		},
+		status: state.New().WithBrowse(),
 	})
 	if !containsLine(strings.Split(ansi.Strip(strings.Join(remote, "\n")), "\n"), "• space: checkout") {
 		t.Fatalf("expected remote actions to include checkout, got %v", remote)
@@ -1847,8 +1993,10 @@ func TestRenderActionHelpLinesAreSectionSpecific(t *testing.T) {
 
 func TestHiddenHotkeysPopupShowsMovedAndConditionalActions(t *testing.T) {
 	got := ansi.Strip(renderHiddenHotkeysPopup(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+		},
+		status: state.New().WithBrowse(),
 	}, 90, 0))
 	for _, want := range []string{
 		"Hidden hotkeys by section",
@@ -1868,8 +2016,10 @@ func TestHiddenHotkeysPopupShowsMovedAndConditionalActions(t *testing.T) {
 
 func TestHiddenHotkeysPopupCentersHeaderAndFooter(t *testing.T) {
 	got := ansi.Strip(renderHiddenHotkeysPopup(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+		},
+		status: state.New().WithBrowse(),
 	}, 90, 0))
 	lines := strings.Split(got, "\n")
 	findLine := func(want string) string {
@@ -1916,6 +2066,16 @@ func TestRenderHiddenHotkeySectionTitleHighlightsActiveSection(t *testing.T) {
 
 func TestRenderCherryPickPopupShowsQueueOrderAndHelp(t *testing.T) {
 	got := ansi.Strip(renderCherryPickPopup(model{
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch: "main",
+				Head:   "other123",
+				GraphCommits: []git.GraphCommit{
+					{Hash: "pick123", Parents: []string{"root"}, Author: "Ada Lovelace", Subject: "first change", RelativeAge: "2 days ago"},
+					{Hash: "other123", Parents: []string{"pick123"}, Author: "Grace Hopper", Subject: "second change", RelativeAge: "1 day ago"},
+				},
+			},
+		},
 		status: state.Status{
 			Mode: state.ModeCherryPickPick,
 			Targets: []state.TargetItem{
@@ -1924,16 +2084,7 @@ func TestRenderCherryPickPopupShowsQueueOrderAndHelp(t *testing.T) {
 			},
 			TargetIdx:     1,
 			SelectedQueue: []string{"pick123"},
-		},
-		repoStatus: git.Status{
-			Branch: "main",
-			Head:   "other123",
-			GraphCommits: []git.GraphCommit{
-				{Hash: "pick123", Parents: []string{"root"}, Author: "Ada Lovelace", Subject: "first change", RelativeAge: "2 days ago"},
-				{Hash: "other123", Parents: []string{"pick123"}, Author: "Grace Hopper", Subject: "second change", RelativeAge: "1 day ago"},
-			},
-		},
-	}, 90))
+		}}, 90))
 	for _, want := range []string{
 		"Cherry-pick Targets",
 		"destination: current main",
@@ -1950,17 +2101,21 @@ func TestRenderCherryPickPopupShowsQueueOrderAndHelp(t *testing.T) {
 
 func TestRenderActionHelpLinesShowsCleanupActionsOnlyForDirtyCurrentSection(t *testing.T) {
 	dirty := renderActionHelpLines(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionCurrent,
-		repoStatus: git.Status{
-			Branch:        "main",
-			LocalBranches: []string{"main"},
-			WorktreeDirty: true,
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+			sectionCursor: map[graphSection]int{
+				sectionCurrent: 0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				LocalBranches: []string{"main"},
+				WorktreeDirty: true,
+			},
 		},
-	})
+		pullState: pullState{},
+		status:    state.New().WithBrowse()})
 	dirtyJoined := ansi.Strip(strings.Join(dirty, " "))
 	if !strings.Contains(dirtyJoined, "s: stash changes") || !strings.Contains(dirtyJoined, "c: clean working tree") {
 		t.Fatalf("expected dirty local actions to include cleanup shortcuts, got %v", dirty)
@@ -1970,16 +2125,20 @@ func TestRenderActionHelpLinesShowsCleanupActionsOnlyForDirtyCurrentSection(t *t
 	}
 
 	clean := renderActionHelpLines(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionCurrent,
-		repoStatus: git.Status{
-			Branch:        "main",
-			LocalBranches: []string{"main"},
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+			sectionCursor: map[graphSection]int{
+				sectionCurrent: 0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionCurrent: 0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:        "main",
+				LocalBranches: []string{"main"},
+			},
 		},
-	})
+		pullState: pullState{},
+		status:    state.New().WithBrowse()})
 	cleanJoined := ansi.Strip(strings.Join(clean, " "))
 	if !strings.Contains(cleanJoined, "dirty only") {
 		t.Fatalf("expected clean local actions to show dirty-only gating, got %v", clean)
@@ -2004,12 +2163,10 @@ func TestRenderTagActionHelpLinesIncludesRemoteDelete(t *testing.T) {
 func TestRenderGraphStashPopPopupShowsPickerAndConfirmStates(t *testing.T) {
 	forceTrueColorProfile(t)
 	picker := model{
-		graphStashPopOpen: true,
-		graphStashPopMode: graphStashPopModePicker,
-		graphStashPopEntries: []git.StashEntry{
+		overlayState: overlayState{graphStashPopOpen: true, graphStashPopMode: graphStashPopModePicker, graphStashPopEntries: []git.StashEntry{
 			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
 			{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
-		},
+		}},
 	}
 	gotPicker := ansi.Strip(renderGraphStashPopPopup(picker, 90, 24))
 	if !strings.Contains(gotPicker, "Pop stash") {
@@ -2026,11 +2183,9 @@ func TestRenderGraphStashPopPopupShowsPickerAndConfirmStates(t *testing.T) {
 	}
 
 	confirm := model{
-		graphStashPopOpen: true,
-		graphStashPopMode: graphStashPopModeConfirm,
-		graphStashPopEntries: []git.StashEntry{
+		overlayState: overlayState{graphStashPopOpen: true, graphStashPopMode: graphStashPopModeConfirm, graphStashPopEntries: []git.StashEntry{
 			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
-		},
+		}},
 	}
 	gotConfirm := ansi.Strip(renderGraphStashPopPopup(confirm, 90, 24))
 	if !strings.Contains(gotConfirm, "Confirm stash pop.") {
@@ -2047,9 +2202,11 @@ func TestRenderGraphStashPopPopupShowsPickerAndConfirmStates(t *testing.T) {
 func TestRTriggersRebaseOnlyInGraphSection(t *testing.T) {
 	// With no graph rows / no local lane -> 'r' should block with error message
 	graph := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		commitLimit:   0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+		},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0,
 	}
 	gotModel, cmd := graph.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	got := gotModel.(model)
@@ -2062,9 +2219,11 @@ func TestRTriggersRebaseOnlyInGraphSection(t *testing.T) {
 
 	// Outside graph section 'r' should be ignored entirely
 	current := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionCurrent,
-		commitLimit:   0,
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+		},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0,
 	}
 	gotModel, cmd = current.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	got = gotModel.(model)
@@ -2078,9 +2237,11 @@ func TestRTriggersRebaseOnlyInGraphSection(t *testing.T) {
 
 func TestFetchKeyDoesNotForceLoadingMode(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		commitLimit:   0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+		},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0,
 	}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
 	got := gotModel.(model)
@@ -2097,9 +2258,11 @@ func TestFetchKeyDoesNotForceLoadingMode(t *testing.T) {
 
 func TestFetchKeyWorksFromAnyBrowseSection(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionCurrent,
-		commitLimit:   0,
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+		},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0,
 	}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
 	got := gotModel.(model)
@@ -2116,9 +2279,11 @@ func TestFetchKeyWorksFromAnyBrowseSection(t *testing.T) {
 
 func TestFetchTagsKeyEntersLoadingMode(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		commitLimit:   0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+		},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0,
 	}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}})
 	got := gotModel.(model)
@@ -2135,9 +2300,11 @@ func TestFetchTagsKeyEntersLoadingMode(t *testing.T) {
 
 func TestNumberKeysSwitchSections(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		commitLimit:   0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+		},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0,
 	}
 
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
@@ -2179,28 +2346,32 @@ func TestNumberKeysSwitchSections(t *testing.T) {
 
 func TestSpaceChecksOutFromGraphSection(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		commitLimit:   0,
-		repoStatus: git.Status{
-			Root:          "/repo",
-			Branch:        "main",
-			Head:          "head",
-			LocalBranches: []string{"main"},
-			GraphCommits: []git.GraphCommit{{
-				Graph:       "*",
-				Hash:        "head",
-				Decorations: []string{"HEAD -> main"},
-			}},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
+			graphLaneCursor: 0,
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:          "/repo",
+				Branch:        "main",
+				Head:          "head",
+				LocalBranches: []string{"main"},
+				GraphCommits: []git.GraphCommit{{
+					Graph:       "*",
+					Hash:        "head",
+					Decorations: []string{"HEAD -> main"},
+				}},
+			},
 		},
-		graphLaneCursor: 0,
-	}
+		pullState:   pullState{},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	got := gotModel.(model)
 	if cmd != nil {
@@ -2219,28 +2390,32 @@ func TestSpaceChecksOutFromGraphSection(t *testing.T) {
 
 func TestSpaceChecksOutFromRemoteSection(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionRemote,
-		commitLimit:   0,
-		repoStatus: git.Status{
-			Root:           "/repo",
-			Branch:         "main",
-			Head:           "head",
-			RemoteBranches: []string{"origin/main"},
-			LocalBranches:  []string{"main"},
-			DefaultBranch:  "main",
-			Tracking:       map[string]git.BranchTracking{"main": {}},
-			HasCommits:     true,
-			Remote:         "origin",
-			GraphCommits:   []git.GraphCommit{{Hash: "head"}},
+		navigationState: navigationState{
+			activeSection: sectionRemote,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:           "/repo",
+				Branch:         "main",
+				Head:           "head",
+				RemoteBranches: []string{"origin/main"},
+				LocalBranches:  []string{"main"},
+				DefaultBranch:  "main",
+				Tracking:       map[string]git.BranchTracking{"main": {}},
+				HasCommits:     true,
+				Remote:         "origin",
+				GraphCommits:   []git.GraphCommit{{Hash: "head"}},
+			},
 		},
-	}
+		pullState:   pullState{},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	got := gotModel.(model)
 	if cmd != nil {
@@ -2256,25 +2431,29 @@ func TestSpaceChecksOutFromRemoteSection(t *testing.T) {
 
 func TestEnterDoesNotCheckoutInBrowseMode(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionRemote,
-		commitLimit:   0,
-		repoStatus: git.Status{
-			Root:           "/repo",
-			Branch:         "main",
-			Head:           "head",
-			RemoteBranches: []string{"origin/main"},
-			LocalBranches:  []string{"main"},
-			Remote:         "origin",
-			HasCommits:     true,
+		navigationState: navigationState{
+			activeSection: sectionRemote,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:           "/repo",
+				Branch:         "main",
+				Head:           "head",
+				RemoteBranches: []string{"origin/main"},
+				LocalBranches:  []string{"main"},
+				Remote:         "origin",
+				HasCommits:     true,
+			},
 		},
-	}
+		pullState:   pullState{},
+		status:      state.New().WithBrowse(),
+		commitLimit: 0}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := gotModel.(model)
 	if cmd != nil {
@@ -2287,19 +2466,23 @@ func TestEnterDoesNotCheckoutInBrowseMode(t *testing.T) {
 
 func TestRemoteSectionSkipsBareRemoteName(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionRemote,
-		repoStatus: git.Status{
-			RemoteBranches: []string{"origin", "origin/HEAD", "origin/main"},
-			LocalBranches:  []string{"main"},
+		navigationState: navigationState{
+			activeSection: sectionRemote,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				RemoteBranches: []string{"origin", "origin/HEAD", "origin/main"},
+				LocalBranches:  []string{"main"},
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 
 	got := m.renderSectionContent(sectionRemote, 40, 10)
 	if strings.Contains(got, "o->origin\n") {
@@ -2338,16 +2521,19 @@ func TestRenderSectionContentStartsAtLeftEdge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := model{
-				status:     state.New().WithBrowse(),
-				repoStatus: tt.repo,
-				sectionCursor: map[graphSection]int{
-					sectionGraph:   0,
-					sectionCurrent: 0,
-					sectionRemote:  0,
-					sectionTags:    0,
+				navigationState: navigationState{
+					sectionCursor: map[graphSection]int{
+						sectionGraph:   0,
+						sectionCurrent: 0,
+						sectionRemote:  0,
+						sectionTags:    0,
+					},
+					activeSection: sectionGraph,
 				},
-				activeSection: sectionGraph,
-			}
+				repositoryState: repositoryState{
+					repoStatus: tt.repo,
+				},
+				status: state.New().WithBrowse()}
 			got := ansi.Strip(m.renderSectionContent(tt.section, 40, 4))
 			lines := strings.Split(got, "\n")
 			if len(lines) == 0 {
@@ -2362,18 +2548,21 @@ func TestRenderSectionContentStartsAtLeftEdge(t *testing.T) {
 
 func TestRenderSectionContentKeepsActiveCursorVisible(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			LocalBranches: []string{"main", "feature", "tmp1", "tmp2", "tmp2-2", "tmp2-3"},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 5,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
+			activeSection: sectionCurrent,
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 5,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				LocalBranches: []string{"main", "feature", "tmp1", "tmp2", "tmp2-2", "tmp2-3"},
+			},
 		},
-		activeSection: sectionCurrent,
-	}
+		status: state.New().WithBrowse()}
 	got := ansi.Strip(m.renderSectionContent(sectionCurrent, 30, 4))
 	if !strings.Contains(got, "tmp2-3") {
 		t.Fatalf("expected active cursor item to remain visible, got %q", got)
@@ -2392,18 +2581,22 @@ func TestRenderSectionContentKeepsActiveCursorVisible(t *testing.T) {
 
 func TestRenderSectionContentShowsInactiveOverflowCount(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			LocalBranches: []string{"main", "feature", "release", "hotfix"},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				LocalBranches: []string{"main", "feature", "release", "hotfix"},
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := ansi.Strip(m.renderSectionContent(sectionCurrent, 30, 3))
 	if !strings.Contains(got, "… +2") {
 		t.Fatalf("expected inactive section to show hidden item count, got %q", got)
@@ -2440,14 +2633,16 @@ func containsLine(lines []string, want string) bool {
 
 func TestFetchedMsgKeepsPassiveBrowseState(t *testing.T) {
 	m := model{
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
+		},
 		status:      state.New().WithBrowse(),
 		commitLimit: 0,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
-		},
 	}
 	status := git.Status{
 		Root:          "/repo",
@@ -2473,17 +2668,20 @@ func TestFetchedMsgKeepsPassiveBrowseState(t *testing.T) {
 
 func TestRefreshedMsgPreservesCachedTagEntries(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		tagEntries: []git.TagEntry{
-			{Name: "v1.0.0", CommitHash: "abc1234", Subject: "initial", RelativeAge: "2 days ago", OnOrigin: true},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			tagEntries: []git.TagEntry{
+				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "initial", RelativeAge: "2 days ago", OnOrigin: true},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 
 	gotModel, _ := m.Update(refreshedMsg{status: git.Status{Root: "/repo", Branch: "main", Head: "def5678"}})
 	got := gotModel.(model)
@@ -2497,16 +2695,18 @@ func TestRefreshedMsgPreservesCachedTagEntries(t *testing.T) {
 
 func TestCheckoutFocusesGraphHeadRow(t *testing.T) {
 	m := model{
-		commitLimit:     0,
-		activeSection:   sectionCurrent,
-		graphScroll:     12,
-		graphLaneCursor: 3,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   15,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		navigationState: navigationState{
+			activeSection:   sectionCurrent,
+			graphScroll:     12,
+			graphLaneCursor: 3,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   15,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
+		commitLimit: 0,
 	}
 	status := git.Status{
 		Branch:        "tmp1",
@@ -2544,16 +2744,18 @@ func TestCheckoutFocusesGraphHeadRow(t *testing.T) {
 
 func TestBranchCreateFocusesGraphHeadRow(t *testing.T) {
 	m := model{
-		status:          loadingToast("Branch created."),
-		activeSection:   sectionCurrent,
-		graphScroll:     9,
-		graphLaneCursor: 2,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   6,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		navigationState: navigationState{
+			activeSection:   sectionCurrent,
+			graphScroll:     9,
+			graphLaneCursor: 2,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   6,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
+		status: loadingToast("Branch created."),
 	}
 	status := git.Status{
 		Branch:        "feature/new-flow",
@@ -2833,20 +3035,24 @@ func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
 
 func TestGraphDetailShowsStashSummaryForFocusedCommit(t *testing.T) {
 	m := model{
-		repoStatus: git.Status{
-			LocalBranches: []string{"main"},
-			GraphCommits: []git.GraphCommit{
-				{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Add stash marker", Decorations: []string{"main"}},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				LocalBranches: []string{"main"},
+				GraphCommits: []git.GraphCommit{
+					{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Add stash marker", Decorations: []string{"main"}},
+				},
+			},
+			stashByBase: map[string][]git.StashEntry{
+				"abc1234": {
+					{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+					{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
+				},
 			},
 		},
-		stashByBase: map[string][]git.StashEntry{
-			"abc1234": {
-				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
-				{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
-			},
-		},
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{}}
 
 	got := m.renderDetailContent(80, 24)
 	if !strings.Contains(got, "stashes:") {
@@ -2866,21 +3072,25 @@ func TestGraphDetailShowsStashSummaryForFocusedCommit(t *testing.T) {
 func TestRenderGraphContentShowsStashBadgeForFocusedCommit(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			LocalBranches: []string{"main"},
-			GraphCommits: []git.GraphCommit{
-				{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				LocalBranches: []string{"main"},
+				GraphCommits: []git.GraphCommit{
+					{Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}},
+				},
+			},
+			stashByBase: map[string][]git.StashEntry{
+				"abc1234": {
+					{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+				},
 			},
 		},
-		stashByBase: map[string][]git.StashEntry{
-			"abc1234": {
-				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
-			},
-		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 
 	raw := m.renderGraphContent(80, 8)
 	if !strings.Contains(raw, stashMark.Render("*")) {
@@ -2891,16 +3101,20 @@ func TestRenderGraphContentShowsStashBadgeForFocusedCommit(t *testing.T) {
 func TestRenderGraphContentShowsTagPointerForTaggedCommit(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			LocalBranches: []string{"main"},
-			GraphCommits: []git.GraphCommit{
-				{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0"}},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				LocalBranches: []string{"main"},
+				GraphCommits: []git.GraphCommit{
+					{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0"}},
+				},
 			},
 		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 
 	raw := m.renderGraphContent(80, 8)
 	if !strings.Contains(raw, tagColor.Render("*")) {
@@ -2966,16 +3180,20 @@ func TestAttachGraphTagEntriesCopiesCommitTags(t *testing.T) {
 func TestRenderGraphContentShowsTagPointerForMultipleTags(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			LocalBranches: []string{"main"},
-			GraphCommits: []git.GraphCommit{
-				{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0", "v1.0.1"}},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				LocalBranches: []string{"main"},
+				GraphCommits: []git.GraphCommit{
+					{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0", "v1.0.1"}},
+				},
 			},
 		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 
 	raw := m.renderGraphContent(80, 8)
 	if !strings.Contains(raw, tagColor.Render("*")) {
@@ -2986,21 +3204,25 @@ func TestRenderGraphContentShowsTagPointerForMultipleTags(t *testing.T) {
 func TestRenderGraphContentShowsOverlapPointerForStashAndTag(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			LocalBranches: []string{"main"},
-			GraphCommits: []git.GraphCommit{
-				{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0"}},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				LocalBranches: []string{"main"},
+				GraphCommits: []git.GraphCommit{
+					{Graph: "*", Hash: "abc1234", RelativeAge: "5 minutes ago", Subject: "Marker commit", Decorations: []string{"main"}, Tags: []string{"v1.0.0"}},
+				},
+			},
+			stashByBase: map[string][]git.StashEntry{
+				"abc1234": {
+					{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+				},
 			},
 		},
-		stashByBase: map[string][]git.StashEntry{
-			"abc1234": {
-				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
-			},
-		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 
 	raw := m.renderGraphContent(80, 8)
 	if !strings.Contains(raw, tagOverlapColor.Render("*")) {
@@ -3011,13 +3233,15 @@ func TestRenderGraphContentShowsOverlapPointerForStashAndTag(t *testing.T) {
 func TestRenderStashPopupListsEntriesFlatAndKeepsOrder(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
-		stashEntries: []git.StashEntry{
-			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
-			{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
-			{Ref: "stash@{2}", Hash: "stashhash2", BaseHash: "def5678", Subject: "feature WIP"},
+		repositoryState: repositoryState{
+			stashEntries: []git.StashEntry{
+				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+				{Ref: "stash@{1}", Hash: "stashhash1", BaseHash: "abc1234", Subject: "older change"},
+				{Ref: "stash@{2}", Hash: "stashhash2", BaseHash: "def5678", Subject: "feature WIP"},
+			},
 		},
-		stashPopupCursor: 1,
-	}
+		pullState:    pullState{},
+		overlayState: overlayState{stashPopupCursor: 1}}
 
 	got := renderStashPopup(m, 90, 24)
 	plain := ansi.Strip(got)
@@ -3044,8 +3268,10 @@ func TestRenderStashPopupListsEntriesFlatAndKeepsOrder(t *testing.T) {
 func TestRenderStashPopupTruncatesLongSubject(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
-		stashEntries: []git.StashEntry{
-			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "this subject is definitely longer than twenty chars"},
+		repositoryState: repositoryState{
+			stashEntries: []git.StashEntry{
+				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "this subject is definitely longer than twenty chars"},
+			},
 		},
 	}
 
@@ -3061,8 +3287,10 @@ func TestRenderStashPopupTruncatesLongSubject(t *testing.T) {
 func TestRenderStashPopupCentersDescriptionLine(t *testing.T) {
 	forceTrueColorProfile(t)
 	m := model{
-		stashEntries: []git.StashEntry{
-			{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+		repositoryState: repositoryState{
+			stashEntries: []git.StashEntry{
+				{Ref: "stash@{0}", Hash: "stashhash0", BaseHash: "abc1234", Subject: "latest change"},
+			},
 		},
 	}
 
@@ -3122,7 +3350,7 @@ func TestRenderConfirmPopupCentersPushYesNoFooter(t *testing.T) {
 
 func TestRenderStashMessagePopupShowsInputAndHelp(t *testing.T) {
 	m := model{
-		stashMessageDraft: "wip: local cleanup",
+		overlayState: overlayState{stashMessageDraft: "wip: local cleanup"},
 	}
 	got := renderStashMessagePopup(m, 72)
 	if !strings.Contains(got, "Enter a message for this stash.") {
@@ -3139,8 +3367,7 @@ func TestRenderStashMessagePopupShowsInputAndHelp(t *testing.T) {
 func TestRenderTagPopupUsesSingleTitleStrip(t *testing.T) {
 	forceTrueColorProfile(t)
 	got := ansi.Strip(renderTagPopup(model{
-		tagPopupTarget: "abc1234",
-		tagPopupDraft:  "v1.2.3",
+		overlayState: overlayState{tagPopupTarget: "abc1234", tagPopupDraft: "v1.2.3"},
 	}, 72, 24))
 	if !strings.Contains(got, "Create tag") {
 		t.Fatalf("expected tag popup title, got %q", got)
@@ -3393,24 +3620,28 @@ func TestRenderGraphLineNeverWraps(t *testing.T) {
 
 func TestRenderGraphContentClipsHeadersBeforeRows(t *testing.T) {
 	m := model{
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			GraphCommits: []git.GraphCommit{
-				{
-					Hash:        "abcdef123456",
-					RelativeAge: "5 minutes ago",
-					Subject:     "Merge branch 'main' into a-feature-branch-that-is-way-too-long",
-					Decorations: []string{"HEAD -> feature-branch", "origin/feature-branch"},
-				},
-				{
-					Graph: "*|||\\\\|||*",
-					Hash:  "fedcba987654",
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				GraphCommits: []git.GraphCommit{
+					{
+						Hash:        "abcdef123456",
+						RelativeAge: "5 minutes ago",
+						Subject:     "Merge branch 'main' into a-feature-branch-that-is-way-too-long",
+						Decorations: []string{"HEAD -> feature-branch", "origin/feature-branch"},
+					},
+					{
+						Graph: "*|||\\\\|||*",
+						Hash:  "fedcba987654",
+					},
 				},
 			},
 		},
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{sectionGraph: 0},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	got := m.renderGraphContent(40, 8)
 	lines := strings.Split(got, "\n")
 	if len(lines) != 8 {
@@ -3425,12 +3656,14 @@ func TestRenderGraphContentClipsHeadersBeforeRows(t *testing.T) {
 
 func TestRenderRightRailRendersStackedCards(t *testing.T) {
 	m := model{
-		repoStatus: git.Status{
-			LocalBranches:       []string{"feature/super-long-local-branch-name"},
-			RemoteBranches:      []string{"origin/super-long-remote-branch-name"},
-			TagProvenanceLoaded: true,
-			TagEntries: []git.TagEntry{
-				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				LocalBranches:       []string{"feature/super-long-local-branch-name"},
+				RemoteBranches:      []string{"origin/super-long-remote-branch-name"},
+				TagProvenanceLoaded: true,
+				TagEntries: []git.TagEntry{
+					{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
+				},
 			},
 		},
 	}
@@ -3471,11 +3704,13 @@ func TestRenderRightRailRendersStackedCards(t *testing.T) {
 
 func TestRenderTagsEmptyStateStopsPromptAfterProvenanceLoad(t *testing.T) {
 	m := model{
-		repoStatus: git.Status{
-			TagProvenanceLoaded: true,
-			TagSyncSummary:      string(tagSyncSynced),
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				TagProvenanceLoaded: true,
+				TagSyncSummary:      string(tagSyncSynced),
+			},
+			tagSyncAttempted: true,
 		},
-		tagSyncAttempted: true,
 	}
 	got := m.renderSectionContent(sectionTags, 40, 4)
 	if strings.Contains(got, "Press F to sync tag provenance.") {
@@ -3488,14 +3723,18 @@ func TestRenderTagsEmptyStateStopsPromptAfterProvenanceLoad(t *testing.T) {
 
 func TestRenderTagsSectionAddsColumnHeader(t *testing.T) {
 	m := model{
-		repoStatus: git.Status{
-			TagProvenanceLoaded: true,
-			TagEntries: []git.TagEntry{
-				{Name: "v1.0.0", CommitHash: "abc1234", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{sectionTags: 0},
+		},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				TagProvenanceLoaded: true,
+				TagEntries: []git.TagEntry{
+					{Name: "v1.0.0", CommitHash: "abc1234", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
+				},
 			},
 		},
-		sectionCursor: map[graphSection]int{sectionTags: 0},
-	}
+		pullState: pullState{}}
 	got := m.renderSectionContent(sectionTags, 80, 4)
 	if !strings.Contains(ansi.Strip(got), "hash") || !strings.Contains(ansi.Strip(got), "name") || !strings.Contains(ansi.Strip(got), "age") || !strings.Contains(ansi.Strip(got), "status") {
 		t.Fatalf("expected tags section to render column headers, got %q", got)
@@ -3507,27 +3746,30 @@ func TestRenderTagsSectionAddsColumnHeader(t *testing.T) {
 
 func TestRenderAppViewFitsViewportWidth(t *testing.T) {
 	m := model{
-		width:  140,
-		height: 60,
-		status: state.New().WithBrowse(),
-		repoStatus: git.Status{
-			Branch:              "feature/super-long-local-branch-name",
-			Head:                "abcdef1234567890",
-			Remote:              "origin",
-			LocalBranches:       []string{"feature/super-long-local-branch-name"},
-			RemoteBranches:      []string{"origin/super-long-remote-branch-name"},
-			TagProvenanceLoaded: true,
-			TagEntries: []git.TagEntry{
-				{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
+		navigationState: navigationState{
+			width:  140,
+			height: 60,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
 			},
 		},
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch:              "feature/super-long-local-branch-name",
+				Head:                "abcdef1234567890",
+				Remote:              "origin",
+				LocalBranches:       []string{"feature/super-long-local-branch-name"},
+				RemoteBranches:      []string{"origin/super-long-remote-branch-name"},
+				TagProvenanceLoaded: true,
+				TagEntries: []git.TagEntry{
+					{Name: "v1.0.0", CommitHash: "abc1234", Subject: "release with an extremely long title", RelativeAge: "2 days ago", OriginKnown: true, OnOrigin: true},
+				},
+			},
 		},
-	}
+		status: state.New().WithBrowse()}
 	got := renderAppView(m)
 	lines := strings.Split(got, "\n")
 	for i, line := range lines {
@@ -3548,22 +3790,26 @@ func TestHasHeadDecoration(t *testing.T) {
 
 func TestPushSetUpstreamTriggeredWhenNoUpstream(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		repoStatus: git.Status{
-			Root:       "/repo",
-			Branch:     "feature",
-			Head:       "abc1234",
-			NoUpstream: true,
-			HasCommits: true,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:       "/repo",
+				Branch:     "feature",
+				Head:       "abc1234",
+				NoUpstream: true,
+				HasCommits: true,
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
 	got := gotModel.(model)
 	if cmd == nil {
@@ -3592,23 +3838,27 @@ func TestPushSetUpstreamTriggeredWhenNoUpstream(t *testing.T) {
 
 func TestPushNormalTriggeredWhenUpstreamExists(t *testing.T) {
 	m := model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		repoStatus: git.Status{
-			Root:       "/repo",
-			Branch:     "main",
-			Head:       "abc1234",
-			Upstream:   "origin/main",
-			NoUpstream: false,
-			HasCommits: true,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:       "/repo",
+				Branch:     "main",
+				Head:       "abc1234",
+				Upstream:   "origin/main",
+				NoUpstream: false,
+				HasCommits: true,
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    state.New().WithBrowse()}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
 	got := gotModel.(model)
 	if cmd == nil {
@@ -3634,24 +3884,30 @@ func TestPushNormalTriggeredWhenUpstreamExists(t *testing.T) {
 
 func TestPushRejectedShowsForcePushConfirmAndHighlights(t *testing.T) {
 	m := model{
-		status: loadingToast("Pushing..."),
-		repoStatus: git.Status{
-			Root:     "/repo",
-			Branch:   "develop",
-			Head:     "localhead123",
-			Upstream: "origin/develop",
-			GraphCommits: []git.GraphCommit{
-				{Hash: "localhead123", Decorations: []string{"HEAD -> develop"}},
-				{Hash: "remotehead456", Decorations: []string{"origin/develop"}},
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:     "/repo",
+				Branch:   "develop",
+				Head:     "localhead123",
+				Upstream: "origin/develop",
+				GraphCommits: []git.GraphCommit{
+					{Hash: "localhead123", Decorations: []string{"HEAD -> develop"}},
+					{Hash: "remotehead456", Decorations: []string{"origin/develop"}},
+				},
 			},
 		},
-		handshakeCommits: make(map[string]bool),
-	}
+		pullState: pullState{
+			handshakeCommits: make(map[string]bool),
+		},
+		status: loadingToast("Pushing...")}
 
+	err := fmt.Errorf("git push: exit status 1: error: failed to push some refs to '...' [rejected - non-fast-forward]")
 	msg := executedMsg{
-		action: state.ActionPush,
-		target: "develop",
-		err:    fmt.Errorf("git push: exit status 1: error: failed to push some refs to '...' [rejected - non-fast-forward]"),
+		action:        state.ActionPush,
+		target:        "develop",
+		err:           err,
+		operationErr:  err,
+		errorCategory: NonFastForward,
 	}
 
 	gotModel, cmd := m.Update(msg)
@@ -3676,25 +3932,29 @@ func TestPushRejectedShowsForcePushConfirmAndHighlights(t *testing.T) {
 func TestResetTriggeredResetModePicker(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := model{
-		repo:          fixture.repo,
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
-		},
-		repoStatus: git.Status{
-			Root:       fixture.root,
-			Branch:     "main",
-			Head:       fixture.initialHash,
-			HasCommits: true,
-			GraphCommits: []git.GraphCommit{
-				{Hash: fixture.initialHash, Subject: "Commit 1"},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
 			},
 		},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:       fixture.root,
+				Branch:     "main",
+				Head:       fixture.initialHash,
+				HasCommits: true,
+				GraphCommits: []git.GraphCommit{
+					{Hash: fixture.initialHash, Subject: "Commit 1"},
+				},
+			},
+		},
+		pullState: pullState{},
+		repo:      fixture.repo,
+		status:    state.New().WithBrowse()}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	got := gotModel.(model)
 	if cmd == nil {
@@ -3736,22 +3996,26 @@ func TestResetTriggeredResetModePicker(t *testing.T) {
 func TestResetModePickerExecutesSelectedMode(t *testing.T) {
 	fixture := newCommandRepo(t)
 	m := model{
-		repo:          fixture.repo,
-		status:        state.New().WithResetModePick("Choose a reset mode.", ""),
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		repoStatus: git.Status{
-			Root:       fixture.root,
-			Branch:     "main",
-			Head:       fixture.initialHash,
-			HasCommits: true,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:       fixture.root,
+				Branch:     "main",
+				Head:       fixture.initialHash,
+				HasCommits: true,
+			},
 		},
-	}
+		pullState: pullState{},
+		repo:      fixture.repo,
+		status:    state.New().WithResetModePick("Choose a reset mode.", "")}
 	m.status.Selected = fixture.initialHash
 	m.status.ResetMode = state.ResetModeSoft
 
@@ -3801,21 +4065,25 @@ func TestRenderResetModePopupUsesSingleModeList(t *testing.T) {
 
 func TestResetExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 	m := model{
-		status:        loadingToast("Hard reset..."),
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		repoStatus: git.Status{
-			Root:       "/repo",
-			Branch:     "main",
-			Head:       "c1",
-			HasCommits: true,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:       "/repo",
+				Branch:     "main",
+				Head:       "c1",
+				HasCommits: true,
+			},
 		},
-	}
+		pullState: pullState{},
+		status:    loadingToast("Hard reset...")}
 
 	msg := executedMsg{
 		action:    state.ActionReset,
@@ -3851,20 +4119,23 @@ func TestResetExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 
 func TestMergeExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 	m := model{
-		status: loadingToast("Merging..."),
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		repoStatus: git.Status{
-			Root:       "/repo",
-			Branch:     "main",
-			Head:       "c1",
-			HasCommits: true,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:       "/repo",
+				Branch:     "main",
+				Head:       "c1",
+				HasCommits: true,
+			},
 		},
-	}
+		status: loadingToast("Merging...")}
 
 	msg := executedMsg{
 		action: state.ActionMerge,
@@ -3899,20 +4170,23 @@ func TestMergeExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 
 func TestRebaseExecutedSuccessfullyReturnsToBrowse(t *testing.T) {
 	m := model{
-		status: loadingToast("Rebasing..."),
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		repoStatus: git.Status{
-			Root:       "/repo",
-			Branch:     "main",
-			Head:       "c1",
-			HasCommits: true,
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Root:       "/repo",
+				Branch:     "main",
+				Head:       "c1",
+				HasCommits: true,
+			},
 		},
-	}
+		status: loadingToast("Rebasing...")}
 
 	msg := executedMsg{
 		action: state.ActionRebase,

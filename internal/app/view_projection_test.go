@@ -93,14 +93,18 @@ func TestContextProjectionKeepsDecisionOutOfGraphAndTags(t *testing.T) {
 	for _, section := range []graphSection{sectionGraph, sectionTags} {
 		t.Run(sectionName(section), func(t *testing.T) {
 			m := model{
-				activeSection: section,
-				status:        state.Status{Mode: state.ModeBrowse},
-				repoStatus: git.Status{
-					Branch: "main", Head: "abc", Upstream: "origin/main",
-					TrackingKnown: true, TrackingFresh: true,
-					Tracking: map[string]git.BranchTracking{"main": {Ahead: 0, Behind: 1}},
+				navigationState: navigationState{
+					activeSection: section,
 				},
-			}
+				repositoryState: repositoryState{
+					repoStatus: git.Status{
+						Branch: "main", Head: "abc", Upstream: "origin/main",
+						TrackingKnown: true, TrackingFresh: true,
+						Tracking: map[string]git.BranchTracking{"main": {Ahead: 0, Behind: 1}},
+					},
+				},
+				pullState: pullState{},
+				status:    state.Status{Mode: state.ModeBrowse}}
 			if got := m.contextProjection(100); got.Decision != nil {
 				t.Fatalf("section %v must not receive decision context: %+v", section, got.Decision)
 			}
@@ -110,15 +114,20 @@ func TestContextProjectionKeepsDecisionOutOfGraphAndTags(t *testing.T) {
 
 func TestContextProjectionOmitsUnavailableDecisionAndDoesNotMutateModel(t *testing.T) {
 	m := model{
-		activeSection: sectionCurrent,
-		status:        state.Status{Mode: state.ModeBrowse},
-		repoStatus: git.Status{
-			Branch: "main", Head: "abc", Upstream: "origin/main",
-			TrackingKnown: false, TrackingFresh: true,
-			Tracking: map[string]git.BranchTracking{"main": {Ahead: 2, Behind: 1}},
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
 		},
-		activePullRequest: &pullRequest{ID: 7, Epoch: 3},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch: "main", Head: "abc", Upstream: "origin/main",
+				TrackingKnown: false, TrackingFresh: true,
+				Tracking: map[string]git.BranchTracking{"main": {Ahead: 2, Behind: 1}},
+			},
+		},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 7, Epoch: 3},
+		},
+		status: state.Status{Mode: state.ModeBrowse}}
 	before := m
 	got := m.contextProjection(80)
 	if got.Decision != nil {
@@ -131,15 +140,20 @@ func TestContextProjectionOmitsUnavailableDecisionAndDoesNotMutateModel(t *testi
 
 func TestContextProjectionKeepsDecisionWhilePullIsActive(t *testing.T) {
 	m := model{
-		activeSection: sectionCurrent,
-		status:        state.Status{Mode: state.ModeBrowse},
-		repoStatus: git.Status{
-			Branch: "main", Head: "abc", Upstream: "origin/main",
-			TrackingKnown: true, TrackingFresh: true,
-			Tracking: map[string]git.BranchTracking{"main": {Ahead: 0, Behind: 2}},
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
 		},
-		activePullRequest: &pullRequest{ID: 7, Epoch: 3},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch: "main", Head: "abc", Upstream: "origin/main",
+				TrackingKnown: true, TrackingFresh: true,
+				Tracking: map[string]git.BranchTracking{"main": {Ahead: 0, Behind: 2}},
+			},
+		},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 7, Epoch: 3},
+		},
+		status: state.Status{Mode: state.ModeBrowse}}
 	got := m.contextProjection(80)
 	if got.Decision == nil {
 		t.Fatal("valid decision context should remain visible while pull workflow is active")
@@ -151,13 +165,17 @@ func TestContextProjectionKeepsDecisionWhilePullIsActive(t *testing.T) {
 
 func TestRenderContextProjectionKeepsDecisionOutOfOtherSections(t *testing.T) {
 	m := model{
-		activeSection: sectionRemote,
-		repoStatus: git.Status{
-			Branch: "main", Head: "abc", Upstream: "origin/main",
-			TrackingKnown: true, TrackingFresh: true,
-			Tracking: map[string]git.BranchTracking{"main": {Ahead: 0, Behind: 1}},
+		navigationState: navigationState{
+			activeSection: sectionRemote,
 		},
-	}
+		repositoryState: repositoryState{
+			repoStatus: git.Status{
+				Branch: "main", Head: "abc", Upstream: "origin/main",
+				TrackingKnown: true, TrackingFresh: true,
+				Tracking: map[string]git.BranchTracking{"main": {Ahead: 0, Behind: 1}},
+			},
+		},
+		pullState: pullState{}}
 	if got := m.contextProjection(100); got.Decision != nil {
 		t.Fatalf("non-current section must not receive decision context: %+v", got.Decision)
 	}
@@ -167,14 +185,18 @@ func TestContextProjectionKeepsDecisionOutOfPreviewAndReview(t *testing.T) {
 	for _, mode := range []state.Mode{state.ModeReview, state.ModeOutcomePreview} {
 		t.Run(string(mode), func(t *testing.T) {
 			m := model{
-				activeSection: sectionCurrent,
-				status:        state.Status{Mode: mode},
-				repoStatus: git.Status{
-					Branch: "main", Head: "abc", Upstream: "origin/main",
-					TrackingKnown: true, TrackingFresh: true,
-					Tracking: map[string]git.BranchTracking{"main": {Ahead: 0, Behind: 1}},
+				navigationState: navigationState{
+					activeSection: sectionCurrent,
 				},
-			}
+				repositoryState: repositoryState{
+					repoStatus: git.Status{
+						Branch: "main", Head: "abc", Upstream: "origin/main",
+						TrackingKnown: true, TrackingFresh: true,
+						Tracking: map[string]git.BranchTracking{"main": {Ahead: 0, Behind: 1}},
+					},
+				},
+				pullState: pullState{},
+				status:    state.Status{Mode: mode}}
 			if got := m.contextProjection(100); got.Decision != nil {
 				t.Fatalf("mode %s must not receive decision context: %+v", mode, got.Decision)
 			}

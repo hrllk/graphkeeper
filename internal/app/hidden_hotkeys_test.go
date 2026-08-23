@@ -27,7 +27,10 @@ func TestVisibleHiddenHotkeySectionsReturnsActiveSectionOnly(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sections := visibleHiddenHotkeySections(model{activeSection: tt.section})
+			sections := visibleHiddenHotkeySections(model{
+				navigationState: navigationState{
+					activeSection: tt.section,
+				}})
 			wantLen := 1
 			if tt.want == "" {
 				wantLen = 0
@@ -58,8 +61,10 @@ func TestHiddenHotkeysPopupShowsActiveSectionOnly(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ansi.Strip(renderHiddenHotkeysPopup(model{
-				status:        state.New().WithBrowse(),
-				activeSection: tt.active,
+				navigationState: navigationState{
+					activeSection: tt.active,
+				},
+				status: state.New().WithBrowse(),
 			}, 90, 0))
 			for _, want := range tt.want {
 				if !strings.Contains(got, want) {
@@ -93,8 +98,10 @@ func TestGlobalHotkeyItemsAreMainFooterSource(t *testing.T) {
 func TestHiddenHotkeysPopupUsesANSISemanticColors(t *testing.T) {
 	withColorProfile(t, termenv.TrueColor)
 	got := renderHiddenHotkeysPopup(model{
-		status:        state.New().WithBrowse(),
-		activeSection: sectionGraph,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+		},
+		status: state.New().WithBrowse(),
 	}, 90, 0)
 	if strings.Contains(got, "38;5;205") {
 		t.Fatalf("hidden hotkeys popup must not use pink 256-color border: %q", got)
@@ -144,14 +151,14 @@ func TestHiddenHotkeyPopupUsesHotkeyWidthPolicy(t *testing.T) {
 
 func TestHiddenHotkeyPopupInputIsConsumedAndReopensAtTop(t *testing.T) {
 	m := model{
-		status:              state.New().WithBrowse(),
-		activeSection:       sectionGraph,
-		sectionCursor:       map[graphSection]int{sectionGraph: 0},
-		hiddenHotkeysOpen:   true,
-		width:               120,
-		height:              24,
-		graphSearchOpen:     false,
-		hiddenHotkeysScroll: 0,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{sectionGraph: 0},
+			width:         120,
+			height:        24,
+		},
+		status:       state.New().WithBrowse(),
+		overlayState: overlayState{hiddenHotkeysOpen: true, graphSearchOpen: false, hiddenHotkeysScroll: 0},
 	}
 	initialSection := m.activeSection
 	initialCursor := m.sectionCursor[sectionGraph]
@@ -207,12 +214,13 @@ func TestHiddenHotkeyPopupInputIsConsumedAndReopensAtTop(t *testing.T) {
 
 func TestHiddenHotkeyPopupFitsSmallHeightAndOverlay(t *testing.T) {
 	m := model{
-		status:              state.New().WithBrowse(),
-		activeSection:       sectionGraph,
-		hiddenHotkeysOpen:   true,
-		width:               120,
-		height:              24,
-		hiddenHotkeysScroll: 99,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			width:         120,
+			height:        24,
+		},
+		status:       state.New().WithBrowse(),
+		overlayState: overlayState{hiddenHotkeysOpen: true, hiddenHotkeysScroll: 99},
 	}
 	bodyWidth, bodyHeight := 80, 12
 	popup := renderHiddenHotkeysPopup(m, bodyWidth, bodyHeight)
@@ -232,12 +240,13 @@ func TestHiddenHotkeyPopupFitsSmallHeightAndOverlay(t *testing.T) {
 
 func TestHiddenHotkeyPopupResizesWithoutBlankContent(t *testing.T) {
 	m := model{
-		status:              state.New().WithBrowse(),
-		activeSection:       sectionGraph,
-		hiddenHotkeysOpen:   true,
-		width:               120,
-		height:              40,
-		hiddenHotkeysScroll: 99,
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			width:         120,
+			height:        40,
+		},
+		status:       state.New().WithBrowse(),
+		overlayState: overlayState{hiddenHotkeysOpen: true, hiddenHotkeysScroll: 99},
 	}
 	gotModel, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
 	if cmd != nil {

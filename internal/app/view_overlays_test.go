@@ -57,8 +57,8 @@ func TestShellOverlayStackOrder(t *testing.T) {
 
 func TestShellOverlayStackSuppressesLoadingAndBlockedDuringBranchInput(t *testing.T) {
 	m := model{
-		status:     state.New().WithLoading("Enter a branch name."),
-		branchOpen: true,
+		status:       state.New().WithLoading("Enter a branch name."),
+		overlayState: overlayState{branchOpen: true},
 	}
 	overlays := shellOverlayStack(m, 80, 24)
 	var loadingActive, blockedActive bool

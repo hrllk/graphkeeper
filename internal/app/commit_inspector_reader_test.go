@@ -93,7 +93,7 @@ func TestCommitInspectorUsesInjectedReaderForMetadataAndDiff(t *testing.T) {
 }
 
 func TestCommitInspectorRejectsStaleDiffWindowIdentity(t *testing.T) {
-	m := model{commitInspectorOpen: true, commitInspectorRequest: 4, commitInspectorEpoch: 2}
+	m := model{inspectorState: inspectorState{commitInspectorOpen: true, commitInspectorRequest: 4, commitInspectorEpoch: 2}}
 	m.commitInspectorSnapshot = CommitSnapshot{FullHash: "abc", Parent: "p", Files: []ChangedFile{{StableID: "current", Path: "a.go"}}}
 	msg := commitInspectorResultMsg{Result: InspectorResult[DiffWindow]{
 		State: PaneReady, Commit: "abc", Parent: "p", FileID: "stale", RequestID: 4, RepositoryEpoch: 2,

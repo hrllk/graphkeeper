@@ -9,13 +9,13 @@ import (
 )
 
 func TestCommitInspectorQAndEscClose(t *testing.T) {
-	m := model{commitInspectorOpen: true}
+	m := model{inspectorState: inspectorState{commitInspectorOpen: true}}
 	next, _ := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	if next.(model).commitInspectorOpen {
 		t.Fatal("q should close the Inspector before global overlay rewriting")
 	}
 
-	m = model{commitInspectorOpen: true}
+	m = model{inspectorState: inspectorState{commitInspectorOpen: true}}
 	next, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
 	got := next.(model)
 	if got.commitInspectorOpen {
@@ -25,7 +25,9 @@ func TestCommitInspectorQAndEscClose(t *testing.T) {
 
 func TestCommitInspectorKeymapKeepsNavigationInInspector(t *testing.T) {
 	m := model{
-		commitInspectorOpen: true,
+		inspectorState: inspectorState{
+			commitInspectorOpen: true,
+		},
 	}
 	for _, key := range []string{"tab", "m", "r", "h", "l", "enter"} {
 		next, _ := m.handleCommitInspectorKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
@@ -37,12 +39,14 @@ func TestCommitInspectorKeymapKeepsNavigationInInspector(t *testing.T) {
 
 func TestCommitInspectorJKMovesChangedFileSelection(t *testing.T) {
 	m := model{
-		commitInspectorOpen: true,
-		commitInspector: CommitSnapshot{Files: []ChangedFile{
-			{Status: "M", Path: "a.go"},
-			{Status: "A", Path: "b.go"},
-		}},
-		commitInspectorCursor: 0,
+		inspectorState: inspectorState{
+			commitInspectorOpen:   true,
+			commitInspectorCursor: 0,
+			commitInspector: CommitSnapshot{Files: []ChangedFile{
+				{Status: "M", Path: "a.go"},
+				{Status: "A", Path: "b.go"},
+			}},
+		},
 	}
 	next, cmd := m.handleCommitInspectorKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	got := next.(model)
@@ -53,14 +57,19 @@ func TestCommitInspectorJKMovesChangedFileSelection(t *testing.T) {
 
 func TestCommitInspectorRendersBorderedTreeAndUnifiedRows(t *testing.T) {
 	m := model{
-		width: 80, height: 20,
-		commitInspectorOpen: true,
-		commitInspector: CommitSnapshot{
-			FullHash: "abc123", Subject: "change", AuthorName: "dev", Parent: "parent",
-			Files: []ChangedFile{{Status: "M", Path: "internal/app/main.go"}},
+		navigationState: navigationState{
+			width:  80,
+			height: 20,
 		},
-		commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+new"},
-		commitInspectorCursor: 0,
+		inspectorState: inspectorState{
+			commitInspectorOpen:   true,
+			commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+new"},
+			commitInspectorCursor: 0,
+			commitInspector: CommitSnapshot{
+				FullHash: "abc123", Subject: "change", AuthorName: "dev", Parent: "parent",
+				Files: []ChangedFile{{Status: "M", Path: "internal/app/main.go"}},
+			},
+		},
 	}
 	got := m.renderCommitInspectorPopup(80, 20)
 	if lipgloss.Width(got) != 80 || lipgloss.Height(got) != 20 {
@@ -75,12 +84,13 @@ func TestCommitInspectorRendersBorderedTreeAndUnifiedRows(t *testing.T) {
 
 func TestCommitInspectorDiffDoesNotWrapLongCode(t *testing.T) {
 	m := model{
-		commitInspector: CommitSnapshot{
+		inspectorState: inspectorState{commitInspector: CommitSnapshot{
 			FullHash: "abc123", Subject: "change", AuthorName: "dev",
 			Files: []ChangedFile{{Status: "M", Path: "main.go"}},
 		},
-		commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+a very long line that must stay on one terminal row"},
-		commitInspectorCursor: 0,
+			commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+a very long line that must stay on one terminal row"},
+			commitInspectorCursor: 0,
+		},
 	}
 	got := m.renderCommitInspectorPopup(60, 20)
 	if lipgloss.Width(got) != 60 || lipgloss.Height(got) != 20 {
@@ -93,12 +103,13 @@ func TestCommitInspectorDiffDoesNotWrapLongCode(t *testing.T) {
 
 func TestCommitInspectorKeepsDividerAlignedWithANSISelectedRow(t *testing.T) {
 	m := model{
-		commitInspector: CommitSnapshot{Files: []ChangedFile{
+		inspectorState: inspectorState{commitInspector: CommitSnapshot{Files: []ChangedFile{
 			{Status: "M", Path: "first.go"},
 			{Status: "A", Path: "second.go"},
 		}},
-		commitInspectorCursor: 0,
-		commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+new"},
+			commitInspectorCursor: 0,
+			commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+new"},
+		},
 	}
 	rows := m.renderInspectorBody(70, 8)
 	firstSeparator := strings.Index(rows[0], "│")

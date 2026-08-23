@@ -15,23 +15,27 @@ import (
 
 func testKeyHandlingModel(repo *git.Repo, status git.Status) model {
 	return model{
-		repo:          repo,
-		status:        state.New().WithBrowse(),
-		repoStatus:    status,
-		activeSection: sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{repoStatus: status, stashByBase: make(map[string][]git.StashEntry)},
+		pullState:       pullState{handshakeCommits: make(map[string]bool)},
+		repo:            repo,
+		status:          state.New().WithBrowse(),
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
 		},
-		handshakeCommits: make(map[string]bool),
-		stashByBase:      make(map[string][]git.StashEntry),
 	}
 }
 
 func TestBrowseQQuitsApplication(t *testing.T) {
-	m := model{status: state.New().WithBrowse(), activeSection: sectionGraph}
+	m := model{
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+		}, status: state.New().WithBrowse()}
 	got, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	if got.(model).status.Mode != state.ModeBrowse {
 		t.Fatalf("expected q to leave Browse state unchanged, got %s", got.(model).status.Mode)
@@ -58,7 +62,10 @@ func TestOverlayQClosesWithoutQuitting(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := model{status: state.New().WithBrowse(), activeSection: sectionGraph}
+			m := model{
+				navigationState: navigationState{
+					activeSection: sectionGraph,
+				}, status: state.New().WithBrowse()}
 			tt.setup(&m)
 			gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 			if cmd != nil {

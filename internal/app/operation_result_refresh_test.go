@@ -9,13 +9,14 @@ import (
 
 func TestOperationResultRefreshFailureMarksVerificationUnknown(t *testing.T) {
 	m := model{
-		status: state.Status{Mode: state.ModeOperationResult, Action: state.ActionPull},
-		operationResult: &OperationResultSummary{
-			Execution:    ExecutionSucceeded,
-			Verification: VerificationVerified,
-			Headline:     "PULL COMPLETED",
+		pullState: pullState{
+			operationResult: &OperationResultSummary{
+				Execution:    ExecutionSucceeded,
+				Verification: VerificationVerified,
+				Headline:     "PULL COMPLETED",
+			},
 		},
-	}
+		status: state.Status{Mode: state.ModeOperationResult, Action: state.ActionPull}}
 	next, _ := handleLifecycleUpdate(m, refreshedMsg{err: errors.New("status unavailable")})
 	got := next.(model)
 	if got.operationResult.Verification != VerificationUnknown {

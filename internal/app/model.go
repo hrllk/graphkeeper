@@ -11,41 +11,43 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
-type model struct {
-	repo            *git.Repo
-	repositoryRead  RepositoryReadPort
-	pull            PullPort
-	inspectorReader commitinspector.CommitInspectorReader
-	tagProvenance   TagProvenanceStore
-	eventSink       events.EventSink
-	status          state.Status
-	repoStatus      git.Status
+type repositoryState struct {
+	repoStatus         git.Status
+	tagEntries         []git.TagEntry
+	tagSyncAttempted   bool
+	stashEntries       []git.StashEntry
+	stashByBase        map[string][]git.StashEntry
+	repoSnapshotLoaded bool
+	graphReadSnapshot  graph.Snapshot
+	repositoryEpoch    uint64
+	refreshGeneration  uint64
+	err                error
+}
 
-	// Repository-derived caches and snapshots.
-	tagEntries        []git.TagEntry
-	tagSyncAttempted  bool
-	stashEntries      []git.StashEntry
-	stashByBase       map[string][]git.StashEntry
-	handshakeCommits  map[string]bool
-	pullIsFastForward bool
+type pullState struct {
+	handshakeCommits          map[string]bool
+	pullIsFastForward         bool
+	nextPullRequestID         uint64
+	activePullRequest         *pullRequest
+	pullCancel                context.CancelFunc
+	pullConfirmStale          bool
+	lastPullMode              PullMode
+	lastPullOperationBaseline PullSnapshotIdentity
+	operationResult           *OperationResultSummary
+}
 
-	// Section navigation and graph focus.
-	activeSection   graphSection
-	sectionCursor   map[graphSection]int
-	graphLaneCursor int
-	graphScroll     int
-	contextScroll   int
-	awaitingGoTop   bool
+type pullConfirmInput struct {
+	CurrentBranch string
+	TargetRef     string
+	CurrentOnly   int
+	TargetOnly    int
+	ImpactKnown   bool
+	MergeText     string
+	RebaseText    string
+	RiskText      string
+}
 
-	// Graph search state.
-	graphSearchOpen   bool
-	graphSearchDraft  string
-	graphSearchQuery  string
-	graphSearchIndex  []graphSearchEntry
-	graphSearchCursor int
-	graphSearchError  string
-
-	// Read-only Graph commit inspector.
+type inspectorState struct {
 	commitInspectorOpen                bool
 	commitInspector                    CommitSnapshot
 	commitInspectorSnapshot            CommitSnapshot
@@ -71,8 +73,9 @@ type model struct {
 	commitInspectorDiffError           string
 	commitInspectorStale               bool
 	commitInspectorContinuationPending bool
+}
 
-	// Modal and popup state.
+type overlayState struct {
 	branchOpen           bool
 	branchDraft          string
 	branchBase           string
@@ -92,28 +95,48 @@ type model struct {
 	graphStashPopEntries []git.StashEntry
 	hiddenHotkeysOpen    bool
 	hiddenHotkeysScroll  int
+	graphSearchOpen      bool
+	graphSearchDraft     string
+	graphSearchQuery     string
+	graphSearchIndex     []graphSearchEntry
+	graphSearchCursor    int
+	graphSearchError     string
+	mergeConfirmView     *mergeConfirmViewModel
+}
+
+type navigationState struct {
+	activeSection   graphSection
+	sectionCursor   map[graphSection]int
+	graphLaneCursor int
+	graphScroll     int
+	contextScroll   int
+	awaitingGoTop   bool
+	width           int
+	height          int
+}
+
+type model struct {
+	repositoryState
+	pullState
+	inspectorState
+	overlayState
+	navigationState
+
+	repo             *git.Repo
+	repositoryRead   RepositoryReadPort
+	pull             PullPort
+	inspectorReader  commitinspector.CommitInspectorReader
+	tagProvenance    TagProvenanceStore
+	eventSink        events.EventSink
+	status           state.Status
+	pullConfirmInput *pullConfirmInput
+
+	// Repository-derived caches and snapshots.
 
 	// Viewport and transient errors.
-	width              int
-	height             int
 	commitLimit        int
-	err                error
-	repoSnapshotLoaded bool
-	graphReadSnapshot  graph.Snapshot
-
-	// repositoryEpoch invalidates repository reads that started before a user
-	// operation. Bubble Tea commands run concurrently, so an older refresh
-	// must not overwrite a mutation's result when it completes later.
-	repositoryEpoch           uint64
-	refreshGeneration         uint64
-	nextPullRequestID         uint64
-	activePullRequest         *pullRequest
-	pullCancel                context.CancelFunc
-	pullConfirmStale          bool
-	mergeConfirmView          *mergeConfirmViewModel
-	lastPullMode              PullMode
-	lastPullOperationBaseline PullSnapshotIdentity
-	operationResult           *OperationResultSummary
+	startupReadPending bool
+	startupFailed      bool
 }
 
 type graphSection int
@@ -134,26 +157,33 @@ const (
 
 func NewWithDependencies(deps Dependencies) (tea.Model, error) {
 	m := model{
-		repo:            deps.Repo,
-		repositoryRead:  deps.RepositoryRead,
-		pull:            deps.Pull,
-		inspectorReader: deps.InspectorReader,
-		tagProvenance:   deps.TagProvenance,
-		eventSink:       deps.EventSink,
-		status:          loadingToast("Loading..."),
-		activeSection:   sectionGraph,
-		sectionCursor: map[graphSection]int{
-			sectionGraph:   0,
-			sectionCurrent: 0,
-			sectionRemote:  0,
-			sectionTags:    0,
+		repositoryState: repositoryState{
+			stashByBase: make(map[string][]git.StashEntry),
 		},
-		graphLaneCursor:   0,
-		commitLimit:       0,
-		handshakeCommits:  make(map[string]bool),
-		stashByBase:       make(map[string][]git.StashEntry),
-		graphStashPopMode: graphStashPopModePicker,
-	}
+		pullState: pullState{
+			handshakeCommits: make(map[string]bool),
+		},
+		navigationState: navigationState{
+			activeSection: sectionGraph,
+			sectionCursor: map[graphSection]int{
+				sectionGraph:   0,
+				sectionCurrent: 0,
+				sectionRemote:  0,
+				sectionTags:    0,
+			},
+			graphLaneCursor: 0,
+		},
+		repo:               deps.Repo,
+		repositoryRead:     deps.RepositoryRead,
+		pull:               deps.Pull,
+		inspectorReader:    deps.InspectorReader,
+		tagProvenance:      deps.TagProvenance,
+		eventSink:          deps.EventSink,
+		status:             loadingToast("Loading..."),
+		commitLimit:        0,
+		overlayState:       overlayState{graphStashPopMode: graphStashPopModePicker},
+		startupReadPending: deps.RepositoryRead != nil,
+		startupFailed:      false}
 	return m, nil
 }
 

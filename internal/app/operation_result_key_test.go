@@ -8,7 +8,8 @@ import (
 )
 
 func TestOperationResultKeyDismissesWithoutQuitting(t *testing.T) {
-	m := model{status: state.Status{Mode: state.ModeOperationResult}, operationResult: &OperationResultSummary{Headline: "PULL COMPLETED"}}
+	m := model{
+		pullState: pullState{operationResult: &OperationResultSummary{Headline: "PULL COMPLETED"}}, status: state.Status{Mode: state.ModeOperationResult}}
 	next, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	if cmd != nil {
 		t.Fatalf("dismiss command = %v, want nil", cmd)

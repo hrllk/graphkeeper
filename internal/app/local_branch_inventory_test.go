@@ -22,7 +22,9 @@ func TestCompactDecorationInfoShowsOnlyLocalBranchWithTrackingDecoration(t *test
 }
 
 func TestGraphProjectionCarriesInventoryValidity(t *testing.T) {
-	m := model{repoStatus: git.Status{LocalBranches: []string{}, LocalBranchesKnown: true, LocalBranchesFresh: true}, repositoryEpoch: 9}
+	m := model{
+		repositoryState: repositoryState{repoStatus: git.Status{LocalBranches: []string{}, LocalBranchesKnown: true, LocalBranchesFresh: true}, repositoryEpoch: 9},
+		pullState:       pullState{}}
 	projection := m.screenProjection(80, 10)
 	if !projection.Graph.LocalBranchInventory.Known || projection.Graph.LocalBranchInventory.Epoch != 9 {
 		t.Fatalf("expected known inventory projection, got %+v", projection.Graph.LocalBranchInventory)

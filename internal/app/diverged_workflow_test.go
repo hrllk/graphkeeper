@@ -9,8 +9,14 @@ import (
 )
 
 func TestContextProjectionRecommendationOnlyCurrentAndSuppressedByPull(t *testing.T) {
-	m := model{status: state.New().WithBrowse(), activeSection: sectionCurrent, repositoryEpoch: 7,
-		repoStatus: git.Status{Branch: "main", Upstream: "origin/main", Head: "abc", Remote: "origin", Tracking: map[string]git.BranchTracking{"main": {Ahead: 2, Behind: 1}}, TrackingKnown: true, TrackingFresh: true}}
+	m := model{
+		navigationState: navigationState{
+			activeSection: sectionCurrent,
+		},
+		repositoryState: repositoryState{repositoryEpoch: 7,
+			repoStatus: git.Status{Branch: "main", Upstream: "origin/main", Head: "abc", Remote: "origin", Tracking: map[string]git.BranchTracking{"main": {Ahead: 2, Behind: 1}}, TrackingKnown: true, TrackingFresh: true},
+		},
+		status: state.New().WithBrowse()}
 	if m.contextProjection(80).Recommendation == nil {
 		t.Fatal("current section should project diverged recommendation")
 	}
@@ -27,8 +33,11 @@ func TestContextProjectionRecommendationOnlyCurrentAndSuppressedByPull(t *testin
 
 func TestStalePullFetchedMessageDoesNotReplaceState(t *testing.T) {
 	original := git.Status{Root: "/repo", Branch: "main", Head: "old"}
-	m := model{status: state.New().WithBrowse(), repoStatus: original,
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3}}
+	m := model{
+		repositoryState: repositoryState{repoStatus: original},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 9, Epoch: 3},
+		}, status: state.New().WithBrowse()}
 	next, cmd := m.Update(pullFetchedMsg{status: git.Status{Root: "/repo", Branch: "other", Head: "new"}, requestID: 8, requestEpoch: 3})
 	got := next.(model)
 	if cmd != nil || !reflect.DeepEqual(got.repoStatus, original) || !reflect.DeepEqual(got.status, m.status) {
@@ -38,8 +47,14 @@ func TestStalePullFetchedMessageDoesNotReplaceState(t *testing.T) {
 
 func TestPullFetchedMessageRequiresFreshKnownTrackingEntry(t *testing.T) {
 	baseline := PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "abc", Upstream: "origin/main", TrackingKnown: true, TrackingFresh: true}
-	m := model{status: state.New().WithBrowse(), repoStatus: git.Status{Root: "/repo", Branch: "main", Head: "abc"}, sectionCursor: map[graphSection]int{},
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline}}
+	m := model{
+		navigationState: navigationState{
+			sectionCursor: map[graphSection]int{},
+		},
+		repositoryState: repositoryState{repoStatus: git.Status{Root: "/repo", Branch: "main", Head: "abc"}},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline},
+		}, status: state.New().WithBrowse()}
 
 	next, cmd := m.Update(pullFetchedMsg{status: git.Status{Root: "/repo", Branch: "main", Head: "abc", TrackingKnown: true, TrackingFresh: true}, requestID: 9, requestEpoch: 3, baseline: baseline, operationBaseline: baseline, operationBaselineSet: true})
 	got := next.(model)
@@ -58,8 +73,11 @@ func TestPullFetchedMessageRejectsBaselineMismatchBeforeInstallingState(t *testi
 	original := git.Status{Root: "/repo", Branch: "main", Head: "old"}
 	status := git.Status{Root: "/repo", Branch: "main", Head: "new", TrackingKnown: true, TrackingFresh: true}
 	baseline := pullSnapshotIdentity(status, 3)
-	m := model{status: state.New().WithBrowse(), repoStatus: original,
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline}}
+	m := model{
+		repositoryState: repositoryState{repoStatus: original},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline},
+		}, status: state.New().WithBrowse()}
 
 	next, cmd := m.Update(pullFetchedMsg{status: status, requestID: 9, requestEpoch: 3,
 		baseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "different"}, operationBaseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "different"}, operationBaselineSet: true})
@@ -80,8 +98,11 @@ func TestPullFetchedMessageRejectsBaselineMismatchBeforeInstallingState(t *testi
 
 func TestPullValidationMessageRejectsBaselineMismatch(t *testing.T) {
 	baseline := PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "old"}
-	m := model{status: state.New().WithBrowse(), repoStatus: git.Status{Root: "/repo"},
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline}}
+	m := model{
+		repositoryState: repositoryState{repoStatus: git.Status{Root: "/repo"}},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline},
+		}, status: state.New().WithBrowse()}
 
 	next, cmd := m.Update(pullValidationMsg{requestID: 9, requestEpoch: 3,
 		baseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "new"}, valid: true})
@@ -98,8 +119,11 @@ func TestPullValidationMessageRejectsBaselineMismatch(t *testing.T) {
 }
 
 func TestStalePullExecutionResultBlocksAndRefreshes(t *testing.T) {
-	m := model{status: state.New().WithConfirm(state.ActionPull, "Pull", "Pull"), repoStatus: git.Status{Root: "/repo"},
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3}}
+	m := model{
+		repositoryState: repositoryState{repoStatus: git.Status{Root: "/repo"}},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 9, Epoch: 3},
+		}, status: state.New().WithConfirm(state.ActionPull, "Pull", "Pull")}
 
 	next, cmd := m.Update(pullExecutionResultMsg{action: state.ActionPull, requestID: 9, requestEpoch: 3, stale: true})
 	got := next.(model)
@@ -116,8 +140,11 @@ func TestStalePullExecutionResultBlocksAndRefreshes(t *testing.T) {
 
 func TestPullExecutionResultRejectsBaselineMismatch(t *testing.T) {
 	baseline := PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "old"}
-	m := model{status: state.New().WithConfirm(state.ActionPull, "Pull", "Pull"), repoStatus: git.Status{Root: "/repo"},
-		activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline}}
+	m := model{
+		repositoryState: repositoryState{repoStatus: git.Status{Root: "/repo"}},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 9, Epoch: 3, OperationBaseline: baseline},
+		}, status: state.New().WithConfirm(state.ActionPull, "Pull", "Pull")}
 
 	next, cmd := m.Update(pullExecutionResultMsg{action: state.ActionPull, requestID: 9, requestEpoch: 3,
 		baseline: PullSnapshotIdentity{Epoch: 3, Branch: "main", Head: "new"}})

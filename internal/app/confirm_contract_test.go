@@ -60,12 +60,15 @@ func TestClassifyConfirmKeyStaleDisablesAffirmativeChoices(t *testing.T) {
 
 func TestRenderStaleConfirmShowsDisabledProjection(t *testing.T) {
 	m := model{
-		width:             80,
-		height:            30,
-		status:            state.New().WithConfirm(state.ActionPull, "Pull preview", "Review pull impact."),
-		pullIsFastForward: false,
-		pullConfirmStale:  true,
-	}
+		navigationState: navigationState{
+			width:  80,
+			height: 30,
+		},
+		pullState: pullState{
+			pullIsFastForward: false,
+			pullConfirmStale:  true,
+		},
+		status: state.New().WithConfirm(state.ActionPull, "Pull preview", "Review pull impact.")}
 	got := renderConfirmPopup(m, 80)
 	if !strings.Contains(got, "Preview is stale") || !strings.Contains(got, "n: close") {
 		t.Fatalf("stale projection missing disabled copy: %q", got)

@@ -60,7 +60,9 @@ func TestPullPortPreviewDerivesDivergenceLocally(t *testing.T) {
 	upstreamOID := strings.Repeat("b", 40)
 	repoStatus := git.Status{Branch: "main", Head: hash, Upstream: "origin/main", UpstreamOID: upstreamOID, Tracking: map[string]git.BranchTracking{"main": {Ahead: 1, Behind: 2}}, TrackingKnown: true, TrackingFresh: true}
 	baseline := pullSnapshotIdentity(repoStatus, 7)
-	m := model{repoStatus: repoStatus, repositoryEpoch: 7, status: state.New().WithLoading("Previewing..."), activePullRequest: &pullRequest{ID: 4, Epoch: 7}}
+	m := model{
+		repositoryState: repositoryState{repoStatus: repoStatus, repositoryEpoch: 7},
+		pullState:       pullState{activePullRequest: &pullRequest{ID: 4, Epoch: 7, FetchBaseline: baseline}}, status: state.New().WithLoading("Previewing...")}
 	got, _ := handlePullPortPreview(m, pullPortPreviewMsg{result: PullPreviewResult{RequestID: 4, RepositoryEpoch: 7, Baseline: baseline, Eligible: true, Impact: PullImpact{IsFastForward: true}, Commits: []PullPreviewCommit{{Hash: hash}}}})
 	modelGot := got.(model)
 	if modelGot.status.Mode != state.ModeConfirm || modelGot.pullIsFastForward || modelGot.mergeConfirmView == nil {
@@ -71,7 +73,10 @@ func TestPullPortPreviewDerivesDivergenceLocally(t *testing.T) {
 func TestPullPortPreviewRejectsBaselineMismatch(t *testing.T) {
 	hash := strings.Repeat("a", 40)
 	repoStatus := git.Status{Branch: "main", Head: hash, Upstream: "origin/main", UpstreamOID: strings.Repeat("b", 40), Tracking: map[string]git.BranchTracking{"main": {Ahead: 1, Behind: 2}}, TrackingKnown: true, TrackingFresh: true}
-	m := model{repoStatus: repoStatus, repositoryEpoch: 7, status: state.New().WithLoading("Previewing..."), activePullRequest: &pullRequest{ID: 4, Epoch: 7}}
+	baseline := pullSnapshotIdentity(repoStatus, 7)
+	m := model{
+		repositoryState: repositoryState{repoStatus: repoStatus, repositoryEpoch: 7},
+		pullState:       pullState{activePullRequest: &pullRequest{ID: 4, Epoch: 7, FetchBaseline: baseline}}, status: state.New().WithLoading("Previewing...")}
 	bad := pullSnapshotIdentity(repoStatus, 7)
 	bad.Head = strings.Repeat("c", 40)
 	got, cmd := handlePullPortPreview(m, pullPortPreviewMsg{result: PullPreviewResult{RequestID: 4, RepositoryEpoch: 7, Baseline: bad, Eligible: true, Commits: []PullPreviewCommit{{Hash: hash}}}})

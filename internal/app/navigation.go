@@ -3,6 +3,9 @@ package app
 import "hrllk/graphkeeper/internal/git"
 
 func syncBrowseState(m *model, rs git.Status) {
+	if m.sectionCursor == nil {
+		m.sectionCursor = make(map[graphSection]int)
+	}
 	syncBrowseStateFromGraph(m, rs)
 	syncBrowseStateSectionCursors(m, rs)
 	syncBrowseStateSelection(m, rs)

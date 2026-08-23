@@ -66,7 +66,9 @@ func TestRenderGraphProjectionIncludesHintWithoutExceedingWidth(t *testing.T) {
 }
 
 func TestGraphPageSizeAccountsForStateHint(t *testing.T) {
-	m := model{repoStatus: git.Status{Root: "/repo"}, status: state.New().WithBrowse()}
+	m := model{
+		repositoryState: repositoryState{repoStatus: git.Status{Root: "/repo"}},
+		pullState:       pullState{}, status: state.New().WithBrowse()}
 	rows := []graphRow{{Commit: graphNode{Hash: "1"}, Graph: "*"}, {Commit: graphNode{Hash: "2"}, Graph: "*"}, {Commit: graphNode{Hash: "3"}, Graph: "*"}}
 	withoutHint := graphPageSizeForRowsWithHint(&m, rows, 0, 5, false)
 	withHint := graphPageSizeForRowsWithHint(&m, rows, 0, 5, true)
@@ -76,7 +78,9 @@ func TestGraphPageSizeAccountsForStateHint(t *testing.T) {
 }
 
 func TestScreenProjectionDoesNotShowRepositoryHintBeforeInitialSnapshot(t *testing.T) {
-	m := model{repoStatus: git.Status{}, status: state.New().WithLoading("Loading...")}
+	m := model{
+		repositoryState: repositoryState{repoStatus: git.Status{}},
+		pullState:       pullState{}, status: state.New().WithLoading("Loading...")}
 
 	projection := m.screenProjection(80, 8)
 	if projection.Graph.StateHint != "" {
