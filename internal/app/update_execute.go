@@ -16,9 +16,12 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg2.err != nil {
-		isAuthError := strings.Contains(msg2.err.Error(), "Permission denied") ||
-			strings.Contains(msg2.err.Error(), "Authentication failed") ||
-			strings.Contains(msg2.err.Error(), "Could not read from remote repository")
+		isPushRoutingAction := msg2.action == state.ActionPush || msg2.action == state.ActionForcePush || msg2.action == state.ActionSetUpstream
+		isLegacyPushTagAction := msg2.action == state.ActionPushTag || msg2.action == state.ActionDeleteRemoteTag
+		isAuthError := (isPushRoutingAction && msg2.errorCategory == PermissionDenied) ||
+			(isLegacyPushTagAction && (strings.Contains(msg2.err.Error(), "Permission denied") ||
+				strings.Contains(msg2.err.Error(), "Authentication failed") ||
+				strings.Contains(msg2.err.Error(), "Could not read from remote repository")))
 
 		if msg2.action == state.ActionStash || msg2.action == state.ActionCleanWorkingTree {
 			if msg2.status.Root != "" {
@@ -39,7 +42,7 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		if msg2.action == state.ActionPush && !isAuthError && (strings.Contains(msg2.err.Error(), "[rejected]") || strings.Contains(msg2.err.Error(), "non-fast-forward")) {
+		if msg2.action == state.ActionPush && msg2.errorCategory == NonFastForward && msg2.operationErr != nil && msg2.statusErr == nil {
 			status := m.repoStatus
 			if msg2.status.Root != "" {
 				status = m.withCachedTagEntries(msg2.status)
@@ -58,6 +61,11 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			detailMsg := fmt.Sprintf("The remote branch has different history. Force pushing will overwrite origin/%s history with your local commits. Continue?", branchName)
 			m.status = m.status.WithConfirm(state.ActionForcePush, titleMsg, detailMsg)
 			m.status.Title = titleMsg
+			m.publish("app", "push_force_confirmation", map[string]string{
+				"action": "push",
+				"target": msg2.target,
+				"error":  msg2.operationErr.Error(),
+			})
 			return m, nil
 		}
 		if msg2.action == state.ActionDeleteBranch && strings.Contains(msg2.err.Error(), "current branch cannot be deleted") {
@@ -178,14 +186,18 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.publish("app", "execute_failed", map[string]string{"action": string(msg2.action), "target": msg2.target, "error": msg2.err.Error()})
 		return m, nil
 	}
-	if msg2.action != state.ActionDeleteTag {
-		msg2.status = m.withCachedTagEntries(msg2.status)
+	if msg2.action == state.ActionCheckout {
+		msg2.status = applyRepositoryStatus(&m, msg2.status)
+	} else {
+		if msg2.action != state.ActionDeleteTag {
+			msg2.status = m.withCachedTagEntries(msg2.status)
+		}
+		m.repoStatus = msg2.status
+		if msg2.status.TagProvenanceLoaded {
+			m.tagSyncAttempted = true
+		}
+		m.storeTagEntries(msg2.status)
 	}
-	m.repoStatus = msg2.status
-	if msg2.status.TagProvenanceLoaded {
-		m.tagSyncAttempted = true
-	}
-	m.storeTagEntries(msg2.status)
 	if msg2.action == state.ActionStash {
 		syncBrowseState(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
@@ -292,7 +304,6 @@ func handleExecutedUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if msg2.action == state.ActionCheckout {
 		m.commitLimit = 0
-		syncBrowseState(&m, msg2.status)
 		focusGraphHead(&m, msg2.status)
 		m.status = deriveStatus(msg2.status)
 		m.publish("app", "execute_action", map[string]string{
