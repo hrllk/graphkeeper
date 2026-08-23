@@ -1,11 +1,14 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/state"
@@ -268,3 +271,91 @@ func TestHandleExecutedPushCategoryWithoutOperationDiagnostic(t *testing.T) {
 }
 
 var _ = strings.Contains
+
+func TestExecutePushCommandBoundary(t *testing.T) {
+	cases := []struct {
+		name         string
+		invoke       func(*git.Repo, string, int) tea.Cmd
+		action       state.Action
+		wantForce    bool
+		wantUpstream bool
+	}{
+		{"ordinary", executePush, state.ActionPush, false, false},
+		{"force", executeForcePush, state.ActionForcePush, true, false},
+		{"set-upstream", executePushSetUpstream, state.ActionSetUpstream, false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotBranch string
+			var gotForce, gotUpstream bool
+			original := pushStatusOps
+			pushStatusOps = pushStatusOperations{
+				push: func(_ context.Context, _ *git.Repo, branch string, force, setUpstream bool) (string, error) {
+					gotBranch, gotForce, gotUpstream = branch, force, setUpstream
+					return "pushed", nil
+				},
+				status: func(_ context.Context, _ *git.Repo, limit int) (git.Status, error) {
+					if limit != 40 {
+						t.Fatalf("status limit = %d, want 40", limit)
+					}
+					return git.Status{Branch: "main", Head: "head"}, nil
+				},
+			}
+			defer func() { pushStatusOps = original }()
+
+			result := cmdResult(t, tc.invoke(nil, "main", 40))
+			msg, ok := result.(executedMsg)
+			if !ok {
+				t.Fatalf("result type = %T, want executedMsg", result)
+			}
+			if gotBranch != "main" || gotForce != tc.wantForce || gotUpstream != tc.wantUpstream {
+				t.Fatalf("push args = branch %q, force %v, upstream %v; want branch main, force %v, upstream %v", gotBranch, gotForce, gotUpstream, tc.wantForce, tc.wantUpstream)
+			}
+			if msg.action != tc.action || msg.target != "main" || msg.err != nil || msg.operationErr != nil || msg.statusErr != nil {
+				t.Fatalf("result = %+v", msg)
+			}
+		})
+	}
+}
+
+func TestExecutePushCommandBoundaryErrorProvenance(t *testing.T) {
+	opErr := errors.New("operation diagnostic")
+	statusErr := errors.New("status diagnostic")
+	variants := []struct {
+		name   string
+		invoke func(*git.Repo, string, int) tea.Cmd
+	}{
+		{"ordinary", executePush},
+		{"force", executeForcePush},
+		{"set-upstream", executePushSetUpstream},
+	}
+	cases := []struct {
+		name      string
+		operation error
+		status    error
+		effective error
+		category  GitErrorCategory
+	}{
+		{"success", nil, nil, nil, ""},
+		{"operation only", opErr, nil, opErr, Unknown},
+		{"status only", nil, statusErr, statusErr, Unknown},
+		{"both errors", opErr, statusErr, opErr, Unknown},
+	}
+	for _, variant := range variants {
+		for _, tc := range cases {
+			t.Run(variant.name+"/"+tc.name, func(t *testing.T) {
+				original := pushStatusOps
+				pushStatusOps = pushStatusOperations{
+					push:   func(context.Context, *git.Repo, string, bool, bool) (string, error) { return "", tc.operation },
+					status: func(context.Context, *git.Repo, int) (git.Status, error) { return git.Status{}, tc.status },
+				}
+				defer func() { pushStatusOps = original }()
+
+				msg := cmdResult(t, variant.invoke(nil, "main", 40)).(executedMsg)
+				if msg.err != tc.effective || msg.operationErr != tc.operation || msg.statusErr != tc.status || msg.errorCategory != tc.category {
+					t.Fatalf("result = %+v, want effective=%v operation=%v status=%v category=%q", msg, tc.effective, tc.operation, tc.status, tc.category)
+				}
+			})
+		}
+	}
+}

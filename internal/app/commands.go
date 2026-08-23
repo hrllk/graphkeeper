@@ -359,47 +359,39 @@ func executeCherryPick(repo *git.Repo, hashes []string, limit int) tea.Cmd {
 	}
 }
 
+type pushStatusOperations struct {
+	push   func(context.Context, *git.Repo, string, bool, bool) (string, error)
+	status func(context.Context, *git.Repo, int) (git.Status, error)
+}
+
+var pushStatusOps = pushStatusOperations{
+	push: func(ctx context.Context, repo *git.Repo, branch string, force, setUpstream bool) (string, error) {
+		return repo.Push(ctx, branch, force, setUpstream)
+	},
+	status: func(ctx context.Context, repo *git.Repo, limit int) (git.Status, error) {
+		return repo.Status(ctx, limit)
+	},
+}
+
 func executePush(repo *git.Repo, branch string, limit int) tea.Cmd {
-	return func() tea.Msg {
-		_, operationErr := repo.Push(context.Background(), branch, false, false)
-		status, statusErr := repo.Status(context.Background(), limit)
-		err, category := executedDiagnostic(operationErr, statusErr)
-		return executedMsg{
-			action:        state.ActionPush,
-			target:        branch,
-			status:        status,
-			err:           err,
-			operationErr:  operationErr,
-			statusErr:     statusErr,
-			errorCategory: category,
-		}
-	}
+	return executePushOperation(repo, branch, limit, state.ActionPush, false, false)
 }
 
 func executeForcePush(repo *git.Repo, branch string, limit int) tea.Cmd {
-	return func() tea.Msg {
-		_, operationErr := repo.Push(context.Background(), branch, true, false)
-		status, statusErr := repo.Status(context.Background(), limit)
-		err, category := executedDiagnostic(operationErr, statusErr)
-		return executedMsg{
-			action:        state.ActionForcePush,
-			target:        branch,
-			status:        status,
-			err:           err,
-			operationErr:  operationErr,
-			statusErr:     statusErr,
-			errorCategory: category,
-		}
-	}
+	return executePushOperation(repo, branch, limit, state.ActionForcePush, true, false)
 }
 
 func executePushSetUpstream(repo *git.Repo, branch string, limit int) tea.Cmd {
+	return executePushOperation(repo, branch, limit, state.ActionSetUpstream, false, true)
+}
+
+func executePushOperation(repo *git.Repo, branch string, limit int, action state.Action, force, setUpstream bool) tea.Cmd {
 	return func() tea.Msg {
-		_, operationErr := repo.Push(context.Background(), branch, false, true)
-		status, statusErr := repo.Status(context.Background(), limit)
+		_, operationErr := pushStatusOps.push(context.Background(), repo, branch, force, setUpstream)
+		status, statusErr := pushStatusOps.status(context.Background(), repo, limit)
 		err, category := executedDiagnostic(operationErr, statusErr)
 		return executedMsg{
-			action:        state.ActionSetUpstream,
+			action:        action,
 			target:        branch,
 			status:        status,
 			err:           err,
