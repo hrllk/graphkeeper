@@ -27,6 +27,9 @@ func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 	if action == state.ActionPull && m.activePullRequest == nil {
 		return m, nil
 	}
+	if action == state.ActionPull {
+		clearPullConfirmProjection(&m)
+	}
 	m.status = operationLoadingStatusFor(progressOutcomeExecution, "Running...", action)
 	switch action {
 	case state.ActionPull:
@@ -51,6 +54,7 @@ func (m model) handleOutcomePreviewExecute() (tea.Model, tea.Cmd) {
 func (m model) handleOutcomePreviewEscape() (tea.Model, tea.Cmd) {
 	switch {
 	case m.status.Action == state.ActionPull:
+		clearPullConfirmProjection(&m)
 		if m.pullCancel != nil {
 			m.pullCancel()
 			m.pullCancel = nil

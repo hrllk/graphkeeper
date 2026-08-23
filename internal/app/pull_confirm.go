@@ -64,7 +64,18 @@ func joinUniqueNonEmpty(values ...string) string {
 func applyMergeConfirmProjection(m *model, snapshot PullImpactSnapshot, impacts PullImpactSet, stale bool) bool {
 	view, ok := projectMergeConfirm(snapshot, impacts, stale)
 	if !ok {
+		clearPullConfirmProjection(m)
 		return false
+	}
+	m.pullConfirmInput = &pullConfirmInput{
+		CurrentBranch: view.CurrentBranch,
+		TargetRef:     view.TargetRef,
+		CurrentOnly:   view.CurrentOnly,
+		TargetOnly:    view.TargetOnly,
+		ImpactKnown:   view.ImpactKnown,
+		MergeText:     view.MergeText,
+		RebaseText:    view.RebaseText,
+		RiskText:      view.RiskText,
 	}
 	m.mergeConfirmView = &view
 	m.status = m.status.WithConfirm(state.ActionPull, "Pull into "+view.CurrentBranch+"?", mergeConfirmBody(view, mergeMax(40, m.width-8)))

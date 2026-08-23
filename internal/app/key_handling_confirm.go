@@ -9,7 +9,11 @@ import (
 )
 
 func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	result := classifyConfirmKey(confirmView(m), msg.String())
+	projection, ok := buildConfirmationProjection(m)
+	if !ok {
+		return m, nil
+	}
+	result := classifyConfirmationKey(projection, msg.String())
 	switch result.Decision {
 	case decisionAccept:
 		return m.handleConfirmAccept()
@@ -21,6 +25,7 @@ func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.handleConfirmPullRebase()
 		}
 	case decisionCancel:
+		clearPullConfirmProjection(&m)
 		if m.pullCancel != nil {
 			m.pullCancel()
 			m.pullCancel = nil
@@ -42,6 +47,7 @@ func (m model) handleConfirmAccept() (tea.Model, tea.Cmd) {
 		if m.activePullRequest == nil || m.pullConfirmStale {
 			return m, nil
 		}
+		clearPullConfirmProjection(&m)
 		if m.pullIsFastForward {
 			m.status = operationLoadingStatusFor(progressPull, "Pulling...", state.ActionPull)
 			if m.pull != nil {
@@ -113,6 +119,7 @@ func (m model) handleConfirmPullMerge() (tea.Model, tea.Cmd) {
 		if m.activePullRequest == nil || m.pullConfirmStale {
 			return m, nil
 		}
+		clearPullConfirmProjection(&m)
 		m.handshakeCommits = make(map[string]bool)
 		m.status = operationLoadingStatusFor(progressMerge, "Merging pull...", state.ActionMerge)
 		if m.pull != nil {
@@ -128,6 +135,7 @@ func (m model) handleConfirmPullRebase() (tea.Model, tea.Cmd) {
 		if m.activePullRequest == nil || m.pullConfirmStale {
 			return m, nil
 		}
+		clearPullConfirmProjection(&m)
 		m.handshakeCommits = make(map[string]bool)
 		m.status = operationLoadingStatusFor(progressRebase, "Rebasing pull...", state.ActionRebase)
 		if m.pull != nil {

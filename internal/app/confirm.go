@@ -47,7 +47,7 @@ type confirmViewModel struct {
 	DisabledText string
 }
 
-func classifyConfirmKey(view confirmViewModel, key string) confirmResult {
+func classifyConfirmationKey(view confirmationProjection, key string) confirmResult {
 	if view.Disabled {
 		switch key {
 		case "n", "esc":
@@ -80,34 +80,19 @@ func classifyConfirmKey(view confirmViewModel, key string) confirmResult {
 	}
 }
 
+func classifyConfirmKey(view confirmViewModel, key string) confirmResult {
+	return classifyConfirmationKey(confirmationProjection{
+		Kind: view.Kind, Action: view.Action, Title: view.Title, Detail: view.Detail,
+		ApprovalKey: view.ApprovalKey, ApprovalText: view.ApprovalText, FooterText: view.FooterText,
+		ChoiceKeys: append([]confirmChoice(nil), view.ChoiceKeys...), CancelKeys: append([]string(nil), view.CancelKeys...),
+		Disabled: view.Disabled, DisabledText: view.DisabledText,
+	}, key)
+}
+
 func confirmView(m model) confirmViewModel {
-	view := confirmViewModel{
-		Kind:         confirmBinary,
-		Action:       m.status.Action,
-		Title:        m.status.Title,
-		Detail:       m.status.Detail,
-		ApprovalKey:  "y",
-		ApprovalText: "yes",
-		FooterText:   "y: yes  •  n: no",
-		CancelKeys:   []string{"n", "esc"},
+	projection, ok := buildConfirmationProjection(m)
+	if !ok {
+		return confirmViewModel{}
 	}
-	if m.status.Action == state.ActionPull && !m.pullIsFastForward {
-		view.Kind = confirmChoiceKind
-		view.ChoiceKeys = []confirmChoice{{Key: "m", Label: "merge"}, {Key: "r", Label: "rebase"}}
-		view.FooterText = "m: merge  •  enter: merge  •  r: rebase  •  n: cancel"
-	} else if m.status.Message == "Fast-forward available." {
-		view.FooterText = "enter: fast-forward"
-	} else if m.status.Action == state.ActionDeleteBranch || m.status.Action == state.ActionDeleteTag {
-		view.FooterText = "y: delete  •  n: cancel"
-	} else if m.status.Action == state.ActionStash {
-		view.FooterText = "y: stash  •  n: cancel"
-	} else if m.status.Action == state.ActionCleanWorkingTree {
-		view.FooterText = "y: clean  •  n: cancel"
-	}
-	if m.pullConfirmStale && m.status.Action == state.ActionPull {
-		view.Disabled = true
-		view.DisabledText = "Preview is stale. Refresh before continuing."
-		view.FooterText = "n: close  •  esc: close"
-	}
-	return view
+	return confirmationAsView(projection)
 }

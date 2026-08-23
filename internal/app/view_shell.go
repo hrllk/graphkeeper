@@ -109,51 +109,86 @@ func renderPopupFooter(width int) string {
 
 func renderMergeConfirmPopup(view mergeConfirmViewModel, bodyWidth int) string {
 	width := popupWidthForBody(bodyWidth, 36, 42)
+	return renderDivergentConfirmPopup(confirmationProjection{
+		Kind:          confirmChoiceKind,
+		Title:         "Pull into " + view.CurrentBranch + "?",
+		Detail:        mergeConfirmBody(view, width-4),
+		FooterText:    "m/enter: merge · r: rebase · n/esc: cancel",
+		CurrentBranch: view.CurrentBranch,
+		TargetRef:     view.TargetRef,
+		CurrentOnly:   view.CurrentOnly,
+		TargetOnly:    view.TargetOnly,
+		ImpactKnown:   view.ImpactKnown,
+		MergeText:     view.MergeText,
+		RebaseText:    view.RebaseText,
+		RiskText:      view.RiskText,
+		Disabled:      view.Disabled,
+		DisabledText:  view.DisabledText,
+	}, bodyWidth)
+}
+
+func renderDivergentConfirmPopup(projection confirmationProjection, bodyWidth int) string {
+	width := popupWidthForBody(bodyWidth, 36, 42)
 	popupBox := popupBorder.Padding(1, 2).Width(width).Align(lipgloss.Center)
-	title := "Pull into " + view.CurrentBranch + "?"
-	body := mergeConfirmBody(view, width-4)
-	footer := "m/enter: merge · r: rebase · n/esc: cancel"
-	if view.Disabled {
+	body := mergeConfirmBodyFromProjection(projection, width-4)
+	if projection.Detail != "" && projection.Detail != body {
+		body = joinLayoutSections(projection.Detail, body)
+	}
+	footer := projection.FooterText
+	if projection.Disabled {
 		footer = "n: close · esc: close"
-	} else if width < 54 {
+	} else if width < 54 && footer == "m/enter: merge · r: rebase · n/esc: cancel" {
 		footer = "m/enter: merge\nr: rebase · n/esc: cancel"
 	}
 	body = joinLayoutSections(body, popupHelp.Render(footer), renderPopupFooter(width-4))
-	return renderFloatingTitlePopup(popupBox, title, centerReviewFooterLine(body, width-4), width)
+	return renderFloatingTitlePopup(popupBox, projection.Title, centerReviewFooterLine(body, width-4), width)
+}
+
+func mergeConfirmBodyFromProjection(projection confirmationProjection, width int) string {
+	if projection.Disabled {
+		return fitMergeLines(projection.DisabledText, width)
+	}
+	lines := []string{
+		"Pull into " + fitMergeValue(projection.CurrentBranch, width, "Pull into "),
+		"Target: " + fitMergeValue(projection.TargetRef, width, "Target: "),
+		"Relation: " + fitMergeCounts(projection.CurrentOnly, projection.TargetOnly, width),
+		"",
+		"Merge: " + fitMergeValue(projection.MergeText, width, "Merge: "),
+		"Rebase: " + fitMergeValue(projection.RebaseText, width, "Rebase: "),
+	}
+	if projection.RiskText != "" {
+		lines = append(lines, "Risk: "+fitMergeValue(projection.RiskText, width, "Risk: "))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func renderConfirmPopup(m model, bodyWidth int) string {
-	descStyle := popupBody
-	helpStyle := popupHelp
+	projection, ok := buildConfirmationProjection(m)
+	if !ok {
+		return ""
+	}
+	if projection.Kind == confirmChoiceKind {
+		return renderDivergentConfirmPopup(projection, bodyWidth)
+	}
 	width := popupWidthForBody(bodyWidth, 28, 42)
-	align := lipgloss.Center
 	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(width).
-		Align(align)
-	view := confirmView(m)
-	if view.Kind == confirmChoiceKind && m.mergeConfirmView != nil {
-		mergeView := *m.mergeConfirmView
-		if m.pullConfirmStale {
-			mergeView.Disabled = true
-			mergeView.DisabledText = "Pull preview is stale.\nRefresh before continuing."
-		}
-		return renderMergeConfirmPopup(mergeView, bodyWidth)
-	}
-	popupTitle := view.Title
+		Align(lipgloss.Center)
+	popupTitle := projection.Title
 	if popupTitle == "" || popupTitle == "Confirm" {
 		popupTitle = "Continue?"
 	}
-	detail := view.Detail
-	if view.Disabled {
-		detail = joinLayoutSections(detail, view.DisabledText)
+	detail := projection.Detail
+	if projection.Disabled {
+		detail = joinLayoutSections(detail, projection.DisabledText)
 	}
 	return renderFloatingTitlePopup(
 		popupBox,
 		popupTitle,
 		centerReviewFooterLine(joinLayoutSections(
-			descStyle.Render(detail),
-			helpStyle.Render(view.FooterText),
+			popupBody.Render(detail),
+			popupHelp.Render(projection.FooterText),
 			renderPopupFooter(width-4),
 		), width-4),
 		width,

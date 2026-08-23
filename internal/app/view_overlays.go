@@ -10,7 +10,7 @@ type shellOverlay struct {
 
 func applyShellOverlays(m model, body string, bodyWidth, bodyHeight int) string {
 	for _, overlay := range shellOverlayStack(m, bodyWidth, bodyHeight) {
-		if !overlay.active {
+		if !overlay.active || overlay.popup == "" {
 			continue
 		}
 		body = overlayPopup(body, overlay.popup)
