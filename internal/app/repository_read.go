@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"hrllk/graphkeeper/internal/graph"
 )
@@ -25,13 +26,34 @@ type ReadSnapshotResult struct {
 	Snapshot        ReadSnapshot
 	ErrorKind       ReadErrorKind
 	Canceled        bool
+	Err             error
 }
 
 type ReadSnapshot struct {
-	Root      string
-	Graph     graph.Snapshot
-	Freshness PullSnapshotIdentity
+	Root       string
+	Graph      graph.Snapshot
+	Freshness  PullSnapshotIdentity
+	Repository RepositoryProjection
 }
+
+type RepositoryProjection struct {
+	Root, Branch, Head, Upstream, UpstreamOID, Remote, DefaultBranch string
+	Branches, LocalBranches                                          []string
+	LocalBranchesKnown, LocalBranchesFresh                           bool
+	LocalBranchesError                                               string
+	RemoteBranches                                                   []string
+	BranchUpstreams                                                  map[string]string
+	Tracking                                                         map[string]BranchTracking
+	TrackingKnown, TrackingFresh                                     bool
+	WorktreeDirty, Detached, EmptyRepo                               bool
+	NoRemote, NoUpstream, UpstreamGone                               bool
+	MergeInProgress, RebaseInProgress, CherryPickInProgress          bool
+	ConflictTarget, ConflictTargetSubject                            string
+	LastFetchAt                                                      time.Time
+	RemoteSyncSummary                                                string
+}
+
+type BranchTracking struct{ Ahead, Behind int }
 
 type ReadErrorKind string
 
