@@ -18,10 +18,10 @@
 
 - `docs/product-prd.md`
 - `docs/roadmap.md`
-- `docs/model-refactor-plan.md`
-- `docs/archive/20260625-0015-feature-pull-reset-ux-implementation-plan.md`
-- `docs/archive/20260625-0016-feature-reset-stash-plan.md`
-- `docs/archive/20260625-0018-refactor-alert-messages-english-concise-plan.md`
+- `~/.gstack/graphkeeper/model-refactor-plan.md`
+- `~/.gstack/graphkeeper/archive/20260625-0015-feature-pull-reset-ux-implementation-plan.md`
+- `~/.gstack/graphkeeper/archive/20260625-0016-feature-reset-stash-plan.md`
+- `~/.gstack/graphkeeper/archive/20260625-0018-refactor-alert-messages-english-concise-plan.md`
 - `docs/structure.md`
 
 ## 현재 관찰된 구현 상태
@@ -280,4 +280,4 @@ go build ./cmd/graphkeeper
 
 - 이 문서는 구현 세부를 고정하는 문서가 아니라, `confirm` 승인 후 실행 중이라는 짧은 경험을 공통화하는 문서다.
 - toast는 오래 머무는 상태가 아니라, 작업 시작을 알려주는 짧은 안내여야 한다.
-- 실제 구현 시에는 `docs/model-refactor-plan.md`와 함께 보면서 책임 경계를 맞추는 것이 좋다.
+- 실제 구현 시에는 `~/.gstack/graphkeeper/model-refactor-plan.md`와 함께 보면서 책임 경계를 맞추는 것이 좋다.

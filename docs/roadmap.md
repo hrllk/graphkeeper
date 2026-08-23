@@ -25,7 +25,7 @@ The repo already has these important pieces in place:
    - keep `model.go` for model state and shared types
    - move more code out only when a file becomes too dense
    - do not add new packages just for symmetry
-   - see `docs/model-refactor-plan.md` for the current `model.go` shrink plan
+   - see `~/.gstack/graphkeeper/model-refactor-plan.md` for the current `model.go` shrink plan
 
 3. Keep `internal/graph` as the home for graph rules.
    - lane order
@@ -49,5 +49,6 @@ Run these after each meaningful refactor:
 For UI or rendering changes, also check the relevant package tests in `internal/app`.
 
 ### Archive rule
-Move old one-off plans and outdated implementation notes into `docs/archive/`.
+Keep historical implementation notes in `docs/archive/`.
+Store plans and specs outside the repository under `~/.gstack/graphkeeper/`.
 Keep this file focused on the next practical steps, not long-term brainstorming.

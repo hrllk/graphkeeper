@@ -17,16 +17,20 @@ func (a *Adapter) ReadSnapshot(ctx context.Context, req app.ReadRequest) (app.Re
 	result := app.ReadSnapshotResult{RequestID: req.RequestID, RepositoryEpoch: req.RepositoryEpoch, ErrorKind: app.ReadErrorNone}
 	if a == nil || a.repo == nil {
 		result.ErrorKind = app.ReadErrorRepository
-		return result, &app.ReadError{Kind: app.ReadErrorRepository}
+		err := &app.ReadError{Kind: app.ReadErrorRepository}
+		result.Err = err
+		return result, err
 	}
 	status, err := a.repo.Status(ctx, req.CommitLimit)
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			result.ErrorKind = app.ReadErrorCanceled
 			result.Canceled = true
-			return result, nil
+			result.Err = err
+			return result, err
 		}
 		result.ErrorKind = app.ReadErrorRepository
+		result.Err = err
 		return result, err
 	}
 	if status.Root == "" {
@@ -50,6 +54,19 @@ func MapStatusToSnapshot(status git.Status, epoch uint64) app.ReadSnapshot {
 	}
 	return app.ReadSnapshot{
 		Root: status.Root,
+		Repository: app.RepositoryProjection{
+			Root: status.Root, Branch: status.Branch, Head: status.Head, Upstream: status.Upstream,
+			UpstreamOID: status.UpstreamOID, Remote: status.Remote, DefaultBranch: status.DefaultBranch,
+			Branches: append([]string(nil), status.Branches...), LocalBranches: append([]string(nil), status.LocalBranches...),
+			LocalBranchesKnown: status.LocalBranchesKnown, LocalBranchesFresh: status.LocalBranchesFresh, LocalBranchesError: status.LocalBranchesError,
+			RemoteBranches: append([]string(nil), status.RemoteBranches...), BranchUpstreams: copyStringMap(status.BranchUpstreams),
+			Tracking: mapTracking(status.Tracking), TrackingKnown: status.TrackingKnown, TrackingFresh: status.TrackingFresh,
+			WorktreeDirty: status.WorktreeDirty, Detached: status.Detached, EmptyRepo: status.EmptyRepo,
+			NoRemote: status.NoRemote, NoUpstream: status.NoUpstream, UpstreamGone: status.UpstreamGone,
+			MergeInProgress: status.MergeInProgress, RebaseInProgress: status.RebaseInProgress, CherryPickInProgress: status.CherryPickInProgress,
+			ConflictTarget: status.ConflictTarget, ConflictTargetSubject: status.ConflictTargetSubject,
+			LastFetchAt: status.LastFetchAt, RemoteSyncSummary: status.RemoteSyncSummary,
+		},
 		Graph: graph.Snapshot{
 			Commits: commits, Branch: status.Branch, Head: status.Head,
 			LocalBranches: append([]string(nil), status.LocalBranches...),
@@ -61,6 +78,28 @@ func MapStatusToSnapshot(status git.Status, epoch uint64) app.ReadSnapshot {
 		},
 		Freshness: snapshotIdentity(status, epoch),
 	}
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func mapTracking(in map[string]git.BranchTracking) map[string]app.BranchTracking {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]app.BranchTracking, len(in))
+	for k, v := range in {
+		out[k] = app.BranchTracking{Ahead: v.Ahead, Behind: v.Behind}
+	}
+	return out
 }
 
 func snapshotIdentity(status git.Status, epoch uint64) app.PullSnapshotIdentity {

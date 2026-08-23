@@ -260,4 +260,4 @@ What is intentionally out of scope:
 - `docs/highlighting-color-map.md` - UI color map
 - `docs/cli-reference.md` - CLI options, exit codes, and version resolution
 - `docs/howto-build-and-run.md` - build, verify, and run the CLI
-- `docs/archive/` - older plans and moved docs
+- `docs/archive/` - historical implementation notes that remain in the repository

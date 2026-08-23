@@ -7,8 +7,8 @@
 
 참조한 원문은 다음이다.
 
-- `docs/archive/20260625-0019-refactor-centered-layout-relayout-plan.md`
-- `docs/archive/20260625-0017-refactor-graph-first-layout-and-mode-panels-plan.md`
+`~/.gstack/graphkeeper/archive/20260625-0019-refactor-centered-layout-relayout-plan.md`
+`~/.gstack/graphkeeper/archive/20260625-0017-refactor-graph-first-layout-and-mode-panels-plan.md`
 
 ## AS-IS
 

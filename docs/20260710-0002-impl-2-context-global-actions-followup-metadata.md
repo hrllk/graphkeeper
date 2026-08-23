@@ -1,6 +1,6 @@
 # 20260710-0002 Impl 2
 
-`docs/20260710-0001-context-global-actions-rebalance-plan.md` 의 후속 메타데이터를 구현하기 위한 문서다.
+`~/.gstack/graphkeeper/20260710-0001-context-global-actions-rebalance-plan.md` 의 후속 메타데이터를 구현하기 위한 문서다.
 
 이 문서는 1차 rebalance 문서에서 의도적으로 분리한 두 영역만 다룬다.
 

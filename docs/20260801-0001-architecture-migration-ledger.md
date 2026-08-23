@@ -1,6 +1,6 @@
 # 아키텍처 경계 개선 마이그레이션 원장
 
-이 문서는 `docs/20260731-0003-modern-architecture-boundary-improvement-plan.md`의 구현 추적표다. 각 단계는 기존 동작을 유지하면서 한 개의 경계를 옮긴다.
+이 문서는 `~/.gstack/graphkeeper/20260731-0003-modern-architecture-boundary-improvement-plan.md`의 구현 추적표다. 각 단계는 기존 동작을 유지하면서 한 개의 경계를 옮긴다.
 
 | 단계 | 현재 위치 | 목표 경계 | 책임 소유자 | 호환 장치 | 제거 조건 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- |

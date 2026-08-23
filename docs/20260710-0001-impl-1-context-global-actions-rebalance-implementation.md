@@ -1,6 +1,6 @@
 # 20260710-0001 Impl 1
 
-`docs/20260710-0001-context-global-actions-rebalance-plan.md` 만 보고도 바로 구현할 수 있게 정리한 실행 문서다.
+`~/.gstack/graphkeeper/20260710-0001-context-global-actions-rebalance-plan.md` 만 보고도 바로 구현할 수 있게 정리한 실행 문서다.
 
 이 문서는 아래 목표를 실제 코드 단위로 쪼갠다.
 
