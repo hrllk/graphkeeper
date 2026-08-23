@@ -75,12 +75,26 @@ type graphActionCheckMsg struct {
 	err         error
 }
 
+type GitErrorCategory string
+
+const (
+	PermissionDenied GitErrorCategory = "permission_denied"
+	NotFound         GitErrorCategory = "not_found"
+	NonFastForward   GitErrorCategory = "non_fast_forward"
+	DirtyWorktree    GitErrorCategory = "dirty_worktree"
+	Conflict         GitErrorCategory = "conflict"
+	Unknown          GitErrorCategory = "unknown"
+)
+
 type executedMsg struct {
-	action    state.Action
-	target    string
-	resetMode state.ResetMode
-	status    git.Status
-	err       error
+	action        state.Action
+	target        string
+	resetMode     state.ResetMode
+	status        git.Status
+	err           error
+	operationErr  error
+	statusErr     error
+	errorCategory GitErrorCategory
 }
 
 type createdBranchMsg struct {

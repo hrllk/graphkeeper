@@ -39,14 +39,33 @@ func loadRepoState(repo *git.Repo, limit int, args ...interface{}) tea.Cmd {
 func loadRepositorySnapshot(port RepositoryReadPort, limit int, epoch uint64) tea.Cmd {
 	return func() tea.Msg {
 		if port == nil {
-			return loadedSnapshotMsg{result: ReadSnapshotResult{RepositoryEpoch: epoch, ErrorKind: ReadErrorRepository}}
+			return loadedSnapshotMsg{result: normalizeReadSnapshotResult(ReadSnapshotResult{RepositoryEpoch: epoch, ErrorKind: ReadErrorRepository}, nil)}
 		}
 		result, err := port.ReadSnapshot(context.Background(), ReadRequest{CommitLimit: int(limit), RequestID: 1, RepositoryEpoch: epoch})
-		if err != nil && result.ErrorKind == ReadErrorNone {
-			result.ErrorKind = ReadErrorRepository
-		}
-		return loadedSnapshotMsg{result: result}
+		return loadedSnapshotMsg{result: normalizeReadSnapshotResult(result, err)}
 	}
+}
+
+func normalizeReadSnapshotResult(result ReadSnapshotResult, returnedErr error) ReadSnapshotResult {
+	if result.Err == nil {
+		result.Err = returnedErr
+	}
+	if result.ErrorKind != "" && result.ErrorKind != ReadErrorNone {
+		result.Canceled = result.ErrorKind == ReadErrorCanceled
+		return result
+	}
+	if result.Canceled {
+		result.ErrorKind = ReadErrorCanceled
+		return result
+	}
+	if result.Err != nil {
+		result.ErrorKind = ReadErrorRepository
+		return result
+	}
+	result.ErrorKind = ReadErrorNone
+	result.Canceled = false
+	result.Err = nil
+	return result
 }
 
 func (m *model) refreshCmd() tea.Cmd {
@@ -58,10 +77,7 @@ func (m *model) refreshCmd() tea.Cmd {
 		limit := m.commitLimit
 		readCmd := func() tea.Msg {
 			result, err := port.ReadSnapshot(context.Background(), ReadRequest{CommitLimit: limit, RequestID: generation, RepositoryEpoch: epoch})
-			if err != nil && result.ErrorKind == ReadErrorNone {
-				result.ErrorKind = ReadErrorRepository
-			}
-			return refreshedSnapshotMsg{result: result, refreshGeneration: generation}
+			return refreshedSnapshotMsg{result: normalizeReadSnapshotResult(result, err), refreshGeneration: generation}
 		}
 		return readCmd
 	}
@@ -345,34 +361,52 @@ func executeCherryPick(repo *git.Repo, hashes []string, limit int) tea.Cmd {
 
 func executePush(repo *git.Repo, branch string, limit int) tea.Cmd {
 	return func() tea.Msg {
-		_, err := repo.Push(context.Background(), branch, false, false)
+		_, operationErr := repo.Push(context.Background(), branch, false, false)
 		status, statusErr := repo.Status(context.Background(), limit)
-		if statusErr != nil {
-			return executedMsg{action: state.ActionPush, target: branch, err: statusErr}
+		err, category := executedDiagnostic(operationErr, statusErr)
+		return executedMsg{
+			action:        state.ActionPush,
+			target:        branch,
+			status:        status,
+			err:           err,
+			operationErr:  operationErr,
+			statusErr:     statusErr,
+			errorCategory: category,
 		}
-		return executedMsg{action: state.ActionPush, target: branch, status: status, err: err}
 	}
 }
 
 func executeForcePush(repo *git.Repo, branch string, limit int) tea.Cmd {
 	return func() tea.Msg {
-		_, err := repo.Push(context.Background(), branch, true, false)
+		_, operationErr := repo.Push(context.Background(), branch, true, false)
 		status, statusErr := repo.Status(context.Background(), limit)
-		if statusErr != nil {
-			return executedMsg{action: state.ActionForcePush, target: branch, err: statusErr}
+		err, category := executedDiagnostic(operationErr, statusErr)
+		return executedMsg{
+			action:        state.ActionForcePush,
+			target:        branch,
+			status:        status,
+			err:           err,
+			operationErr:  operationErr,
+			statusErr:     statusErr,
+			errorCategory: category,
 		}
-		return executedMsg{action: state.ActionForcePush, target: branch, status: status, err: err}
 	}
 }
 
 func executePushSetUpstream(repo *git.Repo, branch string, limit int) tea.Cmd {
 	return func() tea.Msg {
-		_, err := repo.Push(context.Background(), branch, false, true)
+		_, operationErr := repo.Push(context.Background(), branch, false, true)
 		status, statusErr := repo.Status(context.Background(), limit)
-		if statusErr != nil {
-			return executedMsg{action: state.ActionSetUpstream, target: branch, err: statusErr}
+		err, category := executedDiagnostic(operationErr, statusErr)
+		return executedMsg{
+			action:        state.ActionSetUpstream,
+			target:        branch,
+			status:        status,
+			err:           err,
+			operationErr:  operationErr,
+			statusErr:     statusErr,
+			errorCategory: category,
 		}
-		return executedMsg{action: state.ActionSetUpstream, target: branch, status: status, err: err}
 	}
 }
 
@@ -656,6 +690,7 @@ func executeFetchForPush(repo *git.Repo, limit int) tea.Cmd {
 }
 
 func beginPullRequest(m *model) pullRequest {
+	clearPullConfirmProjection(m)
 	m.nextPullRequestID++
 	baseline := pullSnapshotIdentity(m.repoStatus, m.repositoryEpoch+1)
 	request := pullRequest{ID: m.nextPullRequestID, Epoch: m.repositoryEpoch + 1, FetchBaseline: baseline}
