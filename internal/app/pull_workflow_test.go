@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"hrllk/graphkeeper/internal/graph"
+	"hrllk/graphkeeper/internal/state"
 )
 
 type fakePull struct {
@@ -73,10 +75,15 @@ func TestPullWorkflowNoOpDoesNotValidateExecuteOrRefresh(t *testing.T) {
 }
 
 func TestPullWorkflowNoOpDoesNotClearExistingGraphSnapshot(t *testing.T) {
+	operationResult := OperationResultSummary{Operation: PullResultMetadata{Action: state.ActionPull}}
 	m := model{
-		graphReadSnapshot: graph.Snapshot{Branch: "main", Head: "head"},
-		activePullRequest: &pullRequest{ID: 7, Epoch: 3},
-	}
+		repositoryState: repositoryState{
+			graphReadSnapshot: graph.Snapshot{Branch: "main", Head: "head"},
+		},
+		pullState: pullState{
+			activePullRequest: &pullRequest{ID: 7, Epoch: 3},
+			operationResult:   &operationResult,
+		}}
 	next, _ := m.Update(pullWorkflowMsg{result: PullWorkflowResult{
 		OperationRequestID: 7,
 		OperationEpoch:     3,
@@ -89,7 +96,29 @@ func TestPullWorkflowNoOpDoesNotClearExistingGraphSnapshot(t *testing.T) {
 		},
 	}})
 	got := next.(model)
-	if got.graphReadSnapshot.Branch != "main" || got.graphReadSnapshot.Head != "head" {
+	if got.graphReadSnapshot.Branch != "main" || got.graphReadSnapshot.Head != "head" || got.operationResult != &operationResult {
 		t.Fatalf("no-op cleared existing graph snapshot: %#v", got.graphReadSnapshot)
+	}
+	if got.status.Detail != "No action needed. Press q or Esc to return to the graph." {
+		t.Fatalf("unexpected no-op detail: %q", got.status.Detail)
+	}
+}
+
+func TestPullWorkflowRefreshIdentityMismatchDoesNotProjectGraph(t *testing.T) {
+	prior := graph.Snapshot{Branch: "before", Head: "old"}
+	m := model{
+		repositoryState: repositoryState{graphReadSnapshot: prior, repoSnapshotLoaded: true},
+		pullState:       pullState{activePullRequest: &pullRequest{ID: 7, Epoch: 3}}}
+	next, cmd := m.Update(pullWorkflowMsg{result: PullWorkflowResult{
+		OperationRequestID: 7, OperationEpoch: 3, RefreshRequestID: 8, RefreshEpoch: 4,
+		Execute: PullExecutionResult{Mode: PullModeMerge, Succeeded: true},
+		Refresh: ReadSnapshotResult{RequestID: 99, RepositoryEpoch: 4, Snapshot: ReadSnapshot{Graph: graph.Snapshot{Branch: "after", Head: "new"}}},
+	}})
+	if cmd != nil {
+		t.Fatalf("identity mismatch scheduled command: %v", cmd)
+	}
+	got := next.(model)
+	if !reflect.DeepEqual(got.graphReadSnapshot, prior) || !got.repoSnapshotLoaded {
+		t.Fatalf("identity mismatch projected graph: %#v", got.graphReadSnapshot)
 	}
 }

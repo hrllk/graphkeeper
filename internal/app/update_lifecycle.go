@@ -23,6 +23,7 @@ func markPullStale(m model) (model, tea.Cmd) {
 			m.pullCancel()
 			m.pullCancel = nil
 		}
+		clearPullConfirmProjection(&m)
 		m.activePullRequest = nil
 		m.pullConfirmStale = false
 		m.nextPullRequestID++
@@ -41,16 +42,30 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.result.RepositoryEpoch != m.repositoryEpoch {
 			return m, nil
 		}
-		if msg.result.ErrorKind == ReadErrorInvalid || msg.result.ErrorKind == ReadErrorRepository || msg.result.ErrorKind == ReadErrorCanceled {
+		if msg.result.ErrorKind != ReadErrorNone {
+			m.err = startupReadError(msg.result)
+			m.status = startupErrorStatus(msg.result)
+			m.startupReadPending = false
+			m.startupFailed = true
 			return m, nil
 		}
 		m.graphReadSnapshot = msg.result.Snapshot.Graph
+		m.repoStatus = applyRepositoryProjection(msg.result.Snapshot.Repository, msg.result.Snapshot.Graph)
+		m.repoSnapshotLoaded = true
+		m.err = nil
+		m.startupReadPending = false
+		m.startupFailed = false
+		syncBrowseState(&m, m.repoStatus)
+		m.status = deriveStatus(m.repoStatus)
 		return m, nil
 	case refreshedSnapshotMsg:
 		if msg.refreshGeneration != m.refreshGeneration || msg.result.RepositoryEpoch != m.repositoryEpoch {
 			return markPullStale(m)
 		}
 		if msg.result.ErrorKind == ReadErrorInvalid || msg.result.ErrorKind == ReadErrorRepository || msg.result.ErrorKind == ReadErrorCanceled {
+			if m.status.Mode == state.ModeLoading {
+				clearPullConfirmProjection(&m)
+			}
 			return m, nil
 		}
 		m.graphReadSnapshot = msg.result.Snapshot.Graph
@@ -72,20 +87,14 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.publish("app", "load_error", map[string]string{"error": msg.err.Error()})
 			return m, nil
 		}
-		msg.status = m.withCachedTagEntries(msg.status)
 		m.err = nil
 		m.repoSnapshotLoaded = true
-		m.repoStatus = msg.status
-		if msg.status.TagProvenanceLoaded {
-			m.tagSyncAttempted = true
-		}
-		m.storeTagEntries(msg.status)
-		syncBrowseState(&m, msg.status)
-		m.status = deriveStatus(msg.status)
+		appliedStatus := applyRepositoryStatus(&m, msg.status)
+		m.status = deriveStatus(appliedStatus)
 		m.publish("app", "load_repo", map[string]string{
-			"root":   msg.status.Root,
-			"branch": msg.status.Branch,
-			"head":   msg.status.Head,
+			"root":   appliedStatus.Root,
+			"branch": appliedStatus.Branch,
+			"head":   appliedStatus.Head,
 		})
 		return m, loadStashState(m.repo)
 	case tickMsg:
@@ -108,6 +117,9 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.commitInspectorEpoch = msg.epoch
 		}
 		if msg.err != nil {
+			if m.status.Mode == state.ModeLoading {
+				clearPullConfirmProjection(&m)
+			}
 			if m.status.Mode == state.ModeOperationResult && m.operationResult != nil {
 				m.operationResult.RefreshError = msg.err
 				m.operationResult.Verification = VerificationUnknown
@@ -118,17 +130,11 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		msg.status = m.withCachedTagEntries(msg.status)
 		m.err = nil
 		m.repoSnapshotLoaded = true
-		m.repoStatus = msg.status
-		if msg.status.TagProvenanceLoaded {
-			m.tagSyncAttempted = true
-		}
-		m.storeTagEntries(msg.status)
-		syncBrowseState(&m, msg.status)
+		appliedStatus := applyRepositoryStatus(&m, msg.status)
 		if !m.branchOpen && (m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError) {
-			m.status = deriveStatus(msg.status)
+			m.status = deriveStatus(appliedStatus)
 		}
 		return m, loadStashState(m.repo)
 	default:

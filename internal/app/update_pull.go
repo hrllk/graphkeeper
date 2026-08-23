@@ -7,6 +7,7 @@ import (
 )
 
 func completePullNoOp(m model, status git.Status, request pullRequest, mode PullMode) (tea.Model, tea.Cmd) {
+	clearPullConfirmProjection(&m)
 	if mode == "" {
 		mode = PullModeNoOp
 	}
@@ -30,6 +31,7 @@ func completePullNoOp(m model, status git.Status, request pullRequest, mode Pull
 }
 
 func handlePullExecutionResult(m model, msg pullExecutionResultMsg) (tea.Model, tea.Cmd) {
+	clearPullConfirmProjection(&m)
 	m.lastPullMode = msg.mode
 	m.lastPullOperationBaseline = msg.operationBaseline
 	input := OperationResultInput{

@@ -15,72 +15,94 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return handleStashUpdate(m, msg)
 	case tagCreatedMsg, tagToastDoneMsg:
 		return handleTagUpdate(m, msg)
-	case fetchedMsg, preparedMsg, pullCheckedMsg, previewMsg, graphActionCheckMsg, pushFetchedMsg, pullFetchedMsg, pullPreviewReadyMsg, pullToastDoneMsg, branchToastDoneMsg:
+	case fetchedMsg, preparedMsg, pullCheckedMsg, previewMsg, graphActionCheckMsg, pushFetchedMsg, pullToastDoneMsg, branchToastDoneMsg:
 		return handleFetchUpdate(m, msg)
+	case pullFetchedMsg:
+		outcome := classifyLegacyPullFetchedOutcome(m.activePullRequest, m.pullConfirmStale, msg)
+		return reducePullLifecycleOutcome(m, outcome, func(m model) (tea.Model, tea.Cmd) {
+			return handleFetchUpdate(m, msg)
+		})
+	case pullPreviewReadyMsg:
+		outcome := classifyLegacyPullPreviewReadyOutcome(m.activePullRequest, m.pullConfirmStale, msg)
+		return reducePullLifecycleOutcome(m, outcome, func(m model) (tea.Model, tea.Cmd) {
+			return handleFetchUpdate(m, msg)
+		})
 	case pullPortPreviewMsg:
 		return handlePullPortPreview(m, msg)
 	case pullValidationMsg:
-		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
-			return m, nil
-		}
-		if !samePullSnapshotIdentity(m.activePullRequest.OperationBaseline, msg.baseline) {
-			m.activePullRequest = nil
-			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, m.refreshCmd()
-		}
-		if msg.err != nil || !msg.valid {
-			m.activePullRequest = nil
-			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, m.refreshCmd()
-		}
-		m.status = operationLoadingStatusFor(progressPull, "Pulling...", state.ActionPull)
-		return m, executeValidatedPull(m.repo, m.commitLimit, *m.activePullRequest, msg.mode)
+		outcome := classifyPullValidationOutcome(m.activePullRequest, m.pullConfirmStale, msg)
+		return reducePullLifecycleOutcome(m, outcome, func(m model) (tea.Model, tea.Cmd) {
+			if outcome.Kind != pullLifecycleConfirmationReady {
+				clearPullConfirmProjection(&m)
+				m.activePullRequest = nil
+				m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+				return m, m.refreshCmd()
+			}
+			m.status = operationLoadingStatusFor(progressPull, "Pulling...", state.ActionPull)
+			return m, executeValidatedPull(m.repo, m.commitLimit, *m.activePullRequest, msg.mode)
+		})
 	case pullWorkflowMsg:
-		if m.activePullRequest == nil || msg.result.OperationRequestID != m.activePullRequest.ID || msg.result.OperationEpoch != m.activePullRequest.Epoch {
-			return m, nil
-		}
-		m.pullCancel = nil
-		if msg.result.RefreshErrorKind != ReadErrorNone {
+		outcome := classifyPullWorkflowOutcome(m.activePullRequest, msg)
+		return reducePullLifecycleOutcome(m, outcome, func(m model) (tea.Model, tea.Cmd) {
+			m.pullCancel = nil
+			if outcome.Kind == pullLifecycleRefreshFailed {
+				clearPullConfirmProjection(&m)
+				m.activePullRequest = nil
+				m.status = state.New()
+				m.status.Mode = state.ModeOperationResult
+				m.status.Action = state.ActionPull
+				m.status.Title = "PULL COMPLETED — STATE UNVERIFIED"
+				m.status.Message = m.status.Title
+				m.status.Detail = "Refresh failed. Press f to refresh repository state."
+				return m, nil
+			}
+			if outcome.Kind == pullLifecycleRefreshIdentityIgnored || outcome.Kind == pullLifecycleCompleted {
+				clearPullConfirmProjection(&m)
+			}
 			m.activePullRequest = nil
+			if outcome.Kind == pullLifecycleExecutionFailed {
+				clearPullConfirmProjection(&m)
+				m.status = state.New().WithBlocked(state.BlockUnknown, "PULL FAILED", "Pull execution failed.")
+				return m, nil
+			}
+			if outcome.Kind == pullLifecycleNoOpCompleted {
+				clearPullConfirmProjection(&m)
+				m.status = state.New()
+				m.status.Mode = state.ModeOperationResult
+				m.status.Action = state.ActionPull
+				m.status.Title = "PULL COMPLETED"
+				m.status.Message = "PULL COMPLETED"
+				m.status.Detail = "No action needed. Press q or Esc to return to the graph."
+				return m, nil
+			}
+			if outcome.Kind == pullLifecyclePreviewStale || outcome.Kind == pullLifecycleValidationRejected {
+				clearPullConfirmProjection(&m)
+				m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+				return m, m.refreshCmd()
+			}
+			if outcome.Kind != pullLifecycleRefreshIdentityIgnored && msg.result.Refresh.RequestID == msg.result.RefreshRequestID && msg.result.Refresh.RepositoryEpoch == msg.result.RefreshEpoch && (msg.result.Refresh.Snapshot.Graph.Commits != nil || msg.result.Refresh.Snapshot.Graph.Branch != "" || msg.result.Refresh.Snapshot.Graph.Head != "") {
+				m.graphReadSnapshot = msg.result.Refresh.Snapshot.Graph
+				m.repoSnapshotLoaded = true
+			}
 			m.status = state.New()
 			m.status.Mode = state.ModeOperationResult
 			m.status.Action = state.ActionPull
-			m.status.Title = "PULL COMPLETED — STATE UNVERIFIED"
-			m.status.Message = m.status.Title
-			m.status.Detail = "Refresh failed. Press f to refresh repository state."
+			m.status.Title = "PULL COMPLETED"
+			m.status.Message = "PULL COMPLETED"
+			m.status.Detail = "Press q or Esc to return to the graph."
 			return m, nil
-		}
-		m.activePullRequest = nil
-		if msg.result.Execute.Reason != PullRejectNone || !msg.result.Execute.Succeeded {
-			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, m.refreshCmd()
-		}
-		if msg.result.Refresh.RequestID == msg.result.RefreshRequestID && msg.result.Refresh.RepositoryEpoch == msg.result.RefreshEpoch && (msg.result.Refresh.Snapshot.Graph.Commits != nil || msg.result.Refresh.Snapshot.Graph.Branch != "" || msg.result.Refresh.Snapshot.Graph.Head != "") {
-			m.graphReadSnapshot = msg.result.Refresh.Snapshot.Graph
-			m.repoSnapshotLoaded = true
-		}
-		m.status = state.New()
-		m.status.Mode = state.ModeOperationResult
-		m.status.Action = state.ActionPull
-		m.status.Title = "PULL COMPLETED"
-		m.status.Message = "PULL COMPLETED"
-		m.status.Detail = "Press q or Esc to return to the graph."
-		return m, nil
+		})
 	case pullExecutionResultMsg:
-		if !m.pullRequestMessageActive(msg.requestID, msg.requestEpoch) {
-			return m, nil
-		}
-		if !samePullSnapshotIdentity(m.activePullRequest.OperationBaseline, msg.baseline) {
+		outcome := classifyPullExecutionResultOutcome(m.activePullRequest, msg)
+		return reducePullLifecycleOutcome(m, outcome, func(m model) (tea.Model, tea.Cmd) {
 			m.activePullRequest = nil
-			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, m.refreshCmd()
-		}
-		m.activePullRequest = nil
-		if msg.stale {
-			m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
-			return m, m.refreshCmd()
-		}
-		return handlePullExecutionResult(m, msg)
+			if outcome.Kind == pullLifecyclePreviewStale {
+				clearPullConfirmProjection(&m)
+				m.status = state.New().WithBlocked(state.BlockStaleSnapshot, "Repository changed.", "Refresh before pulling again.")
+				return m, m.refreshCmd()
+			}
+			return handlePullExecutionResult(m, msg)
+		})
 	case executedMsg:
 		return handleExecutedUpdate(m, msg)
 	case commitInspectorResultMsg:

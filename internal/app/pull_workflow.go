@@ -6,7 +6,7 @@ import "context"
 // freshness immediately before validation, never executes an unauthorized
 // request, and refreshes only after a successful mutation.
 func runPullWorkflow(ctx context.Context, pull PullPort, read RepositoryReadPort, req PullExecutionRequest, mode PullMode, limit int) PullWorkflowResult {
-	result := PullWorkflowResult{OperationRequestID: req.RequestID, OperationEpoch: req.RepositoryEpoch, RefreshRequestID: req.RequestID + 1, RefreshEpoch: req.RepositoryEpoch + 1}
+	result := PullWorkflowResult{OperationRequestID: req.RequestID, OperationEpoch: req.RepositoryEpoch, RefreshRequestID: req.RequestID + 1, RefreshEpoch: req.RepositoryEpoch + 1, RefreshErrorKind: ReadErrorNone}
 	if pull == nil || read == nil {
 		result.Execute = PullExecutionResult{RequestID: req.RequestID, RepositoryEpoch: req.RepositoryEpoch, Mode: mode, Reason: PullRejectNotEligible}
 		return result
