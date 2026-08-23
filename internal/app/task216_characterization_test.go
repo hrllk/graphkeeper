@@ -195,11 +195,8 @@ func TestHandleExecutedStatusOnlyAndBothErrors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// This is intentionally a boundary fixture: executePush currently calls
-			// Repo.Push and Repo.Status directly, while Repo is concrete and has no
-			// injectable operation/status seam. The next implementation step adds
-			// these provenance fields to executedMsg; until then, a real command
-			// cannot independently produce a status-only/both-error result here.
+			// This table isolates reducer behavior. Production command composition
+			// is covered separately by TestExecutePushCommandBoundaryErrorProvenance.
 			msg := executedMsg{action: state.ActionPush, target: "main", err: tc.effective, operationErr: tc.operation, statusErr: tc.status, errorCategory: tc.category}
 			if msg.err != tc.effective {
 				t.Fatalf("effective detail = %v, want %v", msg.err, tc.effective)
