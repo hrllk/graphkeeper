@@ -1590,7 +1590,7 @@ func TestRenderBlockedShowsAlertOverlay(t *testing.T) {
 	if !strings.Contains(got, "Alert") || !strings.Contains(got, "Select a local branch.") || !strings.Contains(got, "Move to a branch line.") {
 		t.Fatalf("expected blocked alert overlay, got %q", got)
 	}
-	if !strings.Contains(got, "enter: dismiss") || !strings.Contains(got, "q: close") {
+	if !strings.Contains(got, "enter: dismiss") || strings.Contains(got, "q: close") || strings.Contains(got, "esc: close") {
 		t.Fatalf("expected blocked alert dismiss help, got %q", got)
 	}
 }
@@ -1614,14 +1614,15 @@ func TestRenderFastForwardConfirmShowsConciseHelp(t *testing.T) {
 				Head:   "abc1234",
 			},
 		},
-		status: state.New().WithConfirm(state.ActionMerge, "Fast-forward available.", "HEAD can move to feature.")}
+		pullState: pullState{pullIsFastForward: true},
+		status:    state.New().WithConfirm(state.ActionPull, "Fast-forward available.", "HEAD can move to feature.")}
 	m.status.Selected = "feature"
 
 	got := renderAppView(m)
 	if strings.Contains(got, "Current:") || strings.Contains(got, "Target:") {
 		t.Fatalf("expected fast-forward popup to omit count detail, got %q", got)
 	}
-	if !strings.Contains(got, "enter: fast-forward") || !strings.Contains(got, "q: close") {
+	if !strings.Contains(got, "f: fast-forward") || strings.Contains(got, "q: close") || strings.Contains(got, "esc: close") {
 		t.Fatalf("expected fast-forward confirm help, got %q", got)
 	}
 }
@@ -1719,7 +1720,7 @@ func TestRenderBranchOpenShowsCenteredPopupOverlay(t *testing.T) {
 	if strings.Contains(got, "Mode: Loading") || strings.Contains(got, "Loading | Enter a branch name.") {
 		t.Fatalf("expected branch input to stay out of the Global panel, got %q", got)
 	}
-	for _, want := range []string{"Create branch", "Enter a branch name.", "name: feature/new-flow", "base: abc1234", "Branch name already exists.", "q: close"} {
+	for _, want := range []string{"Create branch", "Enter a branch name.", "name: feature/new-flow", "base: abc1234", "Branch name already exists."} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected branch popup to contain %q, got %q", want, got)
 		}
@@ -2006,7 +2007,6 @@ func TestHiddenHotkeysPopupShowsMovedAndConditionalActions(t *testing.T) {
 		"m: merge",
 		"Conditional:",
 		"s: reset",
-		hiddenHotkeyPopupFooter,
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected hidden hotkeys popup to contain %q, got %q", want, got)
@@ -2041,15 +2041,6 @@ func TestHiddenHotkeysPopupCentersHeaderAndFooter(t *testing.T) {
 		t.Fatalf("expected header to be centered, got %q", headerLine)
 	}
 
-	footerLine := findLine("q: close")
-	if footerLine == "" {
-		t.Fatal("expected centered footer line to be present")
-	}
-	footerBody := strings.TrimPrefix(footerLine, "│")
-	footerBody = strings.TrimSuffix(footerBody, "│")
-	if leading := len(footerBody) - len(strings.TrimLeft(footerBody, " ")); leading <= 2 {
-		t.Fatalf("expected footer to be centered, got %q", footerLine)
-	}
 }
 
 func TestRenderHiddenHotkeySectionTitleHighlightsActiveSection(t *testing.T) {
@@ -3257,7 +3248,7 @@ func TestRenderStashPopupListsEntriesFlatAndKeepsOrder(t *testing.T) {
 	if first > second {
 		t.Fatalf("expected newest stash to appear before older stash, got %q", plain)
 	}
-	if !strings.Contains(got, "enter: jump") || !strings.Contains(got, "q: close") {
+	if !strings.Contains(got, "enter: jump") || strings.Contains(got, "q: close") || strings.Contains(got, "esc: close") {
 		t.Fatalf("expected stash popup help text, got %q", got)
 	}
 	if strings.Contains(got, "up/down: move") {
@@ -3359,7 +3350,7 @@ func TestRenderStashMessagePopupShowsInputAndHelp(t *testing.T) {
 	if !strings.Contains(got, "message: wip: local cleanup") {
 		t.Fatalf("expected stash message draft, got %q", got)
 	}
-	if !strings.Contains(got, "enter: stash") || !strings.Contains(got, "q: close") {
+	if !strings.Contains(got, "enter: stash") || strings.Contains(got, "q: close") || strings.Contains(got, "esc: close") {
 		t.Fatalf("expected stash message help, got %q", got)
 	}
 }
@@ -3378,7 +3369,7 @@ func TestRenderTagPopupUsesSingleTitleStrip(t *testing.T) {
 	if !strings.Contains(got, "target: abc1234") || !strings.Contains(got, "name: v1.2.3") {
 		t.Fatalf("expected tag popup fields, got %q", got)
 	}
-	if !strings.Contains(got, "enter: create") || !strings.Contains(got, "q: close") {
+	if !strings.Contains(got, "enter: create") || strings.Contains(got, "q: close") || strings.Contains(got, "esc: close") {
 		t.Fatalf("expected tag popup help, got %q", got)
 	}
 }
@@ -4055,7 +4046,7 @@ func TestRenderResetModePopupUsesSingleModeList(t *testing.T) {
 	if strings.Count(got, "s: soft") != 1 || strings.Count(got, "m: mixed") != 1 || strings.Count(got, "h: hard") != 1 {
 		t.Fatalf("expected single-line mode list, got %q", got)
 	}
-	if !strings.Contains(got, "Reset mode") || !strings.Contains(got, "Choose a reset mode.") || !strings.Contains(got, "q: close") {
+	if !strings.Contains(got, "Reset mode") || !strings.Contains(got, "Choose a reset mode.") || strings.Contains(got, "q: close") || strings.Contains(got, "esc: close") {
 		t.Fatalf("expected reset popup to include title, body, and esc help, got %q", got)
 	}
 	if strings.Contains(got, "\nReset mode\n") {

@@ -149,7 +149,7 @@ func renderTagPopup(m model, bodyWidth, bodyHeight int) string {
 	if m.tagPopupError != "" {
 		sections = append(sections, warn.Render(m.tagPopupError))
 	}
-	sections = append(sections, "enter: create", renderPopupFooter(width-4))
+	sections = append(sections, "enter: create")
 	return renderFloatingTitlePopup(popupBox, "Create tag", joinLayoutSections(sections...), width)
 }
 

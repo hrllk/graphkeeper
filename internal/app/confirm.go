@@ -35,6 +35,7 @@ type confirmChoice struct {
 
 type confirmViewModel struct {
 	Kind         confirmKind
+	FastForward  bool
 	Action       state.Action
 	Title        string
 	Detail       string
@@ -56,12 +57,19 @@ func classifyConfirmationKey(view confirmationProjection, key string) confirmRes
 			return confirmResult{Decision: decisionNoop}
 		}
 	}
+	if view.FastForward {
+		if key == "f" {
+			return confirmResult{Decision: decisionAccept}
+		}
+		if key == "esc" {
+			return confirmResult{Decision: decisionCancel}
+		}
+		return confirmResult{Decision: decisionNoop}
+	}
 	if view.Kind == confirmChoiceKind {
 		switch key {
 		case "m":
 			return confirmResult{Decision: decisionChoice, ChoiceKey: choiceMerge}
-		case "enter":
-			return confirmResult{Decision: decisionAccept, ChoiceKey: choiceMerge}
 		case "r":
 			return confirmResult{Decision: decisionChoice, ChoiceKey: choiceRebase}
 		case "n", "esc":
@@ -69,6 +77,9 @@ func classifyConfirmationKey(view confirmationProjection, key string) confirmRes
 		default:
 			return confirmResult{Decision: decisionNoop}
 		}
+	}
+	if view.Action == state.ActionCheckout && key == "enter" {
+		return confirmResult{Decision: decisionNoop}
 	}
 	switch key {
 	case "y", "enter":
@@ -82,7 +93,7 @@ func classifyConfirmationKey(view confirmationProjection, key string) confirmRes
 
 func classifyConfirmKey(view confirmViewModel, key string) confirmResult {
 	return classifyConfirmationKey(confirmationProjection{
-		Kind: view.Kind, Action: view.Action, Title: view.Title, Detail: view.Detail,
+		Kind: view.Kind, FastForward: view.FastForward, Action: view.Action, Title: view.Title, Detail: view.Detail,
 		ApprovalKey: view.ApprovalKey, ApprovalText: view.ApprovalText, FooterText: view.FooterText,
 		ChoiceKeys: append([]confirmChoice(nil), view.ChoiceKeys...), CancelKeys: append([]string(nil), view.CancelKeys...),
 		Disabled: view.Disabled, DisabledText: view.DisabledText,

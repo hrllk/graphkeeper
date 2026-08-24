@@ -103,17 +103,13 @@ func popupWidthForBody(bodyWidth, minWidth, maxWidth int) int {
 	return width
 }
 
-func renderPopupFooter(width int) string {
-	return centerReviewLineInWidth(popupHelp.Render("q: close"), width)
-}
-
 func renderMergeConfirmPopup(view mergeConfirmViewModel, bodyWidth int) string {
 	width := popupWidthForBody(bodyWidth, 36, 42)
 	return renderDivergentConfirmPopup(confirmationProjection{
 		Kind:          confirmChoiceKind,
 		Title:         "Pull into " + view.CurrentBranch + "?",
 		Detail:        mergeConfirmBody(view, width-4),
-		FooterText:    "m/enter: merge · r: rebase · n/esc: cancel",
+		FooterText:    "m: merge · r: rebase",
 		CurrentBranch: view.CurrentBranch,
 		TargetRef:     view.TargetRef,
 		CurrentOnly:   view.CurrentOnly,
@@ -136,11 +132,11 @@ func renderDivergentConfirmPopup(projection confirmationProjection, bodyWidth in
 	}
 	footer := projection.FooterText
 	if projection.Disabled {
-		footer = "n: close · esc: close"
-	} else if width < 54 && footer == "m/enter: merge · r: rebase · n/esc: cancel" {
-		footer = "m/enter: merge\nr: rebase · n/esc: cancel"
+		footer = ""
+	} else if width < 54 && footer == "m: merge · r: rebase" {
+		footer = "m: merge\nr: rebase"
 	}
-	body = joinLayoutSections(body, popupHelp.Render(footer), renderPopupFooter(width-4))
+	body = joinLayoutSections(body, popupHelp.Render(footer))
 	return renderFloatingTitlePopup(popupBox, projection.Title, centerReviewFooterLine(body, width-4), width)
 }
 
@@ -189,7 +185,6 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 		centerReviewFooterLine(joinLayoutSections(
 			popupBody.Render(detail),
 			popupHelp.Render(projection.FooterText),
-			renderPopupFooter(width-4),
 		), width-4),
 		width,
 	)
@@ -205,7 +200,7 @@ func renderReviewPopup(m model, bodyWidth int) string {
 	if popupTitle == "" {
 		popupTitle = "Branch has diverged"
 	}
-	body := joinLayoutSections(centerReviewFooterLine(m.status.Detail, width-4), renderPopupFooter(width-4))
+	body := joinLayoutSections(centerReviewFooterLine(m.status.Detail, width-4))
 	return renderFloatingTitlePopup(
 		popupBox,
 		popupTitle,
@@ -257,7 +252,6 @@ func renderResetModePopup(bodyWidth int) string {
 		strings.Join([]string{
 			bodyStyle.Render("Choose a reset mode."),
 			bodyStyle.Render("s: soft  •  m: mixed  •  h: hard"),
-			renderPopupFooter(popupWidthForBody(bodyWidth, 32, 50) - 4),
 		}, "\n\n"),
 		popupWidthForBody(bodyWidth, 32, 50),
 	)
@@ -299,7 +293,6 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 		renderTargets(m.status),
 		"",
 		helpStyle.Render(helpText),
-		renderPopupFooter(popupWidthForBody(bodyWidth, 28, 40) - 4),
 	}
 	return renderFloatingTitlePopup(
 		popupBox,
@@ -334,7 +327,6 @@ func renderBranchInputPopup(m model, bodyWidth int) string {
 		lines = append(lines, errorStyle.Render(m.branchError))
 	}
 	lines = append(lines, "")
-	lines = append(lines, renderPopupFooter(popupWidthForBody(bodyWidth, 36, 56)-4))
 	return renderFloatingTitlePopup(
 		popupBox,
 		"Create branch",
@@ -368,7 +360,7 @@ func renderGraphSearchPopup(m model, bodyWidth int) string {
 		lines = append(lines, "")
 		lines = append(lines, descStyle.Render(fmt.Sprintf("%d matches", len(matches))))
 	}
-	lines = append(lines, "", renderPopupFooter(popupWidthForBody(bodyWidth, 38, 58)-4))
+	lines = append(lines, "")
 	return renderFloatingTitlePopup(
 		popupBox,
 		"Search Graph",

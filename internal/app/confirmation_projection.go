@@ -6,6 +6,7 @@ import "hrllk/graphkeeper/internal/state"
 // both the popup renderer and key classifier. Slices are owned by the projection.
 type confirmationProjection struct {
 	Kind         confirmKind
+	FastForward  bool
 	Action       state.Action
 	Title        string
 	Detail       string
@@ -44,6 +45,7 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 	}
 	p := confirmationProjection{
 		Kind:         confirmBinary,
+		FastForward:  false,
 		Action:       m.status.Action,
 		Title:        m.status.Message,
 		Detail:       m.status.Detail,
@@ -57,7 +59,7 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 	if p.Action == state.ActionPull && !m.pullIsFastForward {
 		p.Kind = confirmChoiceKind
 		p.ChoiceKeys = []confirmChoice{{Key: "m", Label: "merge"}, {Key: "r", Label: "rebase"}}
-		p.FooterText = "m/enter: merge · r: rebase · n/esc: cancel"
+		p.FooterText = "m: merge · r: rebase"
 		input := m.pullConfirmInput
 		if input == nil && m.mergeConfirmView != nil {
 			v := m.mergeConfirmView
@@ -80,8 +82,11 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 			p.RiskText = input.RiskText
 		}
 	}
-	if m.status.Message == "Fast-forward available." {
-		p.FooterText = "enter: fast-forward"
+	if p.Action == state.ActionPull && m.pullIsFastForward {
+		p.FastForward = true
+		p.ApprovalKey = "f"
+		p.ApprovalText = "fast-forward"
+		p.FooterText = "f: fast-forward"
 	} else if p.Action == state.ActionDeleteBranch || p.Action == state.ActionDeleteTag {
 		p.FooterText = "y: delete  •  n: cancel"
 	} else if p.Action == state.ActionStash {
@@ -92,7 +97,7 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 	if m.pullConfirmStale && p.Action == state.ActionPull {
 		p.Disabled = true
 		p.DisabledText = "Preview is stale. Refresh before continuing."
-		p.FooterText = "n: close  •  esc: close"
+		p.FooterText = ""
 	}
 	p.ChoiceKeys = append([]confirmChoice(nil), p.ChoiceKeys...)
 	p.CancelKeys = append([]string(nil), p.CancelKeys...)
@@ -100,7 +105,7 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 }
 
 func confirmationAsView(p confirmationProjection) confirmViewModel {
-	return confirmViewModel{Kind: p.Kind, Action: p.Action, Title: p.Title, Detail: p.Detail, ApprovalKey: p.ApprovalKey, ApprovalText: p.ApprovalText, FooterText: p.FooterText, ChoiceKeys: append([]confirmChoice(nil), p.ChoiceKeys...), CancelKeys: append([]string(nil), p.CancelKeys...), Disabled: p.Disabled, DisabledText: p.DisabledText}
+	return confirmViewModel{Kind: p.Kind, FastForward: p.FastForward, Action: p.Action, Title: p.Title, Detail: p.Detail, ApprovalKey: p.ApprovalKey, ApprovalText: p.ApprovalText, FooterText: p.FooterText, ChoiceKeys: append([]confirmChoice(nil), p.ChoiceKeys...), CancelKeys: append([]string(nil), p.CancelKeys...), Disabled: p.Disabled, DisabledText: p.DisabledText}
 }
 
 func (p confirmationProjection) mergeView() mergeConfirmViewModel {

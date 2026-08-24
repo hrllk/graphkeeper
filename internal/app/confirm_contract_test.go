@@ -33,7 +33,6 @@ func TestClassifyConfirmKeyPullChoice(t *testing.T) {
 		choice   string
 	}{
 		{"m", decisionChoice, choiceMerge},
-		{"enter", decisionAccept, choiceMerge},
 		{"r", decisionChoice, choiceRebase},
 	} {
 		got := classifyConfirmKey(view, tt.key)
@@ -70,7 +69,7 @@ func TestRenderStaleConfirmShowsDisabledProjection(t *testing.T) {
 		},
 		status: state.New().WithConfirm(state.ActionPull, "Pull preview", "Review pull impact.")}
 	got := renderConfirmPopup(m, 80)
-	if !strings.Contains(got, "Preview is stale") || !strings.Contains(got, "n: close") {
+	if !strings.Contains(got, "Preview is stale") || strings.Contains(got, "esc") || strings.Contains(got, "n: close") {
 		t.Fatalf("stale projection missing disabled copy: %q", got)
 	}
 	if strings.Contains(got, "m: merge") || strings.Contains(got, "r: rebase") {

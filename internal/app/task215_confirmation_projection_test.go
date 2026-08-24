@@ -58,14 +58,14 @@ func TestTask215DivergentProjectionRendererClassifierAgreement(t *testing.T) {
 		status:       state.New().WithConfirm(state.ActionPull, "Pull into main?", mergeConfirmBody(view, 72)),
 	}
 	popup := ansi.Strip(renderConfirmPopup(m, 80))
-	for _, want := range []string{"Pull into main?", "merge body", "rebase body", "m/enter: merge", "r: rebase", "n/esc: cancel"} {
+	for _, want := range []string{"Pull into main?", "merge body", "rebase body", "m: merge", "r: rebase"} {
 		if !strings.Contains(popup, want) {
 			t.Fatalf("divergent renderer missing %q: %q", want, popup)
 		}
 	}
 	for key, expected := range map[string]confirmResult{
 		"m":     {Decision: decisionChoice, ChoiceKey: choiceMerge},
-		"enter": {Decision: decisionAccept, ChoiceKey: choiceMerge},
+		"enter": {Decision: decisionNoop},
 		"r":     {Decision: decisionChoice, ChoiceKey: choiceRebase},
 		"n":     {Decision: decisionCancel},
 		"esc":   {Decision: decisionCancel},
@@ -110,8 +110,8 @@ func TestTask215DivergentRendererUsesProjectionOwnedCopy(t *testing.T) {
 	stale.DisabledText = "Changed stale detail"
 	stale.FooterText = "stale footer must not approve"
 	rendered := ansi.Strip(renderDivergentConfirmPopup(stale, 80))
-	if !strings.Contains(rendered, "Changed stale detail") || !strings.Contains(rendered, "n: close") {
-		t.Fatalf("stale projection did not preserve close-only copy/footer: %q", rendered)
+	if !strings.Contains(rendered, "Changed stale detail") || strings.Contains(rendered, "esc") || strings.Contains(rendered, "n: close") {
+		t.Fatalf("stale projection did not preserve close-only copy without close advertisement: %q", rendered)
 	}
 	if strings.Contains(rendered, "stale footer must not approve") || strings.Contains(rendered, "m/enter: merge") || strings.Contains(rendered, "r: rebase") {
 		t.Fatalf("stale renderer exposed affirmative footer: %q", rendered)
@@ -121,10 +121,10 @@ func TestTask215DivergentRendererUsesProjectionOwnedCopy(t *testing.T) {
 func TestTask215FastForwardIsEnterOnlyAndHidesChoices(t *testing.T) {
 	m := model{pullState: pullState{pullIsFastForward: true}, status: state.New().WithConfirm(state.ActionPull, "Fast-forward available.", "Fast-forward to the target commit.")}
 	popup := ansi.Strip(renderConfirmPopup(m, 80))
-	if !strings.Contains(popup, "enter: fast-forward") || strings.Contains(popup, "merge") || strings.Contains(popup, "rebase") {
+	if !strings.Contains(popup, "f: fast-forward") || strings.Contains(popup, "merge") || strings.Contains(popup, "rebase") {
 		t.Fatalf("fast-forward exposed divergent choices: %q", popup)
 	}
-	for key, want := range map[string]confirmDecision{"enter": decisionAccept, "y": decisionAccept, "n": decisionCancel, "esc": decisionCancel, "m": decisionNoop, "r": decisionNoop} {
+	for key, want := range map[string]confirmDecision{"f": decisionAccept, "enter": decisionNoop, "y": decisionNoop, "n": decisionNoop, "esc": decisionCancel, "m": decisionNoop, "r": decisionNoop} {
 		if got := classifyConfirmKey(confirmView(m), key); got.Decision != want {
 			t.Fatalf("fast-forward key %q: got %q, want %q", key, got.Decision, want)
 		}
@@ -135,7 +135,7 @@ func TestTask215StaleProjectionIsCloseOnlyAndCommandFree(t *testing.T) {
 	view := mergeConfirmViewModel{CurrentBranch: "main", TargetRef: "origin/main", CurrentOnly: 2, TargetOnly: 3, ImpactKnown: true, MergeText: "old merge", RebaseText: "old rebase", Disabled: true, DisabledText: "Preview is stale. Refresh before continuing."}
 	m := model{overlayState: overlayState{mergeConfirmView: &view}, pullState: pullState{pullConfirmStale: true}, status: state.New().WithConfirm(state.ActionPull, "Pull into main?", "old body")}
 	popup := ansi.Strip(renderConfirmPopup(m, 80))
-	if !strings.Contains(popup, "stale") || !strings.Contains(popup, "n: close") || strings.Contains(popup, "m/enter: merge") || strings.Contains(popup, "r: rebase") {
+	if !strings.Contains(popup, "stale") || strings.Contains(popup, "m: merge") || strings.Contains(popup, "r: rebase") || strings.Contains(popup, "esc") {
 		t.Fatalf("stale renderer did not expose close-only copy/footer: %q", popup)
 	}
 	for _, key := range []string{"m", "r", "enter", "y", "x"} {
@@ -162,7 +162,7 @@ func TestTask215ConfirmWidthsAreDeterministicAt40_60_80(t *testing.T) {
 		if first != second {
 			t.Fatalf("width %d fitting is nondeterministic", width)
 		}
-		if !strings.Contains(first, "merge") || !strings.Contains(first, "rebase") || !strings.Contains(first, "cancel") {
+		if !strings.Contains(first, "merge") || !strings.Contains(first, "rebase") {
 			t.Fatalf("width %d lost required footer content: %q", width, first)
 		}
 		for _, line := range strings.Split(first, "\n") {
@@ -284,7 +284,6 @@ func TestTask215TopLevelPullCommandPayloadIdentity(t *testing.T) {
 		mode PullMode
 	}{
 		{key: "m", mode: PullModeMerge},
-		{key: "enter", mode: PullModeMerge},
 		{key: "r", mode: PullModeRebase},
 	} {
 		t.Run(tc.key, func(t *testing.T) {

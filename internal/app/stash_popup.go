@@ -167,7 +167,7 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	if len(rows) == 0 {
 		lines = append(lines, descStyle.Render("(no stash entries)"))
 		lines = append(lines, "")
-		lines = append(lines, renderPopupFooter(popupWidth-4))
+		lines = append(lines, "")
 		body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
 		titleLine := renderTitleStrip(popupBox, "Stash list", popupWidth)
 		bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
@@ -211,7 +211,7 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 		lines = append(lines, muted.Render("..."))
 	}
 	lines = append(lines, "")
-	lines = append(lines, helpStyle.Render("enter: jump"), renderPopupFooter(popupWidth-4))
+	lines = append(lines, helpStyle.Render("enter: jump"))
 	body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
 	titleLine := renderTitleStrip(popupBox, "Stash list", popupWidth)
 	bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
@@ -240,7 +240,7 @@ func renderStashMessagePopup(m model, bodyWidth int) string {
 	if m.stashMessageError != "" {
 		sections = append(sections, errStyle.Render(m.stashMessageError))
 	}
-	sections = append(sections, helpStyle.Render("enter: stash"), renderPopupFooter(popupWidth-4))
+	sections = append(sections, helpStyle.Render("enter: stash"))
 	return renderFloatingTitlePopup(popupBox, "Stash changes", joinLayoutSections(sections...), popupWidth)
 }
 
@@ -264,7 +264,7 @@ func renderGraphStashPopPopup(m model, bodyWidth, bodyHeight int) string {
 	if len(m.graphStashPopEntries) == 0 {
 		lines = append(lines, descStyle.Render("(no stash entries)"))
 		lines = append(lines, "")
-		lines = append(lines, renderPopupFooter(popupWidth-4))
+		lines = append(lines, "")
 		body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
 		titleLine := renderTitleStrip(popupBox, "Pop stash", popupWidth)
 		bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)
@@ -317,7 +317,7 @@ func renderGraphStashPopPopup(m model, bodyWidth, bodyHeight int) string {
 		}
 	}
 
-	lines = append(lines, renderPopupFooter(popupWidth-4))
+	lines = append(lines, "")
 	body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
 	titleLine := renderTitleStrip(popupBox, "Pop stash", popupWidth)
 	bodyBlock := popupBox.BorderTop(false).Align(lipgloss.Left).Width(popupWidth).Render(body)

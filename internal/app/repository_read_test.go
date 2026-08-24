@@ -279,15 +279,15 @@ func TestLegacyStartupAndModalQuitPreserved(t *testing.T) {
 		t.Run(overlay.name, func(t *testing.T) {
 			m := model{status: state.New().WithBrowse()}
 			overlay.open(&m)
-			next, quit := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+			next, quit := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
 			if quit != nil || !overlay.closed(next.(model)) {
-				t.Fatalf("q did not dismiss overlay: model=%#v cmd=%v", next, quit)
+				t.Fatalf("Esc did not dismiss overlay: model=%#v cmd=%v", next, quit)
 			}
 		})
 	}
 	blocked := model{status: state.New().WithBlocked(state.BlockUnknown, "blocked", "detail")}
-	next, quit := blocked.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
-	if quit != nil || next.(model).status.Mode != state.ModeBlocked {
+	next, quit := blocked.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
+	if quit != nil || next.(model).status.Mode != state.ModeBrowse {
 		t.Fatalf("non-startup blocked q changed behavior: model=%#v cmd=%v", next, quit)
 	}
 }

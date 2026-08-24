@@ -45,20 +45,20 @@ func TestBrowseQQuitsApplication(t *testing.T) {
 	}
 }
 
-func TestOverlayQClosesWithoutQuitting(t *testing.T) {
+func TestOverlayQIsNoopWithoutQuitting(t *testing.T) {
 	tests := []struct {
 		name  string
 		setup func(*model)
 		check func(model) bool
 	}{
-		{name: "hidden hotkeys", setup: func(m *model) { m.hiddenHotkeysOpen = true }, check: func(m model) bool { return !m.hiddenHotkeysOpen }},
+		{name: "hidden hotkeys", setup: func(m *model) { m.hiddenHotkeysOpen = true }, check: func(m model) bool { return m.hiddenHotkeysOpen }},
 		{name: "branch input", setup: func(m *model) {
 			m.branchOpen = true
 			m.branchDraft = "feature"
 			m.repoStatus.Root = "/repo"
 			m.repoStatus.Branch = "main"
 			m.status = loadingToast("Enter a branch name.")
-		}, check: func(m model) bool { return !m.branchOpen && m.branchDraft == "" && m.status.Mode == state.ModeBrowse }},
+		}, check: func(m model) bool { return m.branchOpen && m.branchDraft == "featureq" }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -69,10 +69,10 @@ func TestOverlayQClosesWithoutQuitting(t *testing.T) {
 			tt.setup(&m)
 			gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 			if cmd != nil {
-				t.Fatalf("expected overlay q to close synchronously, got %v", cmd)
+				t.Fatalf("expected overlay q to be synchronous no-op/input, got %v", cmd)
 			}
 			if !tt.check(gotModel.(model)) {
-				t.Fatalf("expected overlay q to close %s, got %+v", tt.name, gotModel)
+				t.Fatalf("expected overlay q no-op/input for %s, got %+v", tt.name, gotModel)
 			}
 		})
 	}
@@ -1826,8 +1826,8 @@ func TestConfirmPullShortcutVariants(t *testing.T) {
 	m.activePullRequest = &pullRequest{ID: 8, Epoch: 4}
 	gotModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got = gotModel.(model)
-	if cmd == nil || got.status.Mode != state.ModeLoading || got.status.Message != "Pulling..." {
-		t.Fatalf("expected divergent enter to enter pull loading state, got status=%+v cmd=%v", got.status, cmd)
+	if cmd != nil || got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected divergent enter to be ignored, got status=%+v cmd=%v", got.status, cmd)
 	}
 }
 

@@ -76,8 +76,8 @@ func TestHiddenHotkeysPopupShowsActiveSectionOnly(t *testing.T) {
 					t.Fatalf("expected popup to omit %q, got %q", hidden, got)
 				}
 			}
-			if !strings.Contains(got, hiddenHotkeyPopupFooter) {
-				t.Fatalf("expected popup footer, got %q", got)
+			if strings.Contains(got, "q: close") || strings.Contains(got, "esc: close") {
+				t.Fatalf("popup must not advertise a close key, got %q", got)
 			}
 		})
 	}
@@ -227,8 +227,8 @@ func TestHiddenHotkeyPopupFitsSmallHeightAndOverlay(t *testing.T) {
 	if got := lipgloss.Height(popup); got > bodyHeight {
 		t.Fatalf("expected popup height <= %d, got %d", bodyHeight, got)
 	}
-	if !strings.Contains(ansi.Strip(popup), "Hidden Hotkeys") || !strings.Contains(ansi.Strip(popup), "q: close") {
-		t.Fatalf("expected popup title and footer, got %q", ansi.Strip(popup))
+	if !strings.Contains(ansi.Strip(popup), "Hidden Hotkeys") || strings.Contains(ansi.Strip(popup), "q: close") || strings.Contains(ansi.Strip(popup), "esc: close") {
+		t.Fatalf("expected popup title without close footer, got %q", popup)
 	}
 
 	base := strings.Repeat(strings.Repeat("x", 100)+"\n", bodyHeight-1) + strings.Repeat("x", 100)
@@ -259,7 +259,7 @@ func TestHiddenHotkeyPopupResizesWithoutBlankContent(t *testing.T) {
 	if strings.Contains(plain, "Hidden hotkeys by section\n\n\n") {
 		t.Fatalf("expected resize to avoid blank popup content, got %q", plain)
 	}
-	if !strings.Contains(plain, "q: close") {
-		t.Fatalf("expected close footer after resize, got %q", plain)
+	if strings.Contains(plain, "q: close") || strings.Contains(plain, "esc: close") {
+		t.Fatalf("expected no close footer after resize, got %q", plain)
 	}
 }

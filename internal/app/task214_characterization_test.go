@@ -237,8 +237,8 @@ func TestTask214OverlayPrecedenceAndQEsc(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			gotModel, cmd := tc.m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-			if cmd != nil || tc.stillOpen(gotModel.(model)) {
-				t.Fatalf("q did not normalize to Esc for %s", tc.name)
+			if cmd != nil || !tc.stillOpen(gotModel.(model)) {
+				t.Fatalf("q unexpectedly closed or mutated %s", tc.name)
 			}
 		})
 	}

@@ -47,7 +47,6 @@ func renderAlertPopup(alert alertContent, bodyWidth int) string {
 		descStyle.Render(alert.Description),
 		"",
 		helpStyle.Render("enter: dismiss"),
-		renderPopupFooter(popupWidthForBody(bodyWidth, 28, 50) - 4),
 	}
 	return renderFloatingTitlePopup(
 		popupBox,

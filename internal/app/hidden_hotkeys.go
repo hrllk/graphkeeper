@@ -23,8 +23,6 @@ type hiddenHotkeySection struct {
 	groups []hiddenHotkeyGroup
 }
 
-const hiddenHotkeyPopupFooter = "q: close"
-
 const (
 	hiddenHotkeyPopupMinWidth = 32
 	hiddenHotkeyPopupMaxWidth = 50
@@ -156,7 +154,7 @@ func hiddenHotkeyPopupBody(m model, width int, content []string, showFocus bool,
 		end := min(offset+viewport, len(content))
 		lines = append(lines, content[offset:end]...)
 	}
-	lines = append(lines, "", renderCenteredPopupLine(popupHelp.Render(hiddenHotkeyPopupFooter), width))
+	lines = append(lines, "")
 	return strings.Join(lines, "\n")
 }
 
@@ -261,6 +259,7 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 						{key: "c", desc: "clean working tree"},
 						{key: "space", desc: "checkout"},
 						{key: "d", desc: "delete branch"},
+						{key: "n", desc: "new branch"},
 					},
 				},
 				{
@@ -280,8 +279,6 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 					title: "Visible",
 					items: []hiddenHotkeyItem{
 						{key: "space", desc: "checkout"},
-						{key: "f", desc: "fetch"},
-						{key: "p", desc: "pull"},
 						{key: "d", desc: "delete branch"},
 					},
 				},
