@@ -31,7 +31,7 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 	lines = append(lines, strings.Repeat("─", innerWidth))
 	bodyHeight := max(height-6, 1)
 	lines = append(lines, screenBody(m, snapshot, selected, innerWidth, bodyHeight, height < 12)...)
-	footer := "q close   Esc back   ? help"
+	footer := "Esc back   ? help"
 	if m.commitInspectorDiffWindow.HasMore {
 		footer += "   n next"
 	}

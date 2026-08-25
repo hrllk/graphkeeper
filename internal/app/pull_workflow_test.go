@@ -99,7 +99,7 @@ func TestPullWorkflowNoOpDoesNotClearExistingGraphSnapshot(t *testing.T) {
 	if got.graphReadSnapshot.Branch != "main" || got.graphReadSnapshot.Head != "head" || got.operationResult != &operationResult {
 		t.Fatalf("no-op cleared existing graph snapshot: %#v", got.graphReadSnapshot)
 	}
-	if got.status.Detail != "No action needed. Press q or Esc to return to the graph." {
+	if got.status.Detail != "No action needed. Press esc to return to the graph." {
 		t.Fatalf("unexpected no-op detail: %q", got.status.Detail)
 	}
 }

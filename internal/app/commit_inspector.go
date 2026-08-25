@@ -57,9 +57,6 @@ func (m model) closeCommitInspector() model {
 
 func (m model) handleCommitInspectorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
-	if key == "q" {
-		return m.closeCommitInspector(), nil
-	}
 	if key == "?" {
 		m.commitInspectorHelp = !m.commitInspectorHelp
 		return m, nil
@@ -153,7 +150,7 @@ func (m model) renderCommitInspectorPopup(width, height int) string {
 
 	bodyHeight := max(contentHeight-len(lines)-1, 1)
 	if m.commitInspectorHelp {
-		lines = append(lines, "Inspector help", "j/k changed files   Ctrl+U/D diff scroll", "q close   Esc close   ? help")
+		lines = append(lines, "Inspector help", "j/k changed files   Ctrl+U/D diff scroll", "Esc close   ? help")
 	} else if m.commitInspectorMetadataLoading {
 		lines = append(lines, "Loading…")
 	} else if m.commitInspectorError != "" {
@@ -169,7 +166,7 @@ func (m model) renderCommitInspectorPopup(width, height int) string {
 	if len(lines) > contentHeight-1 {
 		lines = lines[:contentHeight-1]
 	}
-	lines = append(lines, truncateInspector("q close   Esc back   ? help", innerWidth))
+	lines = append(lines, truncateInspector("Esc close   ? help", innerWidth))
 	for len(lines) < contentHeight {
 		lines = append(lines, "")
 	}

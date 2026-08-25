@@ -52,7 +52,7 @@ func TestTopLevelPullWorkflowRefreshOwnership(t *testing.T) {
 			wantGraph:   task212Graph("refreshed"),
 			wantTitle:   "PULL COMPLETED",
 			wantMessage: "PULL COMPLETED",
-			wantDetail:  "Press q or Esc to return to the graph.",
+			wantDetail:  "Press esc to return to the graph.",
 		},
 		{
 			name:        "refresh request mismatch ignores stale projection",
@@ -60,7 +60,7 @@ func TestTopLevelPullWorkflowRefreshOwnership(t *testing.T) {
 			wantGraph:   prior,
 			wantTitle:   "PULL COMPLETED",
 			wantMessage: "PULL COMPLETED",
-			wantDetail:  "Press q or Esc to return to the graph.",
+			wantDetail:  "Press esc to return to the graph.",
 		},
 		{
 			name:        "refresh epoch mismatch ignores stale projection",
@@ -68,7 +68,7 @@ func TestTopLevelPullWorkflowRefreshOwnership(t *testing.T) {
 			wantGraph:   prior,
 			wantTitle:   "PULL COMPLETED",
 			wantMessage: "PULL COMPLETED",
-			wantDetail:  "Press q or Esc to return to the graph.",
+			wantDetail:  "Press esc to return to the graph.",
 		},
 		{
 			name:        "refresh failure leaves graph unverified",
@@ -84,7 +84,7 @@ func TestTopLevelPullWorkflowRefreshOwnership(t *testing.T) {
 			wantGraph:   prior,
 			wantTitle:   "PULL COMPLETED",
 			wantMessage: "PULL COMPLETED",
-			wantDetail:  "Press q or Esc to return to the graph.",
+			wantDetail:  "Press esc to return to the graph.",
 		},
 		{
 			name:        "successful no-op preserves graph and uses no-op copy",
@@ -92,7 +92,7 @@ func TestTopLevelPullWorkflowRefreshOwnership(t *testing.T) {
 			wantGraph:   prior,
 			wantTitle:   "PULL COMPLETED",
 			wantMessage: "PULL COMPLETED",
-			wantDetail:  "No action needed. Press q or Esc to return to the graph.",
+			wantDetail:  "No action needed. Press esc to return to the graph.",
 		},
 	}
 

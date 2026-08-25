@@ -26,7 +26,7 @@ func completePullNoOp(m model, status git.Status, request pullRequest, mode Pull
 	m.status.Action = state.ActionPull
 	m.status.Title = "PULL COMPLETED"
 	m.status.Message = "PULL COMPLETED"
-	m.status.Detail = "No action needed. Press q or Esc to return to the graph."
+	m.status.Detail = "No action needed. Press esc to return to the graph."
 	return m, nil
 }
 
@@ -67,7 +67,7 @@ func handlePullExecutionResult(m model, msg pullExecutionResultMsg) (tea.Model, 
 	if result.Verification == VerificationUnknown {
 		m.status.Detail = "Press f to refresh repository state."
 	} else {
-		m.status.Detail = "Press q or Esc to return to the graph."
+		m.status.Detail = "Press esc to return to the graph."
 	}
 	return m, nil
 }

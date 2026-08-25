@@ -57,7 +57,7 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 	if p.Action == state.ActionPull && !m.pullIsFastForward {
 		p.Kind = confirmChoiceKind
 		p.ChoiceKeys = []confirmChoice{{Key: "m", Label: "merge"}, {Key: "r", Label: "rebase"}}
-		p.FooterText = "m/enter: merge · r: rebase · n/esc: cancel"
+		p.FooterText = "m: merge · r: rebase · esc: cancel"
 		input := m.pullConfirmInput
 		if input == nil && m.mergeConfirmView != nil {
 			v := m.mergeConfirmView
@@ -81,7 +81,9 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 		}
 	}
 	if m.status.Message == "Fast-forward available." {
-		p.FooterText = "enter: fast-forward"
+		p.ApprovalKey = "f"
+		p.ApprovalText = "fast-forward"
+		p.FooterText = "f: fast-forward · esc: cancel"
 	} else if p.Action == state.ActionDeleteBranch || p.Action == state.ActionDeleteTag {
 		p.FooterText = "y: delete  •  n: cancel"
 	} else if p.Action == state.ActionStash {

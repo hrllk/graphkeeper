@@ -58,18 +58,16 @@ func TestTask215DivergentProjectionRendererClassifierAgreement(t *testing.T) {
 		status:       state.New().WithConfirm(state.ActionPull, "Pull into main?", mergeConfirmBody(view, 72)),
 	}
 	popup := ansi.Strip(renderConfirmPopup(m, 80))
-	for _, want := range []string{"Pull into main?", "merge body", "rebase body", "m/enter: merge", "r: rebase", "n/esc: cancel"} {
+	for _, want := range []string{"Pull into main?", "merge body", "rebase body", "m: merge", "r: rebase", "esc: cancel"} {
 		if !strings.Contains(popup, want) {
 			t.Fatalf("divergent renderer missing %q: %q", want, popup)
 		}
 	}
 	for key, expected := range map[string]confirmResult{
-		"m":     {Decision: decisionChoice, ChoiceKey: choiceMerge},
-		"enter": {Decision: decisionAccept, ChoiceKey: choiceMerge},
-		"r":     {Decision: decisionChoice, ChoiceKey: choiceRebase},
-		"n":     {Decision: decisionCancel},
-		"esc":   {Decision: decisionCancel},
-		"x":     {Decision: decisionNoop},
+		"m":   {Decision: decisionChoice, ChoiceKey: choiceMerge},
+		"r":   {Decision: decisionChoice, ChoiceKey: choiceRebase},
+		"esc": {Decision: decisionCancel},
+		"x":   {Decision: decisionNoop},
 	} {
 		if got := classifyConfirmKey(confirmView(m), key); got != expected {
 			t.Fatalf("divergent key %q: got %#v, want %#v", key, got, expected)
@@ -113,18 +111,18 @@ func TestTask215DivergentRendererUsesProjectionOwnedCopy(t *testing.T) {
 	if !strings.Contains(rendered, "Changed stale detail") || !strings.Contains(rendered, "n: close") {
 		t.Fatalf("stale projection did not preserve close-only copy/footer: %q", rendered)
 	}
-	if strings.Contains(rendered, "stale footer must not approve") || strings.Contains(rendered, "m/enter: merge") || strings.Contains(rendered, "r: rebase") {
+	if strings.Contains(rendered, "stale footer must not approve") || strings.Contains(rendered, "m: merge") || strings.Contains(rendered, "r: rebase") {
 		t.Fatalf("stale renderer exposed affirmative footer: %q", rendered)
 	}
 }
 
-func TestTask215FastForwardIsEnterOnlyAndHidesChoices(t *testing.T) {
+func TestTask215FastForwardIsFOnlyAndHidesChoices(t *testing.T) {
 	m := model{pullState: pullState{pullIsFastForward: true}, status: state.New().WithConfirm(state.ActionPull, "Fast-forward available.", "Fast-forward to the target commit.")}
 	popup := ansi.Strip(renderConfirmPopup(m, 80))
-	if !strings.Contains(popup, "enter: fast-forward") || strings.Contains(popup, "merge") || strings.Contains(popup, "rebase") {
-		t.Fatalf("fast-forward exposed divergent choices: %q", popup)
+	if !strings.Contains(popup, "f: fast-forward") || strings.Contains(popup, "enter: fast-forward") || strings.Contains(popup, "q: close") || strings.Contains(popup, "merge") || strings.Contains(popup, "rebase") {
+		t.Fatalf("fast-forward footer contract mismatch: %q", popup)
 	}
-	for key, want := range map[string]confirmDecision{"enter": decisionAccept, "y": decisionAccept, "n": decisionCancel, "esc": decisionCancel, "m": decisionNoop, "r": decisionNoop} {
+	for key, want := range map[string]confirmDecision{"f": decisionAccept, "enter": decisionNoop, "n": decisionNoop, "q": decisionNoop, "esc": decisionCancel, "m": decisionNoop, "r": decisionNoop} {
 		if got := classifyConfirmKey(confirmView(m), key); got.Decision != want {
 			t.Fatalf("fast-forward key %q: got %q, want %q", key, got.Decision, want)
 		}
@@ -284,7 +282,6 @@ func TestTask215TopLevelPullCommandPayloadIdentity(t *testing.T) {
 		mode PullMode
 	}{
 		{key: "m", mode: PullModeMerge},
-		{key: "enter", mode: PullModeMerge},
 		{key: "r", mode: PullModeRebase},
 	} {
 		t.Run(tc.key, func(t *testing.T) {
@@ -320,7 +317,7 @@ func TestTask215TopLevelPullCommandPayloadIdentity(t *testing.T) {
 		})
 	}
 	m := model{pullState: pullState{pullIsFastForward: false, activePullRequest: &pullRequest{ID: 7}}, status: state.New().WithConfirm(state.ActionPull, "Pull", "review")}
-	got, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	got, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if cmd != nil || got.(model).activePullRequest != nil {
 		t.Fatalf("cancel unexpectedly created command or preserved active request")
 	}
@@ -369,7 +366,7 @@ func TestTask215ConfirmCancelClearsPullProjection(t *testing.T) {
 		status:       state.New().WithConfirm(state.ActionPull, "Pull", "review"),
 	}
 	m.pullConfirmInput = &pullConfirmInput{CurrentBranch: "main", TargetRef: "origin/main", ImpactKnown: true, MergeText: "merge", RebaseText: "rebase"}
-	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	got := gotModel.(model)
 	if cmd != nil || got.pullConfirmInput != nil || got.mergeConfirmView != nil {
 		t.Fatalf("cancel retained pull projection: input=%#v view=%#v cmd=%v", got.pullConfirmInput, got.mergeConfirmView, cmd != nil)

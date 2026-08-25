@@ -10,9 +10,9 @@ import (
 
 func TestCommitInspectorQAndEscClose(t *testing.T) {
 	m := model{inspectorState: inspectorState{commitInspectorOpen: true}}
-	next, _ := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-	if next.(model).commitInspectorOpen {
-		t.Fatal("q should close the Inspector before global overlay rewriting")
+	next, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if cmd != nil || !next.(model).commitInspectorOpen {
+		t.Fatal("q should remain a no-op in the Inspector")
 	}
 
 	m = model{inspectorState: inspectorState{commitInspectorOpen: true}}
@@ -75,10 +75,13 @@ func TestCommitInspectorRendersBorderedTreeAndUnifiedRows(t *testing.T) {
 	if lipgloss.Width(got) != 80 || lipgloss.Height(got) != 20 {
 		t.Fatalf("expected exact frame dimensions, got %dx%d", lipgloss.Width(got), lipgloss.Height(got))
 	}
-	for _, want := range []string{"commit: abc123", "message: change", "author: dev", "path: internal/app/main.go", "Changed files", "Diff", "@@", "old", "new", "M"} {
+	for _, want := range []string{"commit: abc123", "message: change", "author: dev", "path: internal/app/main.go", "Changed files", "Diff", "@@", "old", "new", "M", "Esc close"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected %q in Inspector frame: %q", want, got)
 		}
+	}
+	if strings.Contains(got, "q close") {
+		t.Fatalf("Inspector must not advertise q close: %q", got)
 	}
 }
 

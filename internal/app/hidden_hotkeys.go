@@ -23,7 +23,7 @@ type hiddenHotkeySection struct {
 	groups []hiddenHotkeyGroup
 }
 
-const hiddenHotkeyPopupFooter = "q: close"
+const hiddenHotkeyPopupFooter = "esc: close"
 
 const (
 	hiddenHotkeyPopupMinWidth = 32
@@ -261,6 +261,7 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 						{key: "c", desc: "clean working tree"},
 						{key: "space", desc: "checkout"},
 						{key: "d", desc: "delete branch"},
+						{key: "n", desc: "new branch"},
 					},
 				},
 				{
@@ -280,9 +281,6 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 					title: "Visible",
 					items: []hiddenHotkeyItem{
 						{key: "space", desc: "checkout"},
-						{key: "f", desc: "fetch"},
-						{key: "p", desc: "pull"},
-						{key: "d", desc: "delete branch"},
 					},
 				},
 			},

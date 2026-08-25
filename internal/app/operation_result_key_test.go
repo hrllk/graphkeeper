@@ -7,14 +7,22 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
-func TestOperationResultKeyDismissesWithoutQuitting(t *testing.T) {
+func TestOperationResultQIsNoOpAndEscDismissesWithoutQuitting(t *testing.T) {
 	m := model{
 		pullState: pullState{operationResult: &OperationResultSummary{Headline: "PULL COMPLETED"}}, status: state.Status{Mode: state.ModeOperationResult}}
 	next, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	if cmd != nil {
-		t.Fatalf("dismiss command = %v, want nil", cmd)
+		t.Fatalf("q command = %v, want nil", cmd)
+	}
+	if next.(model).status.Mode != state.ModeOperationResult {
+		t.Fatalf("q mode = %s, want operation result", next.(model).status.Mode)
+	}
+
+	next, cmd = next.(model).handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd != nil {
+		t.Fatalf("Esc command = %v, want nil", cmd)
 	}
 	if next.(model).status.Mode != state.ModeBrowse {
-		t.Fatalf("mode = %s, want browse", next.(model).status.Mode)
+		t.Fatalf("Esc mode = %s, want browse", next.(model).status.Mode)
 	}
 }

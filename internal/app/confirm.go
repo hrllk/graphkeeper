@@ -60,10 +60,28 @@ func classifyConfirmationKey(view confirmationProjection, key string) confirmRes
 		switch key {
 		case "m":
 			return confirmResult{Decision: decisionChoice, ChoiceKey: choiceMerge}
-		case "enter":
-			return confirmResult{Decision: decisionAccept, ChoiceKey: choiceMerge}
 		case "r":
 			return confirmResult{Decision: decisionChoice, ChoiceKey: choiceRebase}
+		case "esc":
+			return confirmResult{Decision: decisionCancel}
+		default:
+			return confirmResult{Decision: decisionNoop}
+		}
+	}
+	if view.ApprovalKey == "f" {
+		switch key {
+		case "f":
+			return confirmResult{Decision: decisionAccept}
+		case "esc":
+			return confirmResult{Decision: decisionCancel}
+		default:
+			return confirmResult{Decision: decisionNoop}
+		}
+	}
+	if view.Action == state.ActionCheckout {
+		switch key {
+		case "y":
+			return confirmResult{Decision: decisionAccept}
 		case "n", "esc":
 			return confirmResult{Decision: decisionCancel}
 		default:

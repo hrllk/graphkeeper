@@ -45,7 +45,7 @@ func TestBrowseQQuitsApplication(t *testing.T) {
 	}
 }
 
-func TestOverlayQClosesWithoutQuitting(t *testing.T) {
+func TestOverlayEscClosesWithoutQuitting(t *testing.T) {
 	tests := []struct {
 		name  string
 		setup func(*model)
@@ -67,12 +67,12 @@ func TestOverlayQClosesWithoutQuitting(t *testing.T) {
 					activeSection: sectionGraph,
 				}, status: state.New().WithBrowse()}
 			tt.setup(&m)
-			gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+			gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 			if cmd != nil {
-				t.Fatalf("expected overlay q to close synchronously, got %v", cmd)
+				t.Fatalf("expected overlay Esc to close synchronously, got %v", cmd)
 			}
 			if !tt.check(gotModel.(model)) {
-				t.Fatalf("expected overlay q to close %s, got %+v", tt.name, gotModel)
+				t.Fatalf("expected overlay Esc to close %s, got %+v", tt.name, gotModel)
 			}
 		})
 	}
@@ -1307,10 +1307,10 @@ func TestGraphMergeShortcutUsesFastForwardConfirm(t *testing.T) {
 		t.Fatalf("expected concise fast-forward detail, got %q", got.status.Detail)
 	}
 
-	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	gotModel, cmd = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
 	got = gotModel.(model)
 	if cmd == nil {
-		t.Fatal("expected enter to execute the fast-forward action")
+		t.Fatal("expected f to execute the fast-forward action")
 	}
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Merging..." {
 		t.Fatalf("expected merge loading state after enter, got %+v", got.status)
@@ -1826,8 +1826,8 @@ func TestConfirmPullShortcutVariants(t *testing.T) {
 	m.activePullRequest = &pullRequest{ID: 8, Epoch: 4}
 	gotModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got = gotModel.(model)
-	if cmd == nil || got.status.Mode != state.ModeLoading || got.status.Message != "Pulling..." {
-		t.Fatalf("expected divergent enter to enter pull loading state, got status=%+v cmd=%v", got.status, cmd)
+	if cmd != nil || got.status.Mode != state.ModeConfirm {
+		t.Fatalf("expected divergent enter to be rejected, got status=%+v cmd=%v", got.status, cmd)
 	}
 }
 

@@ -317,7 +317,7 @@ func renderActionHelpLines(m model) []string {
 		}
 		return []string{"• esc: back"}
 	case state.ModeOperationResult:
-		return []string{"• f: refresh state", "• q/Esc: back"}
+		return []string{"• f: refresh state", "• esc: back"}
 	default:
 		return []string{"• r: refresh"}
 	}

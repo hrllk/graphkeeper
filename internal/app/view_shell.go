@@ -104,7 +104,7 @@ func popupWidthForBody(bodyWidth, minWidth, maxWidth int) int {
 }
 
 func renderPopupFooter(width int) string {
-	return centerReviewLineInWidth(popupHelp.Render("q: close"), width)
+	return centerReviewLineInWidth(popupHelp.Render("esc: close"), width)
 }
 
 func renderMergeConfirmPopup(view mergeConfirmViewModel, bodyWidth int) string {
@@ -113,7 +113,7 @@ func renderMergeConfirmPopup(view mergeConfirmViewModel, bodyWidth int) string {
 		Kind:          confirmChoiceKind,
 		Title:         "Pull into " + view.CurrentBranch + "?",
 		Detail:        mergeConfirmBody(view, width-4),
-		FooterText:    "m/enter: merge · r: rebase · n/esc: cancel",
+		FooterText:    "m: merge · r: rebase · esc: cancel",
 		CurrentBranch: view.CurrentBranch,
 		TargetRef:     view.TargetRef,
 		CurrentOnly:   view.CurrentOnly,
@@ -137,8 +137,8 @@ func renderDivergentConfirmPopup(projection confirmationProjection, bodyWidth in
 	footer := projection.FooterText
 	if projection.Disabled {
 		footer = "n: close · esc: close"
-	} else if width < 54 && footer == "m/enter: merge · r: rebase · n/esc: cancel" {
-		footer = "m/enter: merge\nr: rebase · n/esc: cancel"
+	} else if width < 54 && footer == "m: merge · r: rebase · esc: cancel" {
+		footer = "m: merge\nr: rebase · esc: cancel"
 	}
 	body = joinLayoutSections(body, popupHelp.Render(footer), renderPopupFooter(width-4))
 	return renderFloatingTitlePopup(popupBox, projection.Title, centerReviewFooterLine(body, width-4), width)

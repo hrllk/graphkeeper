@@ -72,7 +72,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.status.Action = state.ActionPull
 				m.status.Title = "PULL COMPLETED"
 				m.status.Message = "PULL COMPLETED"
-				m.status.Detail = "No action needed. Press q or Esc to return to the graph."
+				m.status.Detail = "No action needed. Press esc to return to the graph."
 				return m, nil
 			}
 			if outcome.Kind == pullLifecyclePreviewStale || outcome.Kind == pullLifecycleValidationRejected {
@@ -89,7 +89,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status.Action = state.ActionPull
 			m.status.Title = "PULL COMPLETED"
 			m.status.Message = "PULL COMPLETED"
-			m.status.Detail = "Press q or Esc to return to the graph."
+			m.status.Detail = "Press esc to return to the graph."
 			return m, nil
 		})
 	case pullExecutionResultMsg:

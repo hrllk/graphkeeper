@@ -218,14 +218,15 @@ func TestTask214OverlayPrecedenceAndQEsc(t *testing.T) {
 		overlayState: overlayState{graphStashPopOpen: true, stashMessageOpen: true, tagPopupOpen: true, stashPopupOpen: true, branchOpen: true, hiddenHotkeysOpen: true, graphSearchOpen: true}}
 	gotModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	got := gotModel.(model)
-	if cmd != nil || got.commitInspectorOpen || !got.graphStashPopOpen || !got.stashMessageOpen || !got.tagPopupOpen || !got.stashPopupOpen || !got.branchOpen || !got.hiddenHotkeysOpen || !got.graphSearchOpen {
-		t.Fatalf("inspector did not own highest-precedence q: %#v cmd=%v", got, cmd != nil)
+	if cmd != nil || !got.commitInspectorOpen || !got.graphStashPopOpen || !got.stashMessageOpen || !got.tagPopupOpen || !got.stashPopupOpen || !got.branchOpen || !got.hiddenHotkeysOpen || !got.graphSearchOpen {
+		t.Fatalf("q mutated an overlay instead of remaining input/no-op: %#v cmd=%v", got, cmd != nil)
 	}
 	cases := []struct {
-		name      string
-		m         model
-		stillOpen func(model) bool
+		name string
+		m    model
+		open func(model) bool
 	}{
+		{"commit inspector", model{inspectorState: inspectorState{commitInspectorOpen: true}}, func(m model) bool { return m.commitInspectorOpen }},
 		{"graph stash pop", model{overlayState: overlayState{graphStashPopOpen: true}}, func(m model) bool { return m.graphStashPopOpen }},
 		{"stash message", model{overlayState: overlayState{stashMessageOpen: true}}, func(m model) bool { return m.stashMessageOpen }},
 		{"tag popup", model{overlayState: overlayState{tagPopupOpen: true}}, func(m model) bool { return m.tagPopupOpen }},
@@ -236,9 +237,13 @@ func TestTask214OverlayPrecedenceAndQEsc(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotModel, cmd := tc.m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-			if cmd != nil || tc.stillOpen(gotModel.(model)) {
-				t.Fatalf("q did not normalize to Esc for %s", tc.name)
+			qModel, qCmd := tc.m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+			if qCmd != nil || !tc.open(qModel.(model)) {
+				t.Fatalf("q changed %s overlay: cmd=%v model=%#v", tc.name, qCmd != nil, qModel)
+			}
+			escModel, escCmd := qModel.(model).Update(tea.KeyMsg{Type: tea.KeyEsc})
+			if escCmd != nil || tc.open(escModel.(model)) {
+				t.Fatalf("Esc did not close %s overlay: cmd=%v model=%#v", tc.name, escCmd != nil, escModel)
 			}
 		})
 	}

@@ -167,7 +167,7 @@ func TestTopLevelUpdateRoutesLegacyPullFetchedOutcomeMatrix(t *testing.T) {
 		"fetch error":                {msg: pullFetchedMsg{requestID: 7, requestEpoch: 3, fetchBaseline: baseline, err: errors.New("network down")}, wantBlock: state.BlockFetchFailed, wantTitle: "Blocked", wantMessage: "Fetch before pull failed.", wantDetail: "network down"},
 		"missing operation baseline": {msg: pullFetchedMsg{requestID: 7, requestEpoch: 3, fetchBaseline: baseline, status: status}, wantBlock: state.BlockUnknown, wantTitle: "Blocked", wantMessage: "Pull impact unavailable.", wantDetail: "Refresh before pulling again.", wantCommand: true},
 		"tracking unavailable":       {msg: pullFetchedMsg{requestID: 7, requestEpoch: 3, fetchBaseline: baseline, status: git.Status{Branch: status.Branch}, operationBaseline: baseline, operationBaselineSet: true}, wantBlock: state.BlockStaleSnapshot, wantTitle: "Blocked", wantMessage: "Repository changed.", wantDetail: "Refresh before pulling again.", wantCommand: true},
-		"fetched no-op":              {msg: pullFetchedMsg{requestID: 7, requestEpoch: 3, fetchBaseline: baseline, status: status, operationBaseline: baseline, operationBaselineSet: true}, wantMode: state.ModeOperationResult, wantTitle: "PULL COMPLETED", wantMessage: "PULL COMPLETED", wantDetail: "No action needed. Press q or Esc to return to the graph."},
+		"fetched no-op":              {msg: pullFetchedMsg{requestID: 7, requestEpoch: 3, fetchBaseline: baseline, status: status, operationBaseline: baseline, operationBaselineSet: true}, wantMode: state.ModeOperationResult, wantTitle: "PULL COMPLETED", wantMessage: "PULL COMPLETED", wantDetail: "No action needed. Press esc to return to the graph."},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -270,7 +270,7 @@ func TestTopLevelUpdateRoutesLegacyPreviewOutcomeMatrix(t *testing.T) {
 		wantMode    state.Mode
 	}{
 		"analysis error": {msg: pullPreviewReadyMsg{requestID: 7, requestEpoch: 3, baseline: baseline, err: errors.New("analysis failed")}, wantBlock: state.BlockUnknown, wantTitle: "Blocked", wantMessage: "Analysis failed.", wantDetail: "analysis failed"},
-		"analysis no-op": {msg: pullPreviewReadyMsg{requestID: 7, requestEpoch: 3, baseline: baseline}, wantMode: state.ModeOperationResult, wantTitle: "PULL COMPLETED", wantMessage: "PULL COMPLETED", wantDetail: "No action needed. Press q or Esc to return to the graph."},
+		"analysis no-op": {msg: pullPreviewReadyMsg{requestID: 7, requestEpoch: 3, baseline: baseline}, wantMode: state.ModeOperationResult, wantTitle: "PULL COMPLETED", wantMessage: "PULL COMPLETED", wantDetail: "No action needed. Press esc to return to the graph."},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

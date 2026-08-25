@@ -280,8 +280,12 @@ func TestLegacyStartupAndModalQuitPreserved(t *testing.T) {
 			m := model{status: state.New().WithBrowse()}
 			overlay.open(&m)
 			next, quit := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+			if quit != nil || overlay.closed(next.(model)) {
+				t.Fatalf("q unexpectedly dismissed overlay: model=%#v cmd=%v", next, quit)
+			}
+			next, quit = next.(model).handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
 			if quit != nil || !overlay.closed(next.(model)) {
-				t.Fatalf("q did not dismiss overlay: model=%#v cmd=%v", next, quit)
+				t.Fatalf("Esc did not dismiss overlay: model=%#v cmd=%v", next, quit)
 			}
 		})
 	}

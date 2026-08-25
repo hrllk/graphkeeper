@@ -33,7 +33,6 @@ func TestClassifyConfirmKeyPullChoice(t *testing.T) {
 		choice   string
 	}{
 		{"m", decisionChoice, choiceMerge},
-		{"enter", decisionAccept, choiceMerge},
 		{"r", decisionChoice, choiceRebase},
 	} {
 		got := classifyConfirmKey(view, tt.key)
