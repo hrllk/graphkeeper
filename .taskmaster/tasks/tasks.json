@@ -280,9 +280,53 @@
             ],
             "parentTaskId": 1,
             "parentId": "undefined"
+          },
+          {
+            "id": 23,
+            "title": "Modal kind와 Esc-first close contract",
+            "description": "입력 modal과 확인·alert modal을 구분하고 q footer 제거와 Esc close 계약을 모든 대상 modal에 적용한다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260823-233924-modal-hotkey-contract-plan.md Task 1.23. branch/tag/stash/search 입력 중 q는 입력값으로 보존하고 Esc로 닫는다. top-level q→Esc 정규화가 text-input handler보다 먼저 실행되지 않도록 dispatcher precedence를 수정한다. checkout target-pick과 checkout confirmation, stash-pop picker와 confirmation/alert, commit inspector와 status.Mode 기반 overlay 전체의 owner·renderer·handler·accept/cancel/q/footer matrix를 계획 §2.4와 source symbol에 맞춰 고정한다. 전체 modal framework 교체는 제외한다.",
+            "status": "done",
+            "dependencies": [22],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-23T23:39:24+09:00",
+            "parentId": "undefined"
+          },
+          {
+            "id": 24,
+            "title": "Binary/choice modal footer와 fast-forward key contract",
+            "description": "checkout y/n, binary confirm, stash-pop alert와 fast-forward f 표시·키 routing을 실제 mutation capability와 일치시키고, n은 no-ff로 표시하거나 실행하지 않는 unrendered no-op으로 고정한다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260823-233924-modal-hotkey-contract-plan.md Task 1.24. checkout은 y/n-only footer이며 y만 accept, n/Esc cancel, Enter/q는 표시·수락하지 않는다. non-checkout binary confirmation은 현재 classifier의 y/Enter compatibility accept와 n/Esc cancel을 보존하되 Enter는 footer에 표시하지 않는다. reset/delete/tag/remote-tag/clean/set-upstream/force-push/stash/checkout/graph merge·rebase confirmation의 concrete action별 command owner를 matrix로 고정한다. shared renderPopupFooter의 전체 consumer(renderConfirmPopup, renderDivergentConfirmPopup, renderReviewPopup, renderStashMessagePopup, renderGraphStashPopPopup, renderStashPopup, renderResetModePopup, renderTargetPickPopup, renderBranchInputPopup, renderGraphSearchPopup, renderTagPopup, renderAlertPopup; 12 consumer functions)를 variant별로 명시하고 table-driven footer test로 generic q: close가 남지 않았음을 검증한다. buildConfirmationProjection의 fast-forward Enter를 f로, classifier의 fast-forward Enter/n을 reject로 변경한다. stash-pop empty alert/picker/confirmation은 별도 footer·key contract를 사용한다. fast-forward no-ff는 표시·실행하지 않는다.",
+            "status": "done",
+            "dependencies": [23],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-23T23:39:24+09:00",
+            "parentId": "undefined"
+          },
+          {
+            "id": 25,
+            "title": "Section/hidden hotkey registry 정합성",
+            "description": "Local n을 보완하고 Remote f/p/d 표시를 제거하며 section footer와 hidden hotkey help의 정합성을 고정한다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260823-233924-modal-hotkey-contract-plan.md Task 1.25. 기존 Local visible n: new branch 행과 dispatcher는 보존하고 Local hidden help에 같은 항목을 추가한다. Remote visible/hidden help에서 f, p, d를 제거한다. 실제 dispatcher 동작은 별도 승인 없이 삭제하지 않고 help registry 단일화 또는 parity test로 drift를 방지한다.",
+            "status": "done",
+            "dependencies": [23],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-23T23:39:24+09:00",
+            "parentId": "undefined"
+          },
+          {
+            "id": 26,
+            "title": "통합 회귀·terminal matrix·계약 검증",
+            "description": "modal key routing, rendering, narrow terminal과 Local/Remote hotkey 변경을 end-to-end regression matrix로 검증하고 계획·Taskmaster 계약을 동기화한다.",
+            "details": "계획 문서: ~/.gstack/graphkeeper/20260823-233924-modal-hotkey-contract-plan.md Task 1.26. 실제 source test name을 먼저 열거하고 branch/tag/stash-message/graph-search/stash picker·confirm/hidden hotkey/commit inspector/checkout·cherry-pick target pick/각 confirmation action/reset picker/review/outcome/blocked/loading/operation result/fast-forward/divergent pull을 빠짐없이 선택한다. 입력 q 보존, Esc close, q no-op, action별 command non-mutation, shared renderPopupFooter 전체 consumer 12종의 variant footer와 generic q 부재, Local hidden n, Remote f/p/d 미표시와 40/60/80-column·low-height matrix를 검증한다. full/race/vet/build/gofmt/diff-check 및 final independent review CLEAN 후 상태를 갱신한다.",
+            "status": "done",
+            "dependencies": [24, 25],
+            "parentTaskId": 1,
+            "updatedAt": "2026-08-23T23:39:24+09:00",
+            "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-21T12:35:43.104Z"
+        "updatedAt": "2026-08-23T23:39:24+09:00"
       },
       {
         "id": "2",
@@ -481,7 +525,7 @@
             "title": "Neutral Git error category",
             "description": "Git 원문 문자열에 의존하는 application error policy를 중립 error category 기반으로 단계적으로 전환한다.",
             "details": "push 또는 branch delete 한 operation family를 대상으로 adapter/application command result에 PermissionDenied, NotFound, NonFastForward, DirtyWorktree, Conflict, Unknown 등 중립 category를 도입한다. 원문 Git error는 사용자 표시용으로 보존하고 category는 application policy와 blocked/result mode 선택에만 사용한다. Git version/locale 차이를 가정한 substring matching을 해당 family에서 제거하고 representative adapter mapping, category-based application behavior, unknown fallback을 테스트한다. 전체 repository error taxonomy와 user-facing copy 변경은 포함하지 않는다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               "2.15"
             ],
