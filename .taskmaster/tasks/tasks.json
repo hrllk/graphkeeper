@@ -563,7 +563,7 @@
         "description": "터미널 색상 호환성과 밝은 배경 가독성을 수정한다.",
         "details": "3-bit·256색·truecolor 혼용 문제를 정리하고 밝은 배경에서도 상태가 읽히도록 한다.",
         "testStrategy": "",
-        "status": "done",
+        "status": "in-progress",
         "dependencies": [],
         "priority": "medium",
         "subtasks": [
@@ -587,9 +587,19 @@
             "dependencies": [],
             "parentTaskId": 4,
             "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Commit Inspector lifecycle·QA 계약 보완",
+            "description": "Commit Inspector의 refresh stale 처리, 비동기 identity/cancellation 계약, bounded continuation과 unsupported-height renderer, Graph Enter 진입 경로를 보완한다.",
+            "details": "QA/review 도출 P2를 하나의 순차 fix slice로 처리한다. repository refresh의 injected refreshedSnapshotMsg와 legacy refreshedMsg 양쪽에서 열린 Inspector를 stale 처리하고 active reader를 취소하며 late metadata/diff result와 stale continuation을 차단한다. request ID, repository epoch, commit, parent, file ID, window mismatch 및 파일 전환 후 late result를 독립 fixture로 검증한다. non-zero StartLine continuation의 exact NextStartLine progression, row repeat/skip 방지, partial hunk context를 검증한다. width 40/60/80 및 minimum/unsupported height에서 footer·identity·loading/error/partial hint·unsupported marker clipping을 검증한다. 실제 model.Update의 Graph Enter → inspectCommitCommand → metadata/diff result → Inspector renderer production path를 통합 테스트한다. Commit Inspector mutation capability는 추가하지 않으며, tree-sitter grammar/combined diff/Git status reliability는 별도 후속 범위로 둔다. 완료 기준: focused/race/full test, vet, build, gofmt/diff-check, PTY smoke 및 independent review CLEAN.",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 4,
+            "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-07-31T08:42:11.256Z"
+        "updatedAt": "2026-08-25T12:00:00+09:00"
       },
       {
         "id": "5",
