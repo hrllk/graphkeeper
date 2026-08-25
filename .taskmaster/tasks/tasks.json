@@ -334,7 +334,7 @@
         "description": "CLI 진입점과 애플리케이션 내부 구조를 현대적인 경계로 점진 개선한다.",
         "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리한 기반 위에 runtime state, screen state, workflow orchestration, Git adapter, renderer projection 경계를 단계적으로 정리한다. 구조개선 계획은 ~/.gstack/graphkeeper/20260731-0003-modern-architecture-boundary-improvement-plan.md를 따른다. T1 baseline과 T2 snapshot/operation epoch 계약을 먼저 완료하고, refresh 순서 역전과 파괴적 Git 작업의 stale target을 방지한다.",
         "testStrategy": "",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -465,7 +465,7 @@
             "title": "Composition-level wiring regression test",
             "description": "production composition root가 RepositoryReadPort, PullPort 및 outbound adapter를 실제 app lifecycle에 연결하는 계약을 고정한다.",
             "details": "Task 4.2 startup lifecycle 복구 이후 수행한다. NewWithDependencies와 production command/update 경계를 deterministic fake port로 검증한다. 주입된 RepositoryReadPort가 initial load/refresh에 사용되고, 주입된 PullPort가 preview/validation/execution에 사용되며, port가 제공된 경우 concrete repository fallback이 선택되지 않는지 확인한다. live Git integration을 전체 app test에 확대하지 않으며, composition boundary test와 race test만 추가한다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               "4.2"
             ],
@@ -477,7 +477,7 @@
             "title": "Pull lifecycle 통합",
             "description": "PullPort와 legacy pull 경로의 preview·stale validation·confirm·execute·refresh lifecycle을 하나의 application contract로 통합한다.",
             "details": "pullPortPreviewMsg/pullWorkflowMsg와 pullFetchedMsg/pullPreviewReadyMsg/pullExecutionResultMsg의 병렬 lifecycle을 neutral pull preview/result DTO와 공통 reducer로 수렴한다. 기존 adapter와 legacy command는 첫 단계에서 유지하고 application reducer와 confirmation projection만 통합한다. fast-forward, divergent merge/rebase, no-op, stale baseline, invalid impact, cancellation late result, refresh success/failure를 양쪽 entry path에 동일 fixture로 적용해 parity를 검증한다. PullPort 계약과 request/epoch/baseline semantics, user-facing key bindings는 변경하지 않는다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               "2.11"
             ],
@@ -489,7 +489,7 @@
             "title": "Repository state application helper",
             "description": "repository status 적용과 cache·browse state 동기화의 중복 lifecycle을 하나의 좁은 application helper로 정리한다.",
             "details": "update_lifecycle.go, update_execute.go, update_fetch.go에 반복되는 repoStatus 저장, tag cache 동기화, syncBrowseState와 최소 cursor update를 applyRepositoryStatus 계열 helper로 중앙화한다. action-specific UX copy, telemetry, Git execution, 전체 error policy는 caller에 남긴다. 성공 load/refresh/mutation, conflict, push rejection, stash, checkout, pull 경로의 repoStatus·cached tags·browse cursor·tagSyncAttempted·필요한 stash reload를 table-driven test로 검증한다. generic god reducer는 만들지 않는다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               "2.12"
             ],
@@ -501,7 +501,7 @@
             "title": "Model state grouping",
             "description": "비대해진 app model의 repository·pull·inspector·overlay·navigation 상태를 value struct로 그룹화한다.",
             "details": "model의 동작과 Bubble Tea value receiver를 유지한 채 repositoryState, pullState, inspectorState, overlayState, navigationState를 도입한다. 첫 단계에서는 새 package를 만들거나 renderer/message ownership을 바꾸지 않고 embedded/value grouping과 reset semantics를 명확히 한다. pull open/cancel/stale invalidation, inspector cancellation/epoch change, popup precedence, overlay 중 repository refresh를 state-transition test로 보강한다. field rename 외에 behavior change와 전면 package 분리는 포함하지 않는다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               "2.13"
             ],
@@ -513,7 +513,7 @@
             "title": "Confirm projection ownership 통합",
             "description": "confirm renderer와 key classifier가 하나의 immutable confirmation projection을 공유하도록 ownership을 정리한다.",
             "details": "confirmView, projectMergeConfirm, applyMergeConfirmProjection, renderConfirmPopup, handleConfirmKey 사이의 중복 title/detail/footer/disabled derivation을 줄인다. 동일 projection이 renderer와 key classification의 source of truth가 되게 하고 mutation command는 key handler에 유지한다. stale projection은 close key만 허용하고, merge/rebase/enter mapping, width 40/60/80 footer, projection 교체 후 이전 merge content 재사용 방지를 검증한다. 전체 popup redesign과 state.Status 제거는 범위에 포함하지 않는다.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               "2.14"
             ],
@@ -563,7 +563,7 @@
         "description": "터미널 색상 호환성과 밝은 배경 가독성을 수정한다.",
         "details": "3-bit·256색·truecolor 혼용 문제를 정리하고 밝은 배경에서도 상태가 읽히도록 한다.",
         "testStrategy": "",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "subtasks": [
@@ -583,7 +583,7 @@
             "title": "Startup lifecycle 복구",
             "description": "실제 TUI가 Loading 상태에서 Browse 또는 명확한 repository error 상태로 전환되도록 startup lifecycle을 복구한다.",
             "details": "P0 QA finding. valid Git repository에서는 loadedSnapshotMsg 이후 repoStatus, graph snapshot, repoSnapshotLoaded, browse status가 일관되게 반영되어야 한다. repository read error와 non-Git directory는 Loading에 머물지 않고 사용자에게 명확한 blocked/error 상태를 보여야 한다. startup loading 중 q의 종료 정책을 명시하고 실제 binary/PTY에서 검증한다. pull·confirm·stale 기능 자체의 범위는 포함하지 않으며, startup lifecycle과 production composition 경계만 수정한다. 완료 기준: valid repo Loading→Browse, invalid repo Loading→error, q/quit 동작, loaded success/error integration test, go test/race/vet, scripts/check.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 4,
             "parentId": "undefined"
