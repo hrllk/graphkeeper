@@ -108,12 +108,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commitInspectorResultMsg:
 		return m.applyCommitInspectorResult(msg)
 	case ContinuationRequested:
-		if msg.Commit != m.commitInspectorSnapshot.FullHash || msg.Parent != m.commitInspectorSnapshot.Parent || msg.FileID != m.commitInspectorDiffWindow.FileID || msg.RepositoryEpoch != m.commitInspectorEpoch || msg.RequestID != m.commitInspectorRequest || msg.Window != m.commitInspectorWindowRequest || m.commitInspectorLoading || m.commitInspectorMetadataLoading || m.commitInspectorDiffLoading {
+		if m.commitInspectorStale || !m.commitInspectorOpen || msg.Commit != m.commitInspectorSnapshot.FullHash || msg.Parent != m.commitInspectorSnapshot.Parent || msg.FileID != m.commitInspectorDiffWindow.FileID || msg.RepositoryEpoch != m.commitInspectorEpoch || msg.RequestID != m.commitInspectorRequest || msg.Window != m.commitInspectorWindowRequest || m.commitInspectorLoading || m.commitInspectorMetadataLoading || m.commitInspectorDiffLoading {
 			return m, nil
 		}
 		return startInspectorContinuation(m)
 	case inspectorContinuationKeyMsg:
-		if m.commitInspectorOpen && m.commitInspectorDiffWindow.HasMore && !m.commitInspectorLoading && !m.commitInspectorMetadataLoading && !m.commitInspectorDiffLoading {
+		if m.commitInspectorOpen && !m.commitInspectorStale && m.commitInspectorDiffWindow.HasMore && !m.commitInspectorLoading && !m.commitInspectorMetadataLoading && !m.commitInspectorDiffLoading {
 			m.commitInspectorContinuationPending = false
 			return startInspectorContinuation(m)
 		}

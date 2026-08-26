@@ -14,6 +14,9 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 		height = 1
 	}
 	innerWidth := max(width-4, 1)
+	if height <= 2 {
+		return fitScreenText("unsupported height", innerWidth)
+	}
 	contentHeight := max(height-2, 1)
 	snapshot := m.commitInspectorSnapshot
 	if snapshot.FullHash == "" {
@@ -21,6 +24,9 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 		snapshot.Parent = m.commitInspectorRequestedParent
 	}
 	selected := selectedScreenFile(snapshot, m.commitInspectorCursor)
+	if height < 12 {
+		return renderCompactInspectorScreen(snapshot, selected, innerWidth, height)
+	}
 	lines := make([]string, 0, contentHeight)
 	lines = append(lines,
 		fitScreenText("COMMIT "+snapshot.FullHash, innerWidth),
@@ -50,6 +56,23 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 	}
 	style := popupBorder.Width(max(width-2, 0)).Height(max(height-2, 0)).Padding(0, 1)
 	return style.Render(strings.Join(lines, "\n"))
+}
+
+func renderCompactInspectorScreen(snapshot CommitSnapshot, selected ChangedFile, width, height int) string {
+	rows := []string{fitScreenText("COMMIT "+snapshot.FullHash, width), "unsupported height"}
+	if height >= 6 {
+		rows = append(rows, fitScreenText("path: "+screenSelectedPath(selected, max(width-6, 1)), width))
+	}
+	if height >= 9 {
+		rows = append(rows, fitScreenText("Esc back", width))
+	}
+	for len(rows) < height {
+		rows = append(rows, "")
+	}
+	if len(rows) > height {
+		rows = rows[:height]
+	}
+	return strings.Join(rows, "\n")
 }
 
 func screenAuthorLine(snapshot CommitSnapshot) string {
@@ -116,31 +139,7 @@ func screenBody(m model, snapshot CommitSnapshot, selected ChangedFile, width, h
 		fileRows = append(fileRows, prefix+screenFileLabel(file, max(fileWidth-2, 1)))
 	}
 	diffLines := renderInspectorDiffWindow(m.commitInspectorDiffWindow)
-	if m.commitInspectorDiffWindow.HasMore {
-		hint := "partial"
-		if m.commitInspectorDiffWindow.PartialReason != "" {
-			hint += " (" + string(m.commitInspectorDiffWindow.PartialReason) + ")"
-		}
-		diffLines = append([]string{hint + "; press n next"}, diffLines...)
-	}
-	if len(m.commitInspectorDiffWindow.Hunks) == 0 && !m.commitInspectorDiffWindow.HasMore {
-		diffLines = []string{"No textual changes"}
-	}
-	if unsupported {
-		diffLines = append([]string{"unsupported height"}, diffLines...)
-	}
-	if m.commitInspectorStale {
-		diffLines = append([]string{"Repository changed; close and reopen to refresh."}, diffLines...)
-	}
-	if m.commitInspectorMetadataLoading || m.commitInspectorLoading {
-		diffLines = []string{"Loading…"}
-	}
-	if m.commitInspectorError != "" {
-		diffLines = []string{"Metadata error: " + m.commitInspectorError}
-	}
-	if m.commitInspectorDiffError != "" {
-		diffLines = []string{"Diff error: " + m.commitInspectorDiffError}
-	}
+	diffLines = append([]string{inspectorStatusRow(m, unsupported)}, diffLines...)
 	for i := 0; i < height-1; i++ {
 		left, right := "", ""
 		if i < len(fileRows) {
@@ -152,6 +151,31 @@ func screenBody(m model, snapshot CommitSnapshot, selected ChangedFile, width, h
 		rows = append(rows, padInspectorCell(fitScreenText(left, fileWidth), fileWidth)+" │ "+fitScreenText(right, diffWidth))
 	}
 	return rows
+}
+
+func inspectorStatusRow(m model, unsupported bool) string {
+	if unsupported {
+		return "unsupported height"
+	}
+	if m.commitInspectorStale {
+		return "Repository changed; close and reopen to refresh."
+	}
+	if m.commitInspectorError != "" {
+		return "Metadata error: " + m.commitInspectorError
+	}
+	if m.commitInspectorDiffError != "" {
+		return "Diff error: " + m.commitInspectorDiffError
+	}
+	if m.commitInspectorMetadataLoading || m.commitInspectorLoading {
+		return "Loading…"
+	}
+	if m.commitInspectorDiffWindow.HasMore {
+		if m.commitInspectorDiffWindow.PartialReason != "" {
+			return "partial (" + string(m.commitInspectorDiffWindow.PartialReason) + "); press n next"
+		}
+		return "partial; press n next"
+	}
+	return "No textual changes"
 }
 
 func screenFileLabel(file ChangedFile, width int) string {

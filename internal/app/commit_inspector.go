@@ -10,9 +10,21 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	ansiutil "github.com/charmbracelet/x/ansi"
+
+	commitinspector "hrllk/graphkeeper/internal/commitinspector"
 )
 
 const inspectorDiffPage = 18
+
+func canonicalFileKey(status commitinspector.ChangedFileStatus, oldPath, path string, occurrence int) string {
+	parts := []string{string(status), oldPath, path, fmt.Sprintf("%d", occurrence)}
+	var b strings.Builder
+	for _, part := range parts {
+		fmt.Fprintf(&b, "%d:", len(part))
+		b.WriteString(part)
+	}
+	return b.String()
+}
 
 func (m model) cancelInspector() model {
 	if m.commitInspectorCancel != nil {
@@ -41,10 +53,13 @@ func (m model) startInspectorDiff() (model, tea.Cmd) {
 	file := m.commitInspectorSnapshot.Files[m.commitInspectorCursor]
 	window := DiffWindowRequest{StartLine: 0, MaxLines: 2000, MaxBytes: 1 << 20}
 	m.commitInspectorWindowRequest = window
-	return m, loadCommitInspectorDiffCommand(m.commitInspectorContext, m, DiffRequest{Commit: m.commitInspectorSnapshot.FullHash, Parent: m.commitInspectorSnapshot.Parent, FileID: file.StableID, RequestID: m.commitInspectorRequest, RepositoryEpoch: m.commitInspectorEpoch, Window: window})
+	return m, loadCommitInspectorDiffCommand(m.commitInspectorContext, m, DiffRequest{Commit: m.commitInspectorSnapshot.FullHash, Parent: m.commitInspectorSnapshot.Parent, FileID: file.StableID, CanonicalKey: file.CanonicalKey, RequestID: m.commitInspectorRequest, RepositoryEpoch: m.commitInspectorEpoch, Window: window})
 }
 
 func (m model) closeCommitInspector() model {
+	// The request counter is the sole operation generation. Invalidate before
+	// cancelling so a result racing with cancellation cannot mutate the model.
+	m.commitInspectorRequest++
 	m = m.cancelInspector()
 	m.commitInspectorOpen = false
 	m.commitInspectorHelp = false
@@ -73,6 +88,9 @@ func (m model) handleCommitInspectorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		filesCount = len(m.commitInspector.Files)
 	}
 	if m.commitInspectorHelp || m.commitInspectorMetadataLoading || m.commitInspectorDiffLoading {
+		return m, nil
+	}
+	if m.commitInspectorStale || m.commitInspectorRevalidating {
 		return m, nil
 	}
 	if key == "n" && m.commitInspectorDiffWindow.HasMore && !m.commitInspectorLoading && !m.commitInspectorMetadataLoading && !m.commitInspectorDiffLoading {
@@ -115,6 +133,11 @@ func (m model) selectInspectorFile() (tea.Model, tea.Cmd) {
 	m.commitInspectorWindowRequest = DiffWindowRequest{}
 	m.commitInspectorContinuationPending = false
 	m.commitInspectorScroll = 0
+	if m.commitInspectorCursor >= 0 && m.commitInspectorCursor < len(m.commitInspectorSnapshot.Files) {
+		file := m.commitInspectorSnapshot.Files[m.commitInspectorCursor]
+		m.commitInspectorSelectedFileID = file.StableID
+		m.commitInspectorSelectedCanonicalKey = file.CanonicalKey
+	}
 	return m.startInspectorDiff()
 }
 
@@ -325,7 +348,7 @@ func renderInspectorDiffWindow(window DiffWindow) []string {
 		}
 	}
 	if len(lines) == 0 {
-		return []string{"No textual changes"}
+		return nil
 	}
 	return lines
 }

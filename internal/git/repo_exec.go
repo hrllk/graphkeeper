@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -18,6 +19,19 @@ import (
 )
 
 const remoteOperationTimeout = 30 * time.Second
+
+var ErrCommitNotFound = errors.New("commit not found")
+
+func classifyCommitLookupError(err error) error {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	text := strings.ToLower(err.Error())
+	if strings.Contains(text, "unknown revision") || strings.Contains(text, "bad object") || strings.Contains(text, "not a commit") || strings.Contains(text, "ambiguous argument") {
+		return fmt.Errorf("%w: %v", ErrCommitNotFound, err)
+	}
+	return err
+}
 
 func (r *Repo) runRemote(ctx context.Context, args ...string) (string, error) {
 	runner := r.runner
@@ -161,7 +175,7 @@ func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection
 	}
 	meta, err := r.git(ctx, "show", "-s", "--format=%H%x00%P%x00%an%x00%ae%x00%s", hash)
 	if err != nil {
-		return CommitInspection{}, err
+		return CommitInspection{}, classifyCommitLookupError(err)
 	}
 	parts := strings.SplitN(meta, "\x00", 5)
 	if len(parts) != 5 {

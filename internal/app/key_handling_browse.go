@@ -213,6 +213,9 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commitInspectorDiffWindow = DiffWindow{}
 		m.commitInspectorWindowRequest = DiffWindowRequest{}
 		m.commitInspectorStale = false
+		m.commitInspectorRevalidating = false
+		m.commitInspectorSelectedFileID = ""
+		m.commitInspectorSelectedCanonicalKey = ""
 		m.commitInspectorContinuationPending = false
 		m.commitInspectorLines = nil
 		m = m.cancelInspector()

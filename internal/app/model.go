@@ -48,31 +48,34 @@ type pullConfirmInput struct {
 }
 
 type inspectorState struct {
-	commitInspectorOpen                bool
-	commitInspector                    CommitSnapshot
-	commitInspectorSnapshot            CommitSnapshot
-	commitInspectorDiffWindow          DiffWindow
-	commitInspectorWindowRequest       DiffWindowRequest
-	commitInspectorCursor              int
-	commitInspectorScroll              int
-	commitInspectorLines               []string
-	commitInspectorHasMore             bool
-	commitInspectorLoading             bool
-	commitInspectorError               string
-	commitInspectorRequest             uint64
-	commitInspectorEpoch               uint64
-	commitInspectorRequestedCommit     string
-	commitInspectorRequestedParent     string
-	commitInspectorCancel              context.CancelFunc
-	commitInspectorContext             context.Context
-	commitInspectorHelp                bool
-	commitInspectorMessage             bool
-	commitInspectorMessageScroll       int
-	commitInspectorMetadataLoading     bool
-	commitInspectorDiffLoading         bool
-	commitInspectorDiffError           string
-	commitInspectorStale               bool
-	commitInspectorContinuationPending bool
+	commitInspectorOpen                 bool
+	commitInspector                     CommitSnapshot
+	commitInspectorSnapshot             CommitSnapshot
+	commitInspectorDiffWindow           DiffWindow
+	commitInspectorWindowRequest        DiffWindowRequest
+	commitInspectorCursor               int
+	commitInspectorScroll               int
+	commitInspectorLines                []string
+	commitInspectorHasMore              bool
+	commitInspectorLoading              bool
+	commitInspectorError                string
+	commitInspectorRequest              uint64
+	commitInspectorEpoch                uint64
+	commitInspectorRequestedCommit      string
+	commitInspectorRequestedParent      string
+	commitInspectorCancel               context.CancelFunc
+	commitInspectorContext              context.Context
+	commitInspectorHelp                 bool
+	commitInspectorMessage              bool
+	commitInspectorMessageScroll        int
+	commitInspectorMetadataLoading      bool
+	commitInspectorDiffLoading          bool
+	commitInspectorDiffError            string
+	commitInspectorStale                bool
+	commitInspectorRevalidating         bool
+	commitInspectorSelectedFileID       string
+	commitInspectorSelectedCanonicalKey string
+	commitInspectorContinuationPending  bool
 }
 
 type overlayState struct {

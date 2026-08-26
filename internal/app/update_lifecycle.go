@@ -36,6 +36,16 @@ func markPullStale(m model) (model, tea.Cmd) {
 	return m, nil
 }
 
+func closeInspectorWithRecoveryAlert(m model, kind string) (model, tea.Cmd) {
+	message := "Commit Inspector closed: selected file is no longer available."
+	if kind == "commit_not_found" {
+		message = "Commit Inspector closed: selected commit is no longer available."
+	}
+	m = m.closeCommitInspector()
+	m.status = state.New().WithBlocked(state.BlockUnknown, message, "Press Enter to dismiss.")
+	return m, nil
+}
+
 func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case loadedSnapshotMsg:
@@ -62,13 +72,21 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.refreshGeneration != m.refreshGeneration || msg.result.RepositoryEpoch != m.repositoryEpoch {
 			return markPullStale(m)
 		}
-		if msg.result.ErrorKind == ReadErrorInvalid || msg.result.ErrorKind == ReadErrorRepository || msg.result.ErrorKind == ReadErrorCanceled {
+		if msg.result.ErrorKind != ReadErrorNone {
 			if m.status.Mode == state.ModeLoading {
 				clearPullConfirmProjection(&m)
 			}
 			return m, nil
 		}
 		m.graphReadSnapshot = msg.result.Snapshot.Graph
+		m.repoStatus = applyRepositoryProjection(msg.result.Snapshot.Repository, msg.result.Snapshot.Graph)
+		m.repoSnapshotLoaded = true
+		m.err = nil
+		syncBrowseState(&m, m.repoStatus)
+		m.status = deriveStatus(m.repoStatus)
+		if m.commitInspectorOpen {
+			return startCommitInspectorRevalidation(m)
+		}
 		return m, nil
 	case loadedMsg:
 		if m.repositoryRead != nil {
@@ -113,7 +131,6 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, staleCmd
 		}
 		if msg.epochSet && msg.epoch > m.commitInspectorEpoch {
-			m = invalidateCommitInspectorForEpoch(m)
 			m.commitInspectorEpoch = msg.epoch
 		}
 		if msg.err != nil {
@@ -136,7 +153,13 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.branchOpen && (m.status.Mode == state.ModeBrowse || m.status.Mode == state.ModeEmpty || m.status.Mode == state.ModeError) {
 			m.status = deriveStatus(appliedStatus)
 		}
-		return m, loadStashState(m.repo)
+		stashCmd := loadStashState(m.repo)
+		if m.commitInspectorOpen {
+			var inspectorCmd tea.Cmd
+			m, inspectorCmd = startCommitInspectorRevalidation(m)
+			return m, tea.Batch(stashCmd, inspectorCmd)
+		}
+		return m, stashCmd
 	default:
 		return m, nil
 	}

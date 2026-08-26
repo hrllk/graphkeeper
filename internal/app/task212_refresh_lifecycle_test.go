@@ -247,8 +247,8 @@ func TestTopLevelLifecycleRefreshOwnershipAndRepositoryReadBoundary(t *testing.T
 			pullState:       pullState{}, repositoryRead: &fakeRepositoryRead{}}
 		gotModel, cmd := m.Update(refreshedSnapshotMsg{refreshGeneration: 5, result: ReadSnapshotResult{RepositoryEpoch: 3, ErrorKind: ReadErrorNone, Snapshot: ReadSnapshot{Graph: task212Graph("stale")}}})
 		got := gotModel.(model)
-		if cmd != nil || !reflect.DeepEqual(got.graphReadSnapshot, task212Graph("stale")) || !reflect.DeepEqual(got.repoStatus, git.Status{Head: "prior"}) {
-			t.Fatalf("matching snapshot refresh crossed repository-read boundary: graph=%#v repo=%#v cmd=%v", got.graphReadSnapshot, got.repoStatus, cmd)
+		if cmd != nil || !reflect.DeepEqual(got.graphReadSnapshot, task212Graph("stale")) || len(got.repoStatus.GraphCommits) != 1 || got.repoStatus.GraphCommits[0].Hash != "stale" {
+			t.Fatalf("matching snapshot refresh did not project through injected reader: graph=%#v repo=%#v cmd=%v", got.graphReadSnapshot, got.repoStatus, cmd)
 		}
 		gotModel, cmd = m.Update(refreshedMsg{status: git.Status{Head: "stale"}, epoch: 2, epochSet: true, err: errors.New("stale")})
 		got = gotModel.(model)

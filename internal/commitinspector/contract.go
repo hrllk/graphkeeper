@@ -76,6 +76,7 @@ type DiffRequest struct {
 	Commit          string
 	Parent          string
 	FileID          string
+	CanonicalKey    string
 	RequestID       uint64
 	RepositoryEpoch uint64
 	Window          DiffWindowRequest
@@ -98,13 +99,14 @@ type CommitSnapshot struct {
 }
 
 type ChangedFile struct {
-	StableID  string
-	Status    ChangedFileStatus
-	OldPath   string
-	Path      string
-	Additions int
-	Deletions int
-	Binary    bool
+	StableID     string
+	CanonicalKey string
+	Status       ChangedFileStatus
+	OldPath      string
+	Path         string
+	Additions    int
+	Deletions    int
+	Binary       bool
 }
 
 type DiffWindow struct {

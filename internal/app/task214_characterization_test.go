@@ -173,7 +173,7 @@ func TestTask214InspectorLifecycleAndResultGuards(t *testing.T) {
 	m.commitInspectorError = "keep"
 	m.commitInspectorRequest, m.commitInspectorEpoch = 7, 4
 	m = m.closeCommitInspector()
-	if m.commitInspectorOpen || m.commitInspectorHelp || m.commitInspectorMetadataLoading || m.commitInspectorDiffLoading || m.commitInspectorLoading || m.commitInspectorContinuationPending || m.commitInspectorError != "keep" || m.commitInspectorRequest != 7 || m.commitInspectorEpoch != 4 {
+	if m.commitInspectorOpen || m.commitInspectorHelp || m.commitInspectorMetadataLoading || m.commitInspectorDiffLoading || m.commitInspectorLoading || m.commitInspectorContinuationPending || m.commitInspectorError != "keep" || m.commitInspectorRequest != 8 || m.commitInspectorEpoch != 4 {
 		t.Fatalf("closeCommitInspector reset/preserved wrong fields: %#v", m)
 	}
 
@@ -184,8 +184,8 @@ func TestTask214InspectorLifecycleAndResultGuards(t *testing.T) {
 	}
 	gotModel, cmd := m.Update(refreshedMsg{epoch: 6, epochSet: true})
 	got := gotModel.(model)
-	if cmd == nil || cancelled != 1 || !got.commitInspectorStale || got.commitInspectorLoading || got.commitInspectorMetadataLoading || got.commitInspectorDiffLoading || got.commitInspectorEpoch != 6 {
-		t.Fatalf("epoch invalidation mismatch: cmd=%v cancels=%d state=%#v", cmd != nil, cancelled, got)
+	if cmd == nil || cancelled != 1 || got.commitInspectorStale || !got.commitInspectorLoading || !got.commitInspectorMetadataLoading || got.commitInspectorDiffLoading || !got.commitInspectorRevalidating || got.commitInspectorRequest != 1 || got.commitInspectorEpoch != 6 {
+		t.Fatalf("epoch refresh revalidation mismatch: cmd=%v cancels=%d state=%#v", cmd != nil, cancelled, got)
 	}
 
 	guarded := model{inspectorState: inspectorState{commitInspectorOpen: true, commitInspectorRequest: 2, commitInspectorEpoch: 4, commitInspectorRequestedCommit: "commit", commitInspectorSnapshot: CommitSnapshot{FullHash: "commit", Parent: "parent", Files: []ChangedFile{{StableID: "file"}}}, commitInspectorWindowRequest: DiffWindowRequest{StartLine: 3, MaxLines: 2, MaxBytes: 64}, commitInspectorDiffWindow: DiffWindow{FileID: "prior"}, commitInspectorLines: []string{"prior"}}}
@@ -314,21 +314,6 @@ func task214OverlayPayload(m model) any {
 		graphStashPopEntries                                                                                              []git.StashEntry
 		graphSearchDraft, graphSearchQuery, graphSearchError                                                              string
 		graphSearchIndex                                                                                                  []graphSearchEntry
-		commitInspectorOpen                                                                                               bool
-		commitInspector                                                                                                   CommitSnapshot
-		commitInspectorSnapshot                                                                                           CommitSnapshot
-		commitInspectorDiffWindow                                                                                         DiffWindow
-		commitInspectorWindowRequest                                                                                      DiffWindowRequest
-		commitInspectorCursor, commitInspectorScroll                                                                      int
-		commitInspectorLines                                                                                              []string
-		commitInspectorHasMore, commitInspectorLoading                                                                    bool
-		commitInspectorError                                                                                              string
-		commitInspectorRequest, commitInspectorEpoch                                                                      uint64
-		commitInspectorRequestedCommit, commitInspectorRequestedParent                                                    string
-		commitInspectorHelp, commitInspectorMessage, commitInspectorMetadataLoading, commitInspectorDiffLoading           bool
-		commitInspectorMessageScroll                                                                                      int
-		commitInspectorDiffError                                                                                          string
-		commitInspectorStale, commitInspectorContinuationPending                                                          bool
 	}{
 		m.branchOpen, m.tagPopupOpen, m.stashMessageOpen, m.stashPopupOpen, m.graphStashPopOpen, m.hiddenHotkeysOpen, m.graphSearchOpen,
 		m.branchDraft, m.branchBase, m.branchError, m.tagPopupDraft, m.tagPopupError, m.tagPopupTarget,
@@ -336,11 +321,6 @@ func task214OverlayPayload(m model) any {
 		m.stashPopupCursor, m.graphStashPopCursor, m.hiddenHotkeysScroll, m.graphSearchCursor,
 		m.graphStashPopMode, m.graphStashPopEntries, m.graphSearchDraft, m.graphSearchQuery, m.graphSearchError,
 		m.graphSearchIndex,
-		m.commitInspectorOpen, m.commitInspector, m.commitInspectorSnapshot, m.commitInspectorDiffWindow, m.commitInspectorWindowRequest,
-		m.commitInspectorCursor, m.commitInspectorScroll, m.commitInspectorLines, m.commitInspectorHasMore, m.commitInspectorLoading,
-		m.commitInspectorError, m.commitInspectorRequest, m.commitInspectorEpoch, m.commitInspectorRequestedCommit, m.commitInspectorRequestedParent,
-		m.commitInspectorHelp, m.commitInspectorMessage, m.commitInspectorMetadataLoading, m.commitInspectorDiffLoading, m.commitInspectorMessageScroll,
-		m.commitInspectorDiffError, m.commitInspectorStale, m.commitInspectorContinuationPending,
 	}
 }
 
@@ -435,7 +415,7 @@ func TestRepositoryRefreshWhileOverlayOpen(t *testing.T) {
 				overlayState:    overlayState{branchDraft: "branch draft", branchBase: "branch base", branchError: "branch error", tagPopupDraft: "tag draft", tagPopupError: "tag error", tagPopupTarget: "tag target", stashMessageDraft: "stash draft", stashMessageError: "stash error", stashPopupCursor: 4, graphStashPopCursor: 5, graphStashPopMode: graphStashPopModeConfirm, graphStashPopEntries: []git.StashEntry{{Hash: "stash"}}, hiddenHotkeysScroll: 6, graphSearchDraft: "search draft", graphSearchQuery: "search query", graphSearchError: "search error", graphSearchCursor: 7},
 
 				inspectorState: inspectorState{
-					commitInspectorOpen:          true,
+					commitInspectorOpen:          false,
 					commitInspectorSnapshot:      CommitSnapshot{FullHash: "commit", Parent: "parent", Files: []ChangedFile{{StableID: "file", Path: "file.go"}}},
 					commitInspectorDiffWindow:    DiffWindow{FileID: "file", HasMore: true, NextStartLine: 9},
 					commitInspectorWindowRequest: DiffWindowRequest{StartLine: 2, MaxLines: 3, MaxBytes: 64},
@@ -452,6 +432,9 @@ func TestRepositoryRefreshWhileOverlayOpen(t *testing.T) {
 			}
 			m.status.WorktreeState = state.WorktreeStateClean
 			tc.setup(&m)
+			if tc.name == "commitInspectorOpen" {
+				m.commitInspectorOpen = true
+			}
 			before := m
 			if !tc.open(m) {
 				t.Fatal("fixture did not open overlay")
