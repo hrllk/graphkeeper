@@ -287,7 +287,9 @@
             "description": "입력 modal과 확인·alert modal을 구분하고 q footer 제거와 Esc close 계약을 모든 대상 modal에 적용한다.",
             "details": "계획 문서: ~/.gstack/graphkeeper/20260823-233924-modal-hotkey-contract-plan.md Task 1.23. branch/tag/stash/search 입력 중 q는 입력값으로 보존하고 Esc로 닫는다. top-level q→Esc 정규화가 text-input handler보다 먼저 실행되지 않도록 dispatcher precedence를 수정한다. checkout target-pick과 checkout confirmation, stash-pop picker와 confirmation/alert, commit inspector와 status.Mode 기반 overlay 전체의 owner·renderer·handler·accept/cancel/q/footer matrix를 계획 §2.4와 source symbol에 맞춰 고정한다. 전체 modal framework 교체는 제외한다.",
             "status": "done",
-            "dependencies": [22],
+            "dependencies": [
+              22
+            ],
             "parentTaskId": 1,
             "updatedAt": "2026-08-23T23:39:24+09:00",
             "parentId": "undefined"
@@ -298,7 +300,9 @@
             "description": "checkout y/n, binary confirm, stash-pop alert와 fast-forward f 표시·키 routing을 실제 mutation capability와 일치시키고, n은 no-ff로 표시하거나 실행하지 않는 unrendered no-op으로 고정한다.",
             "details": "계획 문서: ~/.gstack/graphkeeper/20260823-233924-modal-hotkey-contract-plan.md Task 1.24. checkout은 y/n-only footer이며 y만 accept, n/Esc cancel, Enter/q는 표시·수락하지 않는다. non-checkout binary confirmation은 현재 classifier의 y/Enter compatibility accept와 n/Esc cancel을 보존하되 Enter는 footer에 표시하지 않는다. reset/delete/tag/remote-tag/clean/set-upstream/force-push/stash/checkout/graph merge·rebase confirmation의 concrete action별 command owner를 matrix로 고정한다. shared renderPopupFooter의 전체 consumer(renderConfirmPopup, renderDivergentConfirmPopup, renderReviewPopup, renderStashMessagePopup, renderGraphStashPopPopup, renderStashPopup, renderResetModePopup, renderTargetPickPopup, renderBranchInputPopup, renderGraphSearchPopup, renderTagPopup, renderAlertPopup; 12 consumer functions)를 variant별로 명시하고 table-driven footer test로 generic q: close가 남지 않았음을 검증한다. buildConfirmationProjection의 fast-forward Enter를 f로, classifier의 fast-forward Enter/n을 reject로 변경한다. stash-pop empty alert/picker/confirmation은 별도 footer·key contract를 사용한다. fast-forward no-ff는 표시·실행하지 않는다.",
             "status": "done",
-            "dependencies": [23],
+            "dependencies": [
+              23
+            ],
             "parentTaskId": 1,
             "updatedAt": "2026-08-23T23:39:24+09:00",
             "parentId": "undefined"
@@ -309,7 +313,9 @@
             "description": "Local n을 보완하고 Remote f/p/d 표시를 제거하며 section footer와 hidden hotkey help의 정합성을 고정한다.",
             "details": "계획 문서: ~/.gstack/graphkeeper/20260823-233924-modal-hotkey-contract-plan.md Task 1.25. 기존 Local visible n: new branch 행과 dispatcher는 보존하고 Local hidden help에 같은 항목을 추가한다. Remote visible/hidden help에서 f, p, d를 제거한다. 실제 dispatcher 동작은 별도 승인 없이 삭제하지 않고 help registry 단일화 또는 parity test로 drift를 방지한다.",
             "status": "done",
-            "dependencies": [23],
+            "dependencies": [
+              23
+            ],
             "parentTaskId": 1,
             "updatedAt": "2026-08-23T23:39:24+09:00",
             "parentId": "undefined"
@@ -320,7 +326,10 @@
             "description": "modal key routing, rendering, narrow terminal과 Local/Remote hotkey 변경을 end-to-end regression matrix로 검증하고 계획·Taskmaster 계약을 동기화한다.",
             "details": "계획 문서: ~/.gstack/graphkeeper/20260823-233924-modal-hotkey-contract-plan.md Task 1.26. 실제 source test name을 먼저 열거하고 branch/tag/stash-message/graph-search/stash picker·confirm/hidden hotkey/commit inspector/checkout·cherry-pick target pick/각 confirmation action/reset picker/review/outcome/blocked/loading/operation result/fast-forward/divergent pull을 빠짐없이 선택한다. 입력 q 보존, Esc close, q no-op, action별 command non-mutation, shared renderPopupFooter 전체 consumer 12종의 variant footer와 generic q 부재, Local hidden n, Remote f/p/d 미표시와 40/60/80-column·low-height matrix를 검증한다. full/race/vet/build/gofmt/diff-check 및 final independent review CLEAN 후 상태를 갱신한다.",
             "status": "done",
-            "dependencies": [24, 25],
+            "dependencies": [
+              24,
+              25
+            ],
             "parentTaskId": 1,
             "updatedAt": "2026-08-23T23:39:24+09:00",
             "parentId": "undefined"
@@ -331,7 +340,9 @@
             "description": "Toast와 진행 overlay의 loading 상태에 반복 점선 animation을 추가해 작업이 진행 중임을 즉시 인지할 수 있게 한다.",
             "details": "Task 1.18의 공통 Toast/Progress 경계를 소비한다. loading/progress message의 정적 `Please wait.` 또는 동등한 suffix를 `.` → `..` → `...` → `.` 순서로 반복 표시한다. 각 frame은 300ms 간격으로 갱신하고, 동일 작업의 operation/request identity를 사용해 완료·실패·취소·blocked/result 상태가 되면 즉시 timer를 중단하고 정적 최종 message를 표시한다. 진행 중인 작업의 입력 잠금, overlay precedence, narrow terminal clipping, NO_COLOR 및 기존 toast/result 문구는 보존한다. 전역 layout 개편, 새로운 toast framework, 실제 작업의 비동기 lifecycle 변경은 포함하지 않는다. 테스트는 frame sequence, timer cancellation, operation mismatch late tick no-op, loading→success/failure/canceled 전환, 40/60/80 폭과 low-height renderer를 검증한다. 완료 기준: focused/race/full test, vet, build, gofmt/diff-check 및 independent review CLEAN.",
             "status": "pending",
-            "dependencies": [18],
+            "dependencies": [
+              18
+            ],
             "parentTaskId": 1,
             "parentId": "undefined"
           }
@@ -642,12 +653,165 @@
             "parentId": "undefined"
           }
         ]
+      },
+      {
+        "id": "6",
+        "title": "QA: alpha.6 artifact live TUI QA",
+        "description": "Build release artifact from current source (alpha.6 @ 4d8fcbc) and run live pty-driven QA against a synthetic fixture repo; report-only, no fixes.",
+        "details": "",
+        "testStrategy": "",
+        "status": "review",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "HIGH-1 stash entries never load (loadStashState unreachable on RepositoryRead path)",
+            "description": "S list shows '(no stash entries)' and graph has no S marker despite existing stashes. Verified on fixture (3) and real repo (1). update_lifecycle.go:103-104 early-return.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "HIGH-2 local tags never load at startup (loadLocalTagStatus only on legacy path)",
+            "description": "Tags panel asserts 'No local tags found.' and graph T markers missing until F pressed. Fixture 2 tags, real repo 6 tags. commands.go:31,111.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "HIGH-3 Commit Inspector diff cannot be scrolled",
+            "description": "800-line diff renders only lines 1-39; no scroll key works and no truncation indicator. commit_inspector_screen.go:144-151 ignores commitInspectorScroll.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "HIGH-4 '?' in Commit Inspector opens invisible overlay that swallows input",
+            "description": "Byte-identical screen after '?', next keypress consumed. commitInspectorHelp gates keys at commit_inspector.go:75-77 but screen renderer never renders it.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "MED-5 pure rename renders as whole-file addition",
+            "description": "R file1.txt -> file1-renamed.txt (100% similarity, 0 change) shows @@ -0,0 +1,3 @@ with 3 + lines. File list uses rename detection, diff loader does not.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "MED-6 changed-files list does not scroll; cursor marker vanishes",
+            "description": "60-file commit: only f01-f40 render; with selection on f60 no '>' marker visible anywhere.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "MED-7 'q' does not close the Commit Inspector",
+            "description": "Spec requires footer 'q close  Esc back  ? help'; rendered footer is 'Esc back   ? help' and q is a no-op.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "MED-8 'q' does not close the '?' hotkey overlay",
+            "description": "README: 'In an open overlay, q closes it'. q is a no-op; only esc closes.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "MED-9 '?' overlay omits documented working keys",
+            "description": "Graph missing enter/S/F, Remote missing p/d, Tags missing P/F. enter opens the Commit Inspector - the headline feature.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 10,
+            "title": "LOW-10 binary files not marked in changed-files list",
+            "description": "blob.bin renders as 'A blob.bin'; renderer supports [binary] but adapter never sets Binary/StatusBinary. Diff says 'No textual changes' vs spec 'No textual diff'.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 11,
+            "title": "LOW-11 inspector header row 1 breaks label convention",
+            "description": "Renders 'COMMIT <hash>'; spec says 'commit: <full hash>'; rows 2-4 use lowercase label: form.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 12,
+            "title": "LOW-12 'unsupported height' is raw developer text shown in a mixed state",
+            "description": "At 60x12 it appears alongside a rendered diff.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 13,
+            "title": "LOW-13 inspector width inconsistent with centered main screen",
+            "description": "Main body centers at 180/200; inspector uses full 200, so frame width jumps on open/close.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 14,
+            "title": "UNREPRODUCED-14 frame overflow to 214x59 in a 200x50 terminal",
+            "description": "Observed once during 60-file navigation; 4 further attempts at 4 keypress speeds did not reproduce. Capture kept at scratchpad qa/shots/09-overflow.txt.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-08-26T05:10:20.212Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-21T12:35:43.104Z",
-      "taskCount": 5,
+      "lastModified": "2026-08-26T05:10:20.212Z",
+      "taskCount": 6,
       "completedCount": 2,
       "tags": [
         "master"
