@@ -573,7 +573,7 @@
         "description": "터미널 색상 호환성과 밝은 배경 가독성을 수정한다.",
         "details": "3-bit·256색·truecolor 혼용 문제를 정리하고 밝은 배경에서도 상태가 읽히도록 한다.",
         "testStrategy": "",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "subtasks": [
@@ -603,7 +603,7 @@
             "title": "Commit Inspector lifecycle·QA 계약 보완",
             "description": "같은 workspace의 외부 Git 변경을 main Graph와 열린 Commit Inspector에 반영하고, 유효하지 않은 commit/file에서만 Inspector를 닫고 recovery alert를 표시한다.",
             "details": "같은 workspace의 다른 창에서 commit/reset/branch 변경이 발생하면 기존 1초 refresh cycle로 main Graph snapshot을 반영하고, 열린 Inspector는 정상 refresh마다 무조건 닫지 않는다. injected refresh는 graphReadSnapshot뿐 아니라 repoStatus, repoSnapshotLoaded, syncBrowseState, deriveStatus를 기존 loaded snapshot 성공 경로와 동일하게 갱신한다. legacy refresh는 applyRepositoryStatus/syncBrowseState/조건부 deriveStatus/loadStashState의 기존 ownership을 유지한다. 현재 commit/file identity를 재검증해 유효하면 active reader를 취소하고 commitInspectorRequest를 metadata 전후로 증가시켜 metadata와 첫 diff를 새 request로 자동 재조회한다. ChangedFile.CanonicalKey를 `(status, oldPath, path, occurrenceIndex)` length-prefixed canonical key로 보존하고 StableID miss 시 정확히 하나의 canonical match만 fallback한다. commit_not_found/file_not_found만 Inspector를 닫고 exact recovery alert를 표시하며, configuration/parse/git_exit/timeout/identity/canceled/reader는 Inspector를 유지한다. commit_not_found는 internal/git/repo_exec.go의 git.ErrCommitNotFound typed boundary와 adapter mapping으로 분류한다. refresh 자체 error/cancel은 Inspector를 보존한다. rejected refresh의 markPullStale pull-side effect는 유지하되 repository projection과 Inspector에는 영향을 주지 않는다. request/epoch/commit/parent/file/window mismatch, continuation, renderer final-output height matrix, 실제 model.Update의 Graph Enter → metadata/diff → Inspector production path를 검증한다. Commit Inspector mutation capability는 추가하지 않으며 tree-sitter grammar/combined diff/Git status reliability는 별도 후속 범위다. 완료 기준: focused/race/full test, vet, build, gofmt/diff-check, PTY smoke 및 independent review CLEAN.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 4,
             "parentId": "undefined"
