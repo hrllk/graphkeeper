@@ -809,11 +809,11 @@
             "title": "N1 (P0) 연속 +/- 그룹이 MaxLines=2000 초과 시 Inspector 영구 Loading",
             "description": "버그 2개 연쇄. (1) repo_exec.go:276 이 partial 대신 hard error 반환. (2) commit_inspector_reader_commands.go:63 가드의 result.Value.FileID != result.FileID 가 모든 어댑터 에러 결과를 폐기해 diffLoading이 영구 true. 경계 검증: 1999줄 정상 / 2001줄 정지 / 작은 hunk 4999줄 정상. AC 17 위반. T24+T25.",
             "details": "",
-            "status": "in-progress",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 6,
             "parentId": "undefined",
-            "updatedAt": "2026-08-27T02:38:48.772Z"
+            "updatedAt": "2026-08-27T03:07:21.968Z"
           },
           {
             "id": 16,
@@ -855,14 +855,25 @@
             "dependencies": [],
             "parentTaskId": 6,
             "parentId": "undefined"
+          },
+          {
+            "id": 20,
+            "title": "N5 (P1) continuation 창이 줄번호를 1부터 다시 센다",
+            "description": "activeHunkHeader(repo_exec.go:421)가 원본 hunk header를 그대로 반환하고 :351이 continuation 창 앞에 붙임. 파서는 :523에서 그 헤더로 oldLine/newLine을 초기화하므로 window 2 이후가 실제 오프셋이 아니라 헤더의 원래 시작 번호부터 셈. 관측: 내용은 1334번째 줄인데 '1 — - 1334'로 표시. spec 'parser는 window 시작에 필요한 hunk header와 old/new line cursor를 복원한 뒤 paired rows를 생성한다' 위반. T24 회귀 아님 — 기존 버그이나 T24가 continuation을 실제로 도달 가능하게 만들어 노출 범위가 크게 늘어남. 수정: 창 시작 오프셋만큼 헤더의 시작 번호를 재계산해 합성.",
+            "details": "",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "updatedAt": "2026-08-27T06:39:04.853Z",
+            "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-27T02:38:48.772Z"
+        "updatedAt": "2026-08-27T06:39:04.853Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-27T02:38:48.772Z",
+      "lastModified": "2026-08-27T06:39:04.853Z",
       "taskCount": 6,
       "completedCount": 2,
       "tags": [
