@@ -1519,7 +1519,7 @@ func TestHiddenHotkeysDocumentEverySectionKeyThatWorks(t *testing.T) {
 	}{
 		{sectionGraph, []string{"enter: open commit inspector", "m: merge", "r: rebase", "space: checkout"}},
 		{sectionCurrent, []string{"s: stash changes", "c: clean working tree", "d: delete branch"}},
-		{sectionRemote, []string{"space: checkout"}},
+		{sectionRemote, []string{"space: checkout", "d: delete remote branch"}},
 		{sectionTags, []string{"enter: jump to graph", "P: push tag", "d: delete tag", "D: delete tag on remote"}},
 	} {
 		m := model{

@@ -282,6 +282,7 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 					title: "Visible",
 					items: []hiddenHotkeyItem{
 						{key: "space", desc: "checkout"},
+						{key: "d", desc: "delete remote branch"},
 					},
 				},
 			},
