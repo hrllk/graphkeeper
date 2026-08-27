@@ -660,7 +660,7 @@
         "description": "Build release artifact from current source (alpha.6 @ 4d8fcbc) and run live pty-driven QA against a synthetic fixture repo; report-only, no fixes.",
         "details": "",
         "testStrategy": "",
-        "status": "review",
+        "status": "in-progress",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -803,14 +803,66 @@
             "dependencies": [],
             "parentTaskId": 6,
             "parentId": "undefined"
+          },
+          {
+            "id": 15,
+            "title": "N1 (P0) 연속 +/- 그룹이 MaxLines=2000 초과 시 Inspector 영구 Loading",
+            "description": "버그 2개 연쇄. (1) repo_exec.go:276 이 partial 대신 hard error 반환. (2) commit_inspector_reader_commands.go:63 가드의 result.Value.FileID != result.FileID 가 모든 어댑터 에러 결과를 폐기해 diffLoading이 영구 true. 경계 검증: 1999줄 정상 / 2001줄 정지 / 작은 hunk 4999줄 정상. AC 17 위반. T24+T25.",
+            "details": "",
+            "status": "in-progress",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-27T02:38:48.772Z"
+          },
+          {
+            "id": 16,
+            "title": "N2 (P0) merge commit의 Changed files가 빈 목록",
+            "description": "InspectCommit 파일 목록이 diff-tree 에 hash만 전달. annotateCommitDiffFiles 와 CommitDiffWindow 는 parent,commit 명시. merge는 git이 빈 출력. spec Git Semantics 표 위반, AC 8 위반. finding 05(rename)와 동일한 listing/diff 기준 불일치. T26.",
+            "details": "",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "updatedAt": "2026-08-27T02:38:47.183Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 17,
+            "title": "N3 (P2) unsupported height 가 터미널 높이 12에서 발동",
+            "description": "spec 필수 snapshot matrix가 (40,12)(60,12)(80,12)을 포함하고 임계값은 'height<12'. 렌더러가 body 높이(12→11)를 터미널 임계값 12와 비교해 한 칸 일찍 접힘. 첫 diff 행을 밀어냄. 높이 13은 정상. AC 15 위반(9조합 중 3개). T27.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 18,
+            "title": "N4 (P2) scripts/check 실패 — AC 18의 미충족 절반",
+            "description": "scripts/test 가 GOTMPDIR을 리포 안(.cache/tmp)으로 설정해 t.TempDir()이 워킹트리에 생기고 TestAdapterRejectsDirectoryWithoutRepository 가 graphkeeper 자신을 찾음. GOTMPDIR 리포 밖에서는 통과. 기존 문제이며 이 브랜치와 무관. T28.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
+          },
+          {
+            "id": 19,
+            "title": "spec Testing Plan이 지정한 테스트 파일 5개 중 1개만 존재",
+            "description": "commit_inspector_contract_test.go / state_test.go / view_test.go / stream_test.go 부재. integration_test.go(75줄)만 존재. state_test는 N1 part2를, stream_test는 N1 part1을 잡았을 파일. T30-T33.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 6,
+            "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-26T05:10:20.212Z"
+        "updatedAt": "2026-08-27T02:38:48.772Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-26T05:10:20.212Z",
+      "lastModified": "2026-08-27T02:38:48.772Z",
       "taskCount": 6,
       "completedCount": 2,
       "tags": [
