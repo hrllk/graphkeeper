@@ -9,32 +9,6 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
-func (m model) renderGlobalContent(width, height int) string {
-	if height <= 0 {
-		return ""
-	}
-	lines := make([]string, 0, height)
-	if m.branchOpen {
-		lines = append(lines, "")
-	} else if m.status.Mode == state.ModeLoading || m.status.Mode == state.ModeBlocked {
-		lines = append(lines, "")
-	} else {
-		lines = append(lines, "Mode: "+renderStatusCompact(m.status))
-	}
-	lines = append(lines, "")
-	lines = append(lines, renderSectionTitle("Actions"))
-	lines = append(lines, renderHotkeyLine("tab", "next section"))
-	lines = append(lines, renderHotkeyLine("shift+tab", "previous section"))
-	lines = append(lines, renderHotkeyLine("j/k", "move"))
-	lines = append(lines, renderHotkeyLine("f", "fetch"))
-	lines = append(lines, renderHotkeyLine("F", "fetch tags"))
-	lines = append(lines, renderHotkeyLine("S", "stash list"))
-	lines = append(lines, renderHotkeyLine("q", "quit"))
-	lines = append(lines, renderHotkeyLine("?", "show hidden hotkeys"))
-	lines = fitBlockWidth(lines, width)
-	return fitBlockLines(lines, height)
-}
-
 func (m model) renderDetailsContent(width, height int) string {
 	if height <= 0 {
 		return ""

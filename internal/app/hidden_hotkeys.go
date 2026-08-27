@@ -228,6 +228,7 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 				{
 					title: "Visible",
 					items: []hiddenHotkeyItem{
+						{key: "enter", desc: "open commit inspector"},
 						{key: "m", desc: "merge"},
 						{key: "r", desc: "rebase"},
 						{key: "space", desc: "checkout"},
@@ -293,7 +294,9 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 					title: "Visible",
 					items: []hiddenHotkeyItem{
 						{key: "enter", desc: "jump to graph"},
+						{key: "P", desc: "push tag"},
 						{key: "d", desc: "delete tag"},
+						{key: "D", desc: "delete tag on remote"},
 					},
 				},
 			},

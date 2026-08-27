@@ -1507,26 +1507,46 @@ func TestRenderAppViewUsesCenteredHeaderAndMainLayout(t *testing.T) {
 	}
 }
 
-func TestRenderGlobalContentUsesNewDigitMapping(t *testing.T) {
-	m := model{
-		repositoryState: repositoryState{
-			repoStatus: git.Status{
-				Branch: "main",
-				Head:   "abc1234",
-				Remote: "origin",
-			},
-		},
-		status: state.New().WithBrowse()}
-	got := ansi.Strip(m.renderGlobalContent(40, 14))
-	for _, want := range []string{"Mode: Browse", "Actions", "tab: next section", "shift+tab: previous section", "j/k: move", "f: fetch", "F: fetch tags", "S: stash list", "q: quit", "?: show hidden hotkeys"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("expected global hotkeys to include %q, got %q", want, got)
+// Replaces TestRenderGlobalContentUsesNewDigitMapping. That test asserted the
+// global keys were documented in renderGlobalContent, a panel production never
+// rendered: a green test guarding something the user could not see, which is how
+// f, F and S came to be documented nowhere. Where the global keys belong is still
+// open, so this asserts the section keys the ? overlay does show.
+func TestHiddenHotkeysDocumentEverySectionKeyThatWorks(t *testing.T) {
+	for _, tt := range []struct {
+		section graphSection
+		want    []string
+	}{
+		{sectionGraph, []string{"enter: open commit inspector", "m: merge", "r: rebase", "space: checkout"}},
+		{sectionCurrent, []string{"s: stash changes", "c: clean working tree", "d: delete branch"}},
+		{sectionRemote, []string{"space: checkout"}},
+		{sectionTags, []string{"enter: jump to graph", "P: push tag", "d: delete tag", "D: delete tag on remote"}},
+	} {
+		m := model{
+			navigationState: navigationState{width: 120, height: 40, activeSection: tt.section},
+			repositoryState: repositoryState{repoStatus: git.Status{Branch: "main", Head: "abc1234", Remote: "origin"}},
+			status:          state.New().WithBrowse(),
+		}
+		got := ansi.Strip(strings.Join(hiddenHotkeyContentLines(m, 60), "\n"))
+		for _, want := range tt.want {
+			if !strings.Contains(got, want) {
+				t.Fatalf("%s overlay omitted %q: %q", sectionName(tt.section), want, got)
+			}
 		}
 	}
-	for _, want := range []string{"1 graph", "2 local", "3 remote", "4 tags"} {
-		if strings.Contains(got, want) {
-			t.Fatalf("expected numeric section hotkeys to be hidden, got %q", got)
-		}
+}
+
+// p only branches on Current and Graph (key_handling_browse.go:416), so the
+// Remote overlay must not offer it. README claims otherwise; that is a README bug.
+func TestHiddenHotkeysDoNotOfferPullInRemote(t *testing.T) {
+	m := model{
+		navigationState: navigationState{width: 120, height: 40, activeSection: sectionRemote},
+		repositoryState: repositoryState{repoStatus: git.Status{Branch: "main", Head: "abc1234", Remote: "origin"}},
+		status:          state.New().WithBrowse(),
+	}
+	got := ansi.Strip(strings.Join(hiddenHotkeyContentLines(m, 60), "\n"))
+	if strings.Contains(got, "p: pull") {
+		t.Fatalf("Remote overlay offers pull, which does nothing there: %q", got)
 	}
 }
 
