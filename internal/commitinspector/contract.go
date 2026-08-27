@@ -20,6 +20,10 @@ const (
 	PartialLineLimit     PartialReason = "line_limit"
 	PartialLineTruncated PartialReason = "line_truncated"
 	PartialProcessLimit  PartialReason = "process_limit"
+	// PartialIndivisiblePair marks a window that stopped before a paired
+	// removed/added run because the run alone exceeds the budget. Splitting it
+	// would re-pair its rows across windows, so the run is deferred whole.
+	PartialIndivisiblePair PartialReason = "indivisible_pair"
 )
 
 type ChangedFileStatus string

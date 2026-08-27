@@ -19,24 +19,25 @@ type PairedRow = ci.PairedRow
 type CodeLine = ci.CodeLine
 
 const (
-	PaneIdle             = ci.PaneIdle
-	PaneLoading          = ci.PaneLoading
-	PaneReady            = ci.PaneReady
-	PanePartial          = ci.PanePartial
-	PaneError            = ci.PaneError
-	PaneCanceled         = ci.PaneCanceled
-	PartialByteLimit     = ci.PartialByteLimit
-	PartialLineLimit     = ci.PartialLineLimit
-	PartialLineTruncated = ci.PartialLineTruncated
-	PartialProcessLimit  = ci.PartialProcessLimit
-	StatusAdded          = ci.StatusAdded
-	StatusModified       = ci.StatusModified
-	StatusDeleted        = ci.StatusDeleted
-	StatusRenamed        = ci.StatusRenamed
-	StatusCopied         = ci.StatusCopied
-	StatusBinary         = ci.StatusBinary
-	StatusModeOnly       = ci.StatusModeOnly
-	StatusSubmodule      = ci.StatusSubmodule
+	PaneIdle               = ci.PaneIdle
+	PaneLoading            = ci.PaneLoading
+	PaneReady              = ci.PaneReady
+	PanePartial            = ci.PanePartial
+	PaneError              = ci.PaneError
+	PaneCanceled           = ci.PaneCanceled
+	PartialByteLimit       = ci.PartialByteLimit
+	PartialLineLimit       = ci.PartialLineLimit
+	PartialLineTruncated   = ci.PartialLineTruncated
+	PartialProcessLimit    = ci.PartialProcessLimit
+	PartialIndivisiblePair = ci.PartialIndivisiblePair
+	StatusAdded            = ci.StatusAdded
+	StatusModified         = ci.StatusModified
+	StatusDeleted          = ci.StatusDeleted
+	StatusRenamed          = ci.StatusRenamed
+	StatusCopied           = ci.StatusCopied
+	StatusBinary           = ci.StatusBinary
+	StatusModeOnly         = ci.StatusModeOnly
+	StatusSubmodule        = ci.StatusSubmodule
 )
 
 const (

@@ -304,13 +304,14 @@ func (r *Repo) CommitDiffWindow(ctx context.Context, inspection CommitInspection
 			logical++
 		}
 	}
-	if end < len(lines) && end > rawStart && isLogicalDiffLine(lines[end-1]) && (strings.HasPrefix(lines[end-1], "-") || strings.HasPrefix(lines[end-1], "+")) {
+	indivisiblePair := false
+	if end < len(lines) && end > rawStart && isLogicalDiffLine(lines[end-1]) && isDiffPairLine(lines[end-1]) {
 		groupStart := end - 1
-		for groupStart > rawStart && (strings.HasPrefix(lines[groupStart-1], "-") || strings.HasPrefix(lines[groupStart-1], "+")) {
+		for groupStart > rawStart && isDiffPairLine(lines[groupStart-1]) {
 			groupStart--
 		}
 		groupEnd := end
-		for groupEnd < len(lines) && (strings.HasPrefix(lines[groupEnd], "-") || strings.HasPrefix(lines[groupEnd], "+")) {
+		for groupEnd < len(lines) && isDiffPairLine(lines[groupEnd]) {
 			groupEnd++
 		}
 		if groupEnd > end {
@@ -319,13 +320,30 @@ func (r *Repo) CommitDiffWindow(ctx context.Context, inspection CommitInspection
 			beforeCount := logicalDiffLineCount(lines[rawStart:groupStart])
 			beforeBytes := diffPayloadBytes(lines[rawStart:groupStart])
 			if (maxLines > 0 && groupCount > maxLines) || (maxBytes > 0 && diffPayloadBytes(groupLines) > maxBytes) {
-				return CommitDiff{}, fmt.Errorf("configuration: indivisible diff pair exceeds window budget")
-			}
-			fitsRemaining := (maxLines <= 0 || beforeCount+groupCount <= maxLines) && (maxBytes <= 0 || beforeBytes+diffPayloadBytes(groupLines) <= maxBytes)
-			if fitsRemaining {
-				end = groupEnd
+				// The run alone cannot fit any window. A one-sided run — a file
+				// added or deleted whole — has no zip partner, so by the spec's
+				// pairing rules every row stands on its own and the cap may land
+				// anywhere inside it. Leave end where the cap put it and continue
+				// in the next window.
+				//
+				// A two-sided run is different: cutting between the removed lines
+				// and the added lines they pair with would turn ModifiedLine rows
+				// into separate RemovedLine and AddedLine rows across two windows.
+				// Stop before the run instead and report why.
+				if !oneSidedDiffRun(groupLines) {
+					if groupStart <= rawStart {
+						return CommitDiff{}, fmt.Errorf("configuration: indivisible diff pair exceeds window budget")
+					}
+					end, hasMore = groupStart, true
+					indivisiblePair = true
+				}
 			} else {
-				end, hasMore = groupStart, true
+				fitsRemaining := (maxLines <= 0 || beforeCount+groupCount <= maxLines) && (maxBytes <= 0 || beforeBytes+diffPayloadBytes(groupLines) <= maxBytes)
+				if fitsRemaining {
+					end = groupEnd
+				} else {
+					end, hasMore = groupStart, true
+				}
 			}
 		}
 	}
@@ -369,6 +387,9 @@ func (r *Repo) CommitDiffWindow(ctx context.Context, inspection CommitInspection
 		} else if maxBytes > 0 && diffPayloadBytes(windowLines) >= maxBytes {
 			reason = "byte_limit"
 		}
+		if indivisiblePair {
+			reason = "indivisible_pair"
+		}
 	}
 	return CommitDiff{FileID: file.ID, Lines: windowLines, Rows: rows, HasMore: hasMore, PartialReason: reason, NextStartLine: next}, nil
 }
@@ -408,6 +429,35 @@ func activeHunkHeader(lines []string, at int) string {
 	}
 	return ""
 }
+
+// isDiffPairLine reports whether a line is an added or removed diff row. The
+// "+++"/"---" file headers are excluded so they are never swept into a run.
+func isDiffPairLine(line string) bool {
+	return isLogicalDiffLine(line) && (strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-"))
+}
+
+// oneSidedDiffRun reports whether a contiguous run of diff pair lines is
+// entirely additions or entirely deletions. Such a run has no counterpart to zip
+// against, so each row is already final and the run can be split anywhere.
+func oneSidedDiffRun(lines []string) bool {
+	added, removed := false, false
+	for _, line := range lines {
+		if !isLogicalDiffLine(line) {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "+"):
+			added = true
+		case strings.HasPrefix(line, "-"):
+			removed = true
+		}
+		if added && removed {
+			return false
+		}
+	}
+	return added != removed
+}
+
 func isLogicalDiffLine(line string) bool {
 	return (strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-") || strings.HasPrefix(line, " ")) && !strings.HasPrefix(line, "+++") && !strings.HasPrefix(line, "---")
 }
