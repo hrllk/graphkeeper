@@ -29,8 +29,7 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 		fitScreenText("path: "+screenSelectedPath(selected, max(innerWidth-6, 1)), innerWidth),
 	)
 	lines = append(lines, strings.Repeat("─", innerWidth))
-	bodyHeight := max(height-6, 1)
-	lines = append(lines, screenBody(m, snapshot, selected, innerWidth, bodyHeight, height < 12)...)
+	lines = append(lines, screenBody(m, snapshot, selected, innerWidth, inspectorBodyRows(height), height < 12)...)
 	footer := "Esc back   ? help"
 	if m.commitInspectorDiffWindow.HasMore {
 		footer += "   n next"
@@ -93,8 +92,70 @@ func screenPath(path string) string {
 	return path
 }
 
-func screenBody(m model, snapshot CommitSnapshot, selected ChangedFile, width, height int, unsupported bool) []string {
-	if height < 1 {
+// inspectorBodyRows reports how many rows the Inspector body can show at the
+// given outer height, and it is the only place that math lives: the renderer
+// draws this many and the scroll keys clamp against it.
+//
+// The frame spends height-2 on content, keeps one row for the footer, and the
+// four header rows, the separator and the pane header take six more. Generating
+// more than that used to be silently truncated, which left the last rows of a
+// scrolled diff unreachable.
+func inspectorBodyRows(height int) int {
+	return max(max(height-2, 1)-7, 1)
+}
+
+// inspectorFileOffset scrolls the changed-files list only as far as needed to keep
+// the selected row on screen. Without it the selection walks off the bottom and no
+// "> " marker is rendered anywhere.
+func inspectorFileOffset(cursor, total, visible int) int {
+	if visible < 1 || total <= visible || cursor < visible {
+		return 0
+	}
+	return min(cursor-visible+1, total-visible)
+}
+
+// inspectorDiffLines assembles the diff pane's lines for the current state. The
+// renderer draws them and the scroll keys measure them, so both must agree on the
+// count; that is why this is not inlined in screenBody.
+func (m model) inspectorDiffLines(unsupported bool) []string {
+	if m.commitInspectorDiffError != "" {
+		return []string{"Diff error: " + m.commitInspectorDiffError}
+	}
+	if m.commitInspectorError != "" {
+		return []string{"Metadata error: " + m.commitInspectorError}
+	}
+	if m.commitInspectorMetadataLoading || m.commitInspectorLoading {
+		return []string{"Loading…"}
+	}
+	lines := renderInspectorDiffWindow(m.commitInspectorDiffWindow)
+	if m.commitInspectorDiffWindow.HasMore {
+		hint := "partial"
+		if m.commitInspectorDiffWindow.PartialReason != "" {
+			hint += " (" + string(m.commitInspectorDiffWindow.PartialReason) + ")"
+		}
+		lines = append([]string{hint + "; press n next"}, lines...)
+	}
+	if len(m.commitInspectorDiffWindow.Hunks) == 0 && !m.commitInspectorDiffWindow.HasMore {
+		lines = []string{"No textual changes"}
+	}
+	if unsupported {
+		lines = append([]string{"unsupported height"}, lines...)
+	}
+	if m.commitInspectorStale {
+		lines = append([]string{"Repository changed; close and reopen to refresh."}, lines...)
+	}
+	return lines
+}
+
+// maxInspectorDiffScroll is the furthest the diff pane can scroll before the last
+// line reaches the bottom of the viewport.
+func (m model) maxInspectorDiffScroll() int {
+	visible := inspectorBodyRows(m.height)
+	return max(len(m.inspectorDiffLines(m.height < 12))-visible, 0)
+}
+
+func screenBody(m model, snapshot CommitSnapshot, selected ChangedFile, width, bodyRows int, unsupported bool) []string {
+	if bodyRows < 1 {
 		return nil
 	}
 	fileRatio := 30
@@ -115,39 +176,16 @@ func screenBody(m model, snapshot CommitSnapshot, selected ChangedFile, width, h
 		}
 		fileRows = append(fileRows, prefix+screenFileLabel(file, max(fileWidth-2, 1)))
 	}
-	diffLines := renderInspectorDiffWindow(m.commitInspectorDiffWindow)
-	if m.commitInspectorDiffWindow.HasMore {
-		hint := "partial"
-		if m.commitInspectorDiffWindow.PartialReason != "" {
-			hint += " (" + string(m.commitInspectorDiffWindow.PartialReason) + ")"
-		}
-		diffLines = append([]string{hint + "; press n next"}, diffLines...)
-	}
-	if len(m.commitInspectorDiffWindow.Hunks) == 0 && !m.commitInspectorDiffWindow.HasMore {
-		diffLines = []string{"No textual changes"}
-	}
-	if unsupported {
-		diffLines = append([]string{"unsupported height"}, diffLines...)
-	}
-	if m.commitInspectorStale {
-		diffLines = append([]string{"Repository changed; close and reopen to refresh."}, diffLines...)
-	}
-	if m.commitInspectorMetadataLoading || m.commitInspectorLoading {
-		diffLines = []string{"Loading…"}
-	}
-	if m.commitInspectorError != "" {
-		diffLines = []string{"Metadata error: " + m.commitInspectorError}
-	}
-	if m.commitInspectorDiffError != "" {
-		diffLines = []string{"Diff error: " + m.commitInspectorDiffError}
-	}
-	for i := 0; i < height-1; i++ {
+	diffLines := m.inspectorDiffLines(unsupported)
+	diffOffset := min(max(m.commitInspectorScroll, 0), max(len(diffLines)-bodyRows, 0))
+	fileOffset := inspectorFileOffset(m.commitInspectorCursor, len(fileRows), bodyRows)
+	for i := 0; i < bodyRows; i++ {
 		left, right := "", ""
-		if i < len(fileRows) {
-			left = fileRows[i]
+		if fileIdx := fileOffset + i; fileIdx < len(fileRows) {
+			left = fileRows[fileIdx]
 		}
-		if i < len(diffLines) {
-			right = diffLines[i]
+		if diffIdx := diffOffset + i; diffIdx < len(diffLines) {
+			right = diffLines[diffIdx]
 		}
 		rows = append(rows, padInspectorCell(fitScreenText(left, fileWidth), fileWidth)+" │ "+fitScreenText(right, diffWidth))
 	}

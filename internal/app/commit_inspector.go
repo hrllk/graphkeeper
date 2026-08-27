@@ -12,7 +12,11 @@ import (
 	ansiutil "github.com/charmbracelet/x/ansi"
 )
 
-const inspectorDiffPage = 18
+// inspectorScrollPage is one viewport worth of diff rows, so Ctrl+U and Ctrl+D
+// page by exactly what the user can see.
+func inspectorScrollPage(height int) int {
+	return inspectorBodyRows(height)
+}
 
 func (m model) cancelInspector() model {
 	if m.commitInspectorCancel != nil {
@@ -96,12 +100,9 @@ func (m model) handleCommitInspectorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.selectInspectorFile()
 		}
 	case "ctrl+u":
-		m.commitInspectorScroll -= inspectorDiffPage
-		if m.commitInspectorScroll < 0 {
-			m.commitInspectorScroll = 0
-		}
+		m.commitInspectorScroll = max(m.commitInspectorScroll-inspectorScrollPage(m.height), 0)
 	case "ctrl+d":
-		m.commitInspectorScroll += inspectorDiffPage
+		m.commitInspectorScroll = min(m.commitInspectorScroll+inspectorScrollPage(m.height), m.maxInspectorDiffScroll())
 	}
 	return m, nil
 }
