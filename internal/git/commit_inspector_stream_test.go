@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -160,5 +161,127 @@ func TestCommitDiffWindowDefersTwoSidedRunOverLineCap(t *testing.T) {
 	}
 	if diff.PartialReason != "indivisible_pair" {
 		t.Fatalf("PartialReason = %q, want indivisible_pair", diff.PartialReason)
+	}
+}
+
+// N5 regression. A continuation window used to carry the original hunk header
+// verbatim, so the row parser reseeded its cursors from the hunk origin and every
+// window after the first renumbered from 1: a row whose content was source line
+// 1334 rendered as line 1.
+func TestResumeHunkHeaderAdvancesStartsAndCounts(t *testing.T) {
+	for _, tt := range []struct {
+		name                     string
+		header                   string
+		oldConsumed, newConsumed int
+		want                     string
+	}{
+		{"two sided", "@@ -1,1999 +1,5000 @@", 1333, 1333, "@@ -1334,666 +1334,3667 @@"},
+		{"new file", "@@ -0,0 +1,2001 @@", 0, 2000, "@@ -0,0 +2001,1 @@"},
+		{"deleted file", "@@ -1,300 +0,0 @@", 100, 0, "@@ -101,200 +0,0 @@"},
+		{"omitted counts mean one line", "@@ -5 +5 @@", 0, 0, "@@ -5,1 +5,1 @@"},
+		{"section heading preserved", "@@ -1,5 +1,5 @@ func foo()", 2, 2, "@@ -3,3 +3,3 @@ func foo()"},
+		{"consumed is clamped to the hunk", "@@ -1,5 +1,5 @@", 99, 99, "@@ -6,0 +6,0 @@"},
+		{"malformed header is left alone", "@@ not a header", 3, 3, "@@ not a header"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resumeHunkHeader(tt.header, tt.oldConsumed, tt.newConsumed); got != tt.want {
+				t.Fatalf("resumeHunkHeader(%q, %d, %d) = %q, want %q", tt.header, tt.oldConsumed, tt.newConsumed, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConsumedHunkLinesCountsPerSide(t *testing.T) {
+	lines := []string{" ctx", "-gone", "+new", " ctx", "--- a/file", "+++ b/file", "\\ No newline at end of file"}
+	oldAdvance, newAdvance := consumedHunkLines(lines)
+	if oldAdvance != 3 || newAdvance != 3 {
+		t.Fatalf("consumedHunkLines = (%d, %d), want (3, 3)", oldAdvance, newAdvance)
+	}
+}
+
+// The continuation window's rows must carry the line numbers they actually
+// resume from, not restart at the hunk origin.
+func TestCommitDiffWindowContinuationKeepsLineNumbers(t *testing.T) {
+	repo, inspection := streamFixtureRepo(t, func(dir string) {
+		writeFixtureFile(t, dir, "added.txt", numberedLines("", 250))
+		runGitFixture(t, dir, "add", "added.txt")
+		runGitFixture(t, dir, "commit", "-m", "add 250 lines")
+	})
+	file := fileByPath(t, inspection, "added.txt")
+
+	first, err := repo.CommitDiffWindow(context.Background(), inspection, file, 100, 0, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Rows[0].NewLine != 1 {
+		t.Fatalf("first window starts at new line %d, want 1", first.Rows[0].NewLine)
+	}
+	if !first.HasMore {
+		t.Fatal("expected a continuation")
+	}
+
+	second, err := repo.CommitDiffWindow(context.Background(), inspection, file, 100, first.NextStartLine, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := first.NextStartLine + 1
+	if second.Rows[0].NewLine != want {
+		t.Fatalf("continuation starts at new line %d, want %d", second.Rows[0].NewLine, want)
+	}
+	if second.Rows[0].OldLine != 0 || second.Rows[0].FromPresent {
+		t.Fatalf("an added row must have no old side: %#v", second.Rows[0])
+	}
+}
+
+// Same requirement when both cursors advance: context and removed lines move the
+// old cursor, context and added lines move the new one.
+func TestCommitDiffWindowContinuationKeepsBothCursors(t *testing.T) {
+	repo, inspection := streamFixtureRepo(t, func(dir string) {
+		var before, after strings.Builder
+		for i := 1; i <= 200; i++ {
+			fmt.Fprintf(&before, "line %d\n", i)
+			if i%2 == 0 {
+				fmt.Fprintf(&after, "CHANGED %d\n", i)
+			} else {
+				fmt.Fprintf(&after, "line %d\n", i)
+			}
+		}
+		writeFixtureFile(t, dir, "mixed.txt", before.String())
+		runGitFixture(t, dir, "add", "mixed.txt")
+		runGitFixture(t, dir, "commit", "-m", "seed mixed")
+		writeFixtureFile(t, dir, "mixed.txt", after.String())
+		runGitFixture(t, dir, "add", "mixed.txt")
+		runGitFixture(t, dir, "commit", "-m", "change every other line")
+	})
+	file := fileByPath(t, inspection, "mixed.txt")
+
+	first, err := repo.CommitDiffWindow(context.Background(), inspection, file, 60, 0, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !first.HasMore {
+		t.Skip("fixture did not produce a continuation; nothing to assert")
+	}
+	second, err := repo.CommitDiffWindow(context.Background(), inspection, file, 60, first.NextStartLine, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := second.Rows[0]
+	if row.OldLine <= 1 && row.NewLine <= 1 {
+		t.Fatalf("continuation restarted numbering: %#v", row)
+	}
+	// The content carries its own source line number, so the row must agree.
+	for _, text := range []string{row.From, row.To} {
+		if text == "" {
+			continue
+		}
+		fields := strings.Fields(text)
+		n, convErr := strconv.Atoi(fields[len(fields)-1])
+		if convErr != nil {
+			continue
+		}
+		if n != row.OldLine && n != row.NewLine {
+			t.Fatalf("row %#v does not match its own content line %d", row, n)
+		}
 	}
 }

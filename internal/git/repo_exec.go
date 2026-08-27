@@ -348,9 +348,6 @@ func (r *Repo) CommitDiffWindow(ctx context.Context, inspection CommitInspection
 		}
 	}
 	parseLines := append([]string(nil), lines[rawStart:end]...)
-	if header := activeHunkHeader(lines, rawStart); header != "" && (rawStart == len(lines) || !strings.HasPrefix(lines[rawStart], "@@")) {
-		parseLines = append([]string{header}, parseLines...)
-	}
 	rows, err := parseCommitDiffRowsStrict(parseLines)
 	if err != nil {
 		return CommitDiff{}, err
@@ -418,16 +415,58 @@ func logicalDiffLineCount(lines []string) int {
 	}
 	return n
 }
-func activeHunkHeader(lines []string, at int) string {
-	for i := at - 1; i >= 0; i-- {
-		if strings.HasPrefix(lines[i], "@@") {
-			return lines[i]
+
+// consumedHunkLines reports how far the old and new cursors advance across the
+// given hunk body lines. A context line advances both, a removal advances only
+// the old cursor, an addition only the new one.
+func consumedHunkLines(lines []string) (oldAdvance, newAdvance int) {
+	for _, line := range lines {
+		if !isLogicalDiffLine(line) {
+			continue
 		}
-		if strings.HasPrefix(lines[i], "diff ") {
-			break
+		switch {
+		case strings.HasPrefix(line, " "):
+			oldAdvance++
+			newAdvance++
+		case strings.HasPrefix(line, "-"):
+			oldAdvance++
+		case strings.HasPrefix(line, "+"):
+			newAdvance++
 		}
 	}
-	return ""
+	return oldAdvance, newAdvance
+}
+
+// resumeHunkHeader rewrites a hunk header for a continuation window so it names
+// the line numbers the window actually resumes from.
+//
+// The row parser seeds its old/new cursors from these numbers, and the header is
+// also rendered to the user, so prepending the original header makes every window
+// after the first renumber from the hunk origin: a row whose content is source
+// line 1334 shows up as line 1.
+func resumeHunkHeader(header string, oldConsumed, newConsumed int) string {
+	matches := diffHunkHeader.FindStringSubmatch(header)
+	if matches == nil {
+		return header
+	}
+	oldStart, _ := strconv.Atoi(matches[1])
+	newStart, _ := strconv.Atoi(matches[3])
+	oldCount := hunkHeaderCount(matches[2])
+	newCount := hunkHeaderCount(matches[4])
+	oldConsumed = min(max(oldConsumed, 0), oldCount)
+	newConsumed = min(max(newConsumed, 0), newCount)
+	suffix := header[len(matches[0]):]
+	return fmt.Sprintf("@@ -%d,%d +%d,%d @@%s", oldStart+oldConsumed, oldCount-oldConsumed, newStart+newConsumed, newCount-newConsumed, suffix)
+}
+
+// hunkHeaderCount reads a hunk header length field. Git omits it when the range
+// covers exactly one line.
+func hunkHeaderCount(field string) int {
+	if field == "" {
+		return 1
+	}
+	n, _ := strconv.Atoi(field)
+	return n
 }
 
 // isDiffPairLine reports whether a line is an added or removed diff row. The
@@ -951,6 +990,10 @@ func (r *Repo) gitRawLogicalWindow(ctx context.Context, maxBytes int64, startLin
 	truncated := false
 	logical := 0
 	activeHeader := ""
+	// How far the old and new cursors have advanced inside activeHeader's hunk
+	// while skipping ahead to startLine. Needed to resume the header at the line
+	// numbers the window really starts from.
+	headerOldAdvance, headerNewAdvance := 0, 0
 	var streamErr error
 	lineBuf := make([]byte, 0, 1<<20)
 	lineOverlong := false
@@ -965,14 +1008,20 @@ func (r *Repo) gitRawLogicalWindow(ctx context.Context, maxBytes int64, startLin
 		}
 		if strings.HasPrefix(text, "@@") {
 			activeHeader = text
+			headerOldAdvance, headerNewAdvance = 0, 0
 		}
 		logicalLine := isLogicalDiffLine(text)
 		if !started && logical >= max(startLine, 0) && logicalLine {
 			started = true
 			if activeHeader != "" {
-				out.WriteString(activeHeader)
+				out.WriteString(resumeHunkHeader(activeHeader, headerOldAdvance, headerNewAdvance))
 				out.WriteByte('\n')
 			}
+		}
+		if !started && logicalLine {
+			oldAdvance, newAdvance := consumedHunkLines([]string{text})
+			headerOldAdvance += oldAdvance
+			headerNewAdvance += newAdvance
 		}
 		if started && (logicalLine || strings.HasPrefix(text, "\\") || strings.HasPrefix(text, "@@")) {
 			payload := text + "\n"
