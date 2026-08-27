@@ -181,3 +181,102 @@ func TestInspectorFileOffsetScrollsOnlyAsNeeded(t *testing.T) {
 		}
 	}
 }
+
+// T9 regression, the exact shape of the original bug. Pressing ? toggled
+// commitInspectorHelp but the screen renderer never read it, so the frame came
+// back byte-identical while the modal gate silently ate the next keypress. The
+// Inspector looked frozen. Whatever the help says, the screen must change.
+func TestInspectorHelpChangesTheScreen(t *testing.T) {
+	m := scrollFixture(500, 3)
+	closed := renderCommitInspectorScreen(m, 120, 30)
+	m.commitInspectorHelp = true
+	open := renderCommitInspectorScreen(m, 120, 30)
+	if closed == open {
+		t.Fatal("? produced a byte-identical screen while swallowing input")
+	}
+	if !strings.Contains(open, "Inspector keys") {
+		t.Fatalf("help body missing: %q", open)
+	}
+	if !strings.Contains(open, "? close") {
+		t.Fatalf("footer should offer the way out: %q", open)
+	}
+}
+
+func TestInspectorHelpListsOnlyWorkingKeys(t *testing.T) {
+	m := scrollFixture(500, 3)
+	m.commitInspectorHelp = true
+	got := renderCommitInspectorScreen(m, 120, 30)
+	for _, want := range []string{"j / k", "Ctrl+U / D", "Esc", "?"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("help omitted %q: %q", want, got)
+		}
+	}
+	// q is in the spec but not wired yet (T17). A help screen that names a dead
+	// key is a fresh lie, so it must stay out until the binding lands.
+	for _, line := range m.inspectorHelpLines() {
+		if strings.Contains(line, "q ") || strings.HasPrefix(strings.TrimSpace(line), "q") {
+			t.Fatalf("help claims q works: %q", line)
+		}
+	}
+}
+
+func TestInspectorHelpMentionsContinuationOnlyWhenThereIsMore(t *testing.T) {
+	m := scrollFixture(500, 3)
+	if strings.Contains(strings.Join(m.inspectorHelpLines(), "\n"), "next part") {
+		t.Fatal("help offered n with nothing more to load")
+	}
+	m.commitInspectorDiffWindow.HasMore = true
+	if !strings.Contains(strings.Join(m.inspectorHelpLines(), "\n"), "next part") {
+		t.Fatal("help omitted n while the diff was partial")
+	}
+}
+
+// Closing the help must land back on the same view: the spec requires the
+// selected file and the scroll position to survive.
+func TestInspectorHelpTogglePreservesSelectionAndScroll(t *testing.T) {
+	m := scrollFixture(500, 60)
+	m.height = 30
+	m.commitInspectorCursor = 40
+	m.commitInspectorScroll = 120
+
+	opened, _ := m.handleCommitInspectorKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	withHelp := opened.(model)
+	if !withHelp.commitInspectorHelp {
+		t.Fatal("? did not open the help")
+	}
+	closed, _ := withHelp.handleCommitInspectorKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	back := closed.(model)
+	if back.commitInspectorHelp {
+		t.Fatal("? did not close the help")
+	}
+	if back.commitInspectorCursor != 40 || back.commitInspectorScroll != 120 {
+		t.Fatalf("toggle lost position: cursor=%d scroll=%d", back.commitInspectorCursor, back.commitInspectorScroll)
+	}
+}
+
+// Esc with the help open closes the help, not the Inspector, and the keys the
+// modal swallows must not change anything behind it.
+func TestInspectorHelpEscClosesHelpAndSwallowsQuietly(t *testing.T) {
+	m := scrollFixture(500, 60)
+	m.height = 30
+	m.commitInspectorCursor = 10
+	m.commitInspectorScroll = 50
+	m.commitInspectorHelp = true
+
+	for _, key := range []tea.KeyMsg{{Type: tea.KeyCtrlD}, {Type: tea.KeyRunes, Runes: []rune("j")}} {
+		next, _ := m.handleCommitInspectorKey(key)
+		m = next.(model)
+	}
+	if !m.commitInspectorHelp || m.commitInspectorCursor != 10 || m.commitInspectorScroll != 50 {
+		t.Fatalf("keys leaked through the help: help=%v cursor=%d scroll=%d", m.commitInspectorHelp, m.commitInspectorCursor, m.commitInspectorScroll)
+	}
+
+	afterEsc, _ := m.handleCommitInspectorKey(tea.KeyMsg{Type: tea.KeyEsc})
+	got := afterEsc.(model)
+	if got.commitInspectorHelp {
+		t.Fatal("esc did not close the help")
+	}
+	if !got.commitInspectorOpen {
+		t.Fatal("esc closed the Inspector instead of the help")
+	}
+}

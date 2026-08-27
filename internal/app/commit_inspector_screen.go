@@ -31,7 +31,9 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 	lines = append(lines, strings.Repeat("─", innerWidth))
 	lines = append(lines, screenBody(m, snapshot, selected, innerWidth, inspectorBodyRows(height), height < 12)...)
 	footer := "Esc back   ? help"
-	if m.commitInspectorDiffWindow.HasMore {
+	if m.commitInspectorHelp {
+		footer = "Esc back   ? close"
+	} else if m.commitInspectorDiffWindow.HasMore {
 		footer += "   n next"
 	}
 	for len(lines) < contentHeight-1 {
@@ -154,9 +156,44 @@ func (m model) maxInspectorDiffScroll() int {
 	return max(len(m.inspectorDiffLines(m.height < 12))-visible, 0)
 }
 
+// inspectorHelpLines is the Inspector's key contract. It lists only keys that
+// actually work: q is documented by the spec but not yet wired, and a help screen
+// that names a dead key is worse than one that stays quiet about it.
+func (m model) inspectorHelpLines() []string {
+	lines := []string{
+		"  j / k         previous or next changed file",
+		"  Ctrl+U / D    scroll the diff by one screen",
+	}
+	if m.commitInspectorDiffWindow.HasMore {
+		lines = append(lines, "  n             load the next part of this diff")
+	}
+	return append(lines,
+		"  Esc           back to the graph",
+		"  ?             close this help",
+	)
+}
+
+// screenHelpBody draws the key contract across the whole body. The header and
+// footer stay, and nothing about the selection or the scroll position is touched,
+// so closing the help returns to exactly the view it covered.
+func screenHelpBody(m model, width, bodyRows int) []string {
+	rows := make([]string, 0, bodyRows+1)
+	rows = append(rows, fitScreenText("Inspector keys", width))
+	for _, line := range m.inspectorHelpLines() {
+		rows = append(rows, fitScreenText(line, width))
+	}
+	for len(rows) < bodyRows+1 {
+		rows = append(rows, "")
+	}
+	return rows[:bodyRows+1]
+}
+
 func screenBody(m model, snapshot CommitSnapshot, selected ChangedFile, width, bodyRows int, unsupported bool) []string {
 	if bodyRows < 1 {
 		return nil
+	}
+	if m.commitInspectorHelp {
+		return screenHelpBody(m, width, bodyRows)
 	}
 	fileRatio := 30
 	if width >= 60 && width < 80 {
