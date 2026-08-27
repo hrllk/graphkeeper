@@ -176,7 +176,11 @@ func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection
 	if err != nil {
 		return CommitInspection{}, err
 	}
-	raw, err := r.gitRaw(ctx, "diff-tree", "--root", "--no-commit-id", "--name-status", "-z", "-r", "-M", "-C", hash)
+	commit := strings.TrimSpace(parts[0])
+	// The listing must use the same explicit <parent> <commit> basis as the patch.
+	// Passing the commit alone relies on Git's implicit merge diff semantics, which
+	// emit nothing for a merge commit and leave the file list empty.
+	raw, err := r.gitRaw(ctx, commitDiffTreeArgs(parent, commit, "--name-status", "-z", "-r", "-M", "-C")...)
 	if err != nil {
 		return CommitInspection{}, err
 	}
@@ -185,21 +189,31 @@ func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection
 	if email := strings.TrimSpace(parts[3]); email != "" {
 		author += " <" + email + ">"
 	}
-	r.annotateCommitDiffFiles(ctx, files, parent, strings.TrimSpace(parts[0]))
+	r.annotateCommitDiffFiles(ctx, files, parent, commit)
 	return CommitInspection{
-		Hash: strings.TrimSpace(parts[0]), Subject: sanitizeTerminalText(parts[4]), Author: sanitizeTerminalText(author),
+		Hash: commit, Subject: sanitizeTerminalText(parts[4]), Author: sanitizeTerminalText(author),
 		Message: sanitizeTerminalText(message), Parent: parent, IsRoot: parent == "", Parents: parents, Files: files,
 	}, nil
 }
 
-func (r *Repo) annotateCommitDiffFiles(ctx context.Context, files []CommitDiffFile, parent, commit string) {
-	args := []string{"diff-tree", "--root", "--no-commit-id", "--numstat", "-z", "-r"}
+// commitDiffTreeArgs builds a diff-tree invocation for one commit.
+//
+// The parent selection is the load-bearing part and the reason this is shared.
+// A root commit has no parent and relies on --root. Every other commit, merge
+// commits included, must pass <parent> <commit> explicitly: with the commit
+// alone Git falls back to its implicit merge diff semantics and emits nothing
+// for a merge, which is how the changed-files pane came to render empty.
+// Callers append their own "--" <path> arguments after this.
+func commitDiffTreeArgs(parent, commit string, mode ...string) []string {
+	args := append([]string{"diff-tree", "--root", "--no-commit-id"}, mode...)
 	if parent == "" {
-		args = append(args, commit)
-	} else {
-		args = append(args, parent, commit)
+		return append(args, commit)
 	}
-	out, err := r.gitRaw(ctx, args...)
+	return append(args, parent, commit)
+}
+
+func (r *Repo) annotateCommitDiffFiles(ctx context.Context, files []CommitDiffFile, parent, commit string) {
+	out, err := r.gitRaw(ctx, commitDiffTreeArgs(parent, commit, "--numstat", "-z", "-r")...)
 	if err != nil {
 		return
 	}
@@ -227,12 +241,7 @@ func (r *Repo) annotateCommitDiffFiles(ctx context.Context, files []CommitDiffFi
 		files[i].Additions, _ = strconv.Atoi(stat[0])
 		files[i].Deletions, _ = strconv.Atoi(stat[1])
 	}
-	summaryArgs := []string{"diff-tree", "--root", "--no-commit-id", "--summary", "-r"}
-	if parent == "" {
-		summaryArgs = append(summaryArgs, commit)
-	} else {
-		summaryArgs = append(summaryArgs, parent, commit)
-	}
+	summaryArgs := commitDiffTreeArgs(parent, commit, "--summary", "-r")
 	if summary, summaryErr := r.gitRaw(ctx, summaryArgs...); summaryErr == nil {
 		for i := range files {
 			for _, line := range strings.Split(summary, "\n") {
@@ -259,12 +268,7 @@ func (r *Repo) CommitDiffWindow(ctx context.Context, inspection CommitInspection
 	if len(inspection.Parents) > 0 {
 		parent = inspection.Parents[0]
 	}
-	args := []string{"diff-tree", "--root", "--no-commit-id", "--full-index", "--no-ext-diff", "--unified=80", "-p", "-M", "-C"}
-	if parent == "" {
-		args = append(args, inspection.Hash)
-	} else {
-		args = append(args, parent, inspection.Hash)
-	}
+	args := commitDiffTreeArgs(parent, inspection.Hash, "--full-index", "--no-ext-diff", "--unified=80", "-p", "-M", "-C")
 	args = append(args, "--", file.Path)
 	raw, truncated, err := r.gitRawLogicalWindow(ctx, int64(maxBytes), startLine, args...)
 	if err != nil {

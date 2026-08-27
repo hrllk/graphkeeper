@@ -47,6 +47,8 @@ func (m model) applyCommitInspectorResult(msg commitInspectorResultMsg) (model, 
 			m.commitInspectorLoading = false
 			if result.Error != nil {
 				m.commitInspectorError = result.Error.Message
+			} else {
+				m.commitInspectorError = "commit metadata could not be loaded"
 			}
 			return m, nil
 		}
@@ -60,7 +62,10 @@ func (m model) applyCommitInspectorResult(msg commitInspectorResultMsg) (model, 
 		return m.startInspectorDiffFromReader()
 	}
 	result := msg.Result
-	if !m.commitInspectorOpen || result.RequestID != m.commitInspectorRequest || result.RepositoryEpoch != m.commitInspectorEpoch || result.Commit != m.commitInspectorSnapshot.FullHash || result.Parent != m.commitInspectorSnapshot.Parent || result.FileID != m.currentInspectorFileID() || result.Value.FileID != result.FileID || result.Window != m.commitInspectorWindowRequest {
+	// Request identity only. The payload is checked after the state is known:
+	// every adapter error path returns a zero Value, so folding Value.FileID into
+	// this guard discarded error results and left the pane loading forever.
+	if !m.commitInspectorOpen || result.RequestID != m.commitInspectorRequest || result.RepositoryEpoch != m.commitInspectorEpoch || result.Commit != m.commitInspectorSnapshot.FullHash || result.Parent != m.commitInspectorSnapshot.Parent || result.FileID != m.currentInspectorFileID() || result.Window != m.commitInspectorWindowRequest {
 		return m, nil
 	}
 	m.commitInspectorDiffLoading = false
@@ -72,7 +77,13 @@ func (m model) applyCommitInspectorResult(msg commitInspectorResultMsg) (model, 
 	if result.State == PaneError || result.Error != nil {
 		if result.Error != nil {
 			m.commitInspectorDiffError = result.Error.Message
+		} else {
+			m.commitInspectorDiffError = "diff could not be loaded"
 		}
+		return m, nil
+	}
+	if result.Value.FileID != result.FileID {
+		m.commitInspectorDiffError = "diff response did not match the selected file"
 		return m, nil
 	}
 	m.commitInspectorDiffWindow = result.Value

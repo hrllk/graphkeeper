@@ -117,3 +117,114 @@ func TestCommitInspectorKeyToUpdateUsesFakeReader(t *testing.T) {
 		t.Fatalf("Inspector key path did not retain injected reader or command: reader=%T same=%v cmdnil=%v cursor=%d files=%d snapshot=%#v", got.inspectorReader, got.inspectorReader == fake, cmd == nil, got.commitInspectorCursor, len(got.commitInspectorSnapshot.Files), got.commitInspectorSnapshot)
 	}
 }
+
+// T25 regression. Every error path in the commit inspector adapter returns early
+// without setting result.Value, so Value.FileID is empty. The identity guard used
+// to fold Value.FileID into its request-identity check, which discarded the whole
+// result and left commitInspectorDiffLoading true forever: the pane sat on
+// "Loading…" with no error and no way out. Reproduced in the real binary by
+// opening a commit that adds a file of more than MaxLines contiguous lines.
+func TestCommitInspectorSurfacesDiffErrorWithZeroValue(t *testing.T) {
+	window := DiffWindowRequest{StartLine: 0, MaxLines: 2000, MaxBytes: 1 << 20}
+	m := model{inspectorState: inspectorState{
+		commitInspectorOpen:          true,
+		commitInspectorRequest:       4,
+		commitInspectorEpoch:         2,
+		commitInspectorLoading:       true,
+		commitInspectorDiffLoading:   true,
+		commitInspectorWindowRequest: window,
+	}}
+	m.commitInspectorSnapshot = CommitSnapshot{FullHash: "abc", Parent: "p", Files: []ChangedFile{{StableID: "f", Path: "a.go"}}}
+	msg := commitInspectorResultMsg{Result: InspectorResult[DiffWindow]{
+		State: PaneError, Commit: "abc", Parent: "p", FileID: "f", RequestID: 4, RepositoryEpoch: 2,
+		Window: window,
+		Error:  &InspectorError{Kind: "configuration", Message: "indivisible diff pair exceeds window budget"},
+	}}
+
+	updated, _ := m.applyCommitInspectorResult(msg)
+
+	if updated.commitInspectorDiffLoading || updated.commitInspectorLoading {
+		t.Fatalf("diff error left the pane loading: diff=%v meta=%v", updated.commitInspectorDiffLoading, updated.commitInspectorLoading)
+	}
+	if updated.commitInspectorDiffError != "indivisible diff pair exceeds window budget" {
+		t.Fatalf("diff error was not surfaced: %q", updated.commitInspectorDiffError)
+	}
+}
+
+// A PaneError carrying no Error value must still leave the pane, with copy the
+// user can read rather than an indefinite spinner.
+func TestCommitInspectorSurfacesDiffErrorWithoutMessage(t *testing.T) {
+	window := DiffWindowRequest{StartLine: 0, MaxLines: 2000, MaxBytes: 1 << 20}
+	m := model{inspectorState: inspectorState{
+		commitInspectorOpen:          true,
+		commitInspectorRequest:       1,
+		commitInspectorEpoch:         1,
+		commitInspectorDiffLoading:   true,
+		commitInspectorWindowRequest: window,
+	}}
+	m.commitInspectorSnapshot = CommitSnapshot{FullHash: "abc", Parent: "p", Files: []ChangedFile{{StableID: "f", Path: "a.go"}}}
+	msg := commitInspectorResultMsg{Result: InspectorResult[DiffWindow]{
+		State: PaneError, Commit: "abc", Parent: "p", FileID: "f", RequestID: 1, RepositoryEpoch: 1, Window: window,
+	}}
+
+	updated, _ := m.applyCommitInspectorResult(msg)
+
+	if updated.commitInspectorDiffLoading {
+		t.Fatal("message-less diff error left the pane loading")
+	}
+	if updated.commitInspectorDiffError == "" {
+		t.Fatal("message-less diff error produced no user-visible copy")
+	}
+}
+
+// The payload identity check still has to run for a successful result, so a
+// window for the wrong file cannot overwrite the current selection.
+func TestCommitInspectorRejectsReadyResultWithMismatchedPayload(t *testing.T) {
+	window := DiffWindowRequest{StartLine: 0, MaxLines: 2000, MaxBytes: 1 << 20}
+	m := model{inspectorState: inspectorState{
+		commitInspectorOpen:          true,
+		commitInspectorRequest:       1,
+		commitInspectorEpoch:         1,
+		commitInspectorDiffLoading:   true,
+		commitInspectorWindowRequest: window,
+	}}
+	m.commitInspectorSnapshot = CommitSnapshot{FullHash: "abc", Parent: "p", Files: []ChangedFile{{StableID: "f", Path: "a.go"}}}
+	msg := commitInspectorResultMsg{Result: InspectorResult[DiffWindow]{
+		State: PaneReady, Commit: "abc", Parent: "p", FileID: "f", RequestID: 1, RepositoryEpoch: 1, Window: window,
+		Value: DiffWindow{FileID: "other"},
+	}}
+
+	updated, _ := m.applyCommitInspectorResult(msg)
+
+	if updated.commitInspectorDiffWindow.FileID != "" {
+		t.Fatalf("mismatched payload overwrote the diff window: %#v", updated.commitInspectorDiffWindow)
+	}
+	if updated.commitInspectorDiffError == "" {
+		t.Fatal("mismatched payload was dropped silently")
+	}
+}
+
+// The metadata path has the same shape as the diff path: a PaneError carrying no
+// Error value must still produce copy the user can read, or the failure is silent
+// (commit_inspector_screen.go only renders when commitInspectorError is non-empty).
+func TestCommitInspectorSurfacesMetadataErrorWithoutMessage(t *testing.T) {
+	m := model{inspectorState: inspectorState{
+		commitInspectorOpen:            true,
+		commitInspectorRequest:         3,
+		commitInspectorEpoch:           1,
+		commitInspectorMetadataLoading: true,
+		commitInspectorLoading:         true,
+		commitInspectorRequestedCommit: "abc",
+	}}
+	metadata := InspectorResult[CommitSnapshot]{State: PaneError, Commit: "abc", RequestID: 3, RepositoryEpoch: 1}
+	msg := commitInspectorResultMsg{Metadata: &metadata}
+
+	updated, _ := m.applyCommitInspectorResult(msg)
+
+	if updated.commitInspectorMetadataLoading || updated.commitInspectorLoading {
+		t.Fatalf("metadata error left the pane loading: meta=%v load=%v", updated.commitInspectorMetadataLoading, updated.commitInspectorLoading)
+	}
+	if updated.commitInspectorError == "" {
+		t.Fatal("message-less metadata error produced no user-visible copy")
+	}
+}
