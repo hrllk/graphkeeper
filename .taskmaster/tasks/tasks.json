@@ -689,10 +689,11 @@
             "title": "HIGH-3 Commit Inspector diff cannot be scrolled",
             "description": "800-line diff renders only lines 1-39; no scroll key works and no truncation indicator. commit_inspector_screen.go:144-151 ignores commitInspectorScroll.",
             "details": "",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 6,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-27T08:58:44.604Z"
           },
           {
             "id": 4,
@@ -719,10 +720,11 @@
             "title": "MED-6 changed-files list does not scroll; cursor marker vanishes",
             "description": "60-file commit: only f01-f40 render; with selection on f60 no '>' marker visible anywhere.",
             "details": "",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 6,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-27T08:58:45.943Z"
           },
           {
             "id": 7,
@@ -829,12 +831,13 @@
           {
             "id": 17,
             "title": "N3 (P2) unsupported height 가 터미널 높이 12에서 발동",
-            "description": "spec 필수 snapshot matrix가 (40,12)(60,12)(80,12)을 포함하고 임계값은 'height<12'. 렌더러가 body 높이(12→11)를 터미널 임계값 12와 비교해 한 칸 일찍 접힘. 첫 diff 행을 밀어냄. 높이 13은 정상. AC 15 위반(9조합 중 3개). T27.",
+            "description": "spec 필수 snapshot matrix가 (40,12)(60,12)(80,12)을 포함하고 임계값은 'height<12'. 렌더러가 body 높이(12→11)를 터미널 임계값 12와 비교해 한 칸 일찍 접힘. 첫 diff 행을 밀어냄. 높이 13은 정상. AC 15 위반(9조합 중 3개). T27.\n\n[철회 2026-08-27] 측정 착오였음. tmux -y N 은 pane_height N-1 을 준다 (상태바와 무관). 앱은 m.height 를 터미널 높이 그대로 받으므로 12행 터미널에서는 height<12 가 false 이고 unsupported 가 발동하지 않는다. pane 크기를 실제로 맞춰 재측정한 결과 spec 필수 9조합 전부 통과, 프레임 치수도 정확히 일치. AC 15 는 FAIL 이 아니라 PASS. T27 불필요.",
             "details": "",
-            "status": "pending",
+            "status": "cancelled",
             "dependencies": [],
             "parentTaskId": 6,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-27T08:48:06.282Z"
           },
           {
             "id": 18,
@@ -868,12 +871,12 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-27T06:39:04.853Z"
+        "updatedAt": "2026-08-27T08:58:45.943Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-27T06:39:04.853Z",
+      "lastModified": "2026-08-27T08:58:45.943Z",
       "taskCount": 6,
       "completedCount": 2,
       "tags": [
