@@ -700,10 +700,11 @@
             "title": "HIGH-4 '?' in Commit Inspector opens invisible overlay that swallows input",
             "description": "Byte-identical screen after '?', next keypress consumed. commitInspectorHelp gates keys at commit_inspector.go:75-77 but screen renderer never renders it.",
             "details": "",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": 6,
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-08-27T09:05:41.329Z"
           },
           {
             "id": 5,
@@ -871,12 +872,12 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-08-27T08:58:45.943Z"
+        "updatedAt": "2026-08-27T09:05:41.329Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-27T08:58:45.943Z",
+      "lastModified": "2026-08-27T09:05:41.330Z",
       "taskCount": 6,
       "completedCount": 2,
       "tags": [
