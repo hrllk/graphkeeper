@@ -24,9 +24,17 @@ func renderSectionProjection(p SectionProjection, section graphSection, tagSyncA
 	items := p.Items
 	if len(items) == 0 {
 		if section == sectionTags {
-			lines := []string{fitVisibleWidth(muted.Render("No local tags found."), width)}
-			if !tagSyncAttempted {
-				lines = append(lines, fitVisibleWidth(muted.Render("Press F to sync tag provenance."), width))
+			// "No local tags found." used to print whether or not the load had run,
+			// so the headline asserted a fact the app had not established.
+			// tagSyncAttempted only gated the hint below it.
+			var lines []string
+			if tagSyncAttempted {
+				lines = []string{fitVisibleWidth(muted.Render("No local tags found."), width)}
+			} else {
+				lines = []string{
+					fitVisibleWidth(muted.Render("Tags not loaded yet."), width),
+					fitVisibleWidth(muted.Render("Press F to sync tag provenance."), width),
+				}
 			}
 			return fitBlockLines(lines, height)
 		}

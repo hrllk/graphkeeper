@@ -12,11 +12,17 @@ import (
 )
 
 type repositoryState struct {
-	repoStatus         git.Status
-	tagEntries         []git.TagEntry
-	tagSyncAttempted   bool
-	stashEntries       []git.StashEntry
-	stashByBase        map[string][]git.StashEntry
+	repoStatus       git.Status
+	tagEntries       []git.TagEntry
+	tagSyncAttempted bool
+	stashEntries     []git.StashEntry
+	stashByBase      map[string][]git.StashEntry
+	// stashLoadAttempted separates "never asked" from "asked and got nothing",
+	// and stashLoadError separates both from "asked and it failed". Without these
+	// the popup printed "(no stash entries)" for all three, so a failing
+	// `git stash list` looked exactly like a repository with no stashed work.
+	stashLoadAttempted bool
+	stashLoadError     string
 	repoSnapshotLoaded bool
 	graphReadSnapshot  graph.Snapshot
 	repositoryEpoch    uint64

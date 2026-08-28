@@ -148,6 +148,20 @@ func moveCircularCursor(cursor, delta, count int) int {
 	return cursor
 }
 
+// stashEmptyStateLines names which of the three empty states the popup is in.
+// Collapsing them into one string is what made a failing `git stash list` read
+// as "you have no stashed work".
+func stashEmptyStateLines(m model) []string {
+	switch {
+	case !m.stashLoadAttempted:
+		return []string{"Stash list not loaded yet."}
+	case m.stashLoadError != "":
+		return []string{"Stash list unavailable.", m.stashLoadError}
+	default:
+		return []string{"No stashed work."}
+	}
+}
+
 func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
@@ -165,7 +179,11 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	}
 	rows := buildStashPopupRows(m.stashEntries)
 	if len(rows) == 0 {
-		lines = append(lines, descStyle.Render("(no stash entries)"))
+		// Three different facts used to share one string. Say which one it is:
+		// the list was never loaded, loading failed, or there is nothing stashed.
+		for _, line := range stashEmptyStateLines(m) {
+			lines = append(lines, descStyle.Render(line))
+		}
 		lines = append(lines, "")
 		lines = append(lines, renderPopupFooter(popupWidth-4))
 		body := centerReviewFooterLine(strings.Join(lines, "\n"), popupWidth-4)
