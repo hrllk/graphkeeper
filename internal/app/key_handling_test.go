@@ -1375,8 +1375,11 @@ func TestGraphRebaseShortcutBlocksAncestorTarget(t *testing.T) {
 	if got.status.Mode != state.ModeBlocked {
 		t.Fatalf("expected blocked mode for ancestor target, got %s", got.status.Mode)
 	}
-	if got.status.Message != "Target already included." {
+	if got.status.Message != "Nothing to rebase." {
 		t.Fatalf("expected ancestor block message, got %q", got.status.Message)
+	}
+	if got.status.Block != state.BlockNotDiverged {
+		t.Fatalf("expected a typed reason for the ancestor block, got %q", got.status.Block)
 	}
 }
 

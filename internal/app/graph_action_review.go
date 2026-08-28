@@ -40,6 +40,14 @@ func buildGraphActionFastForwardStatus(action state.Action, target string) state
 	return status
 }
 
+// graphActionVerb names the action in user-facing copy.
+func graphActionVerb(action state.Action) string {
+	if action == state.ActionRebase {
+		return "rebase"
+	}
+	return "merge"
+}
+
 func buildGraphActionReviewDetail(action state.Action, rs git.Status, target, base string, currentOnly, targetOnly int) string {
 	subtitle := "Review before continuing."
 	switch action {

@@ -78,15 +78,20 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		msg.repo = applyRepositoryStatus(&m, msg.repo)
+		// The four states of the gate note's table. Only the last one is a merge
+		// or a rebase; the others are a no-op, a fast-forward that pull owns, or a
+		// rewrite of history this branch already has.
 		switch {
 		case msg.currentOnly == 0 && msg.targetOnly == 0:
-			m.status = state.New().WithBlocked(state.BlockUnknown, "Already aligned.", "Target already matches HEAD.")
+			m.status = state.New().WithBlocked(state.BlockNotDiverged, "Nothing to "+graphActionVerb(msg.action)+".", "Target is the commit HEAD already points at.")
 		case msg.currentOnly == 0:
+			// Not a merge, but still the only way to fast-forward a local branch to
+			// another local branch's tip: pull needs an upstream. Kept executable
+			// and named for what it is.
 			m.status = buildGraphActionFastForwardStatus(msg.action, msg.target)
 		case msg.targetOnly == 0:
-			reason := "Target already included."
-			detail := "Current branch already contains " + msg.target + ". Current: " + strconv.Itoa(msg.currentOnly) + "  Target: " + strconv.Itoa(msg.targetOnly)
-			m.status = state.New().WithBlocked(state.BlockUnknown, reason, detail)
+			m.status = state.New().WithBlocked(state.BlockNotDiverged, "Nothing to "+graphActionVerb(msg.action)+".",
+				"This branch already contains "+msg.target+". Current: "+strconv.Itoa(msg.currentOnly)+"  Target: "+strconv.Itoa(msg.targetOnly))
 		default:
 			m.status = buildGraphActionReviewStatus(msg.action, msg.repo, msg.target, msg.base, msg.currentOnly, msg.targetOnly)
 			m.status.Selected = msg.target

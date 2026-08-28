@@ -61,6 +61,9 @@ const (
 	// BlockNotLocalPointer marks a graph row that no local branch points at, which
 	// is what the merge and rebase gate actually tests.
 	BlockNotLocalPointer BlockReason = "not_local_pointer"
+	// BlockNotDiverged marks a target that shares all its history with HEAD, so a
+	// merge is a no-op and a rebase rewrites commits the branch already has.
+	BlockNotDiverged BlockReason = "not_diverged"
 )
 
 type ResetMode string
