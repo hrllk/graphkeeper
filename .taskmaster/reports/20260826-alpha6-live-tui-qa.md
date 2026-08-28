@@ -17,6 +17,53 @@
 | `go test ./...` | all packages `ok` |
 | CLI vs `docs/cli-reference.md` | conforms (`-h`/`--help`/`--version` → 0, unknown option → 2, positional → 2, help beats version, startup error → 1) |
 
+## Status as of 2026-08-28
+
+This report recorded the state on 2026-08-26 and is kept as written. What changed since,
+and two things this report got wrong.
+
+| Finding | State | Where |
+| --- | --- | --- |
+| HIGH-1 stash never loads | open | taskmaster 6.1 |
+| HIGH-2 tags never load | open | taskmaster 6.2 |
+| HIGH-3 diff cannot scroll | fixed | `9fd14f8` |
+| HIGH-4 `?` invisible overlay | fixed | `f5e48af` |
+| MED-5 rename as whole-file add | open | taskmaster 6.5 |
+| MED-6 file list does not scroll | fixed | `9fd14f8` |
+| MED-7 `q` in Inspector | open, blocked on a spec contradiction | taskmaster 6.7 |
+| MED-8 `q` in `?` overlay | open, same blocker | taskmaster 6.8 |
+| MED-9 overlay omits working keys | section keys fixed; global keys split out | `5a61948`, `dd4e8a5`, taskmaster 8 |
+| LOW-10 … LOW-13 | open | taskmaster 6.10-6.13 |
+| UNREPRODUCED-14 | still unreproduced | taskmaster 6.14 |
+
+Found after this report, during spec verification against the 19 acceptance criteria:
+
+| ID | Finding | State |
+| --- | --- | --- |
+| N1 (P0) | a contiguous +/- group over MaxLines=2000 leaves the Inspector loading forever | fixed `da4cd9c`, `4d53cf7` |
+| N2 (P0) | a merge commit shows an empty Changed files list | fixed `da4cd9c` |
+| N3 (P2) | `unsupported height` at terminal height 12 | **withdrawn — not a defect** |
+| N4 (P2) | `scripts/check` fails | open, taskmaster 6.18 |
+| N5 (P1) | continuation windows restart line numbers at 1 | fixed `b22d677` |
+
+### Two corrections to this report
+
+**N3 was my measurement error, not a defect.** On this host `tmux new-session -y N`
+produces `pane_height N-1`, so the app was driven at height 11 while the spec combos were
+being reported as height 12. Re-measured with the off-by-one corrected, all nine spec
+combos pass.
+
+**MED-9 claims Remote is missing `p` (pull). It is not.** `p` branches only on Current and
+Graph (`handleBrowseGlobalKey`); it does nothing in Remote. The overlay was right and the
+README is wrong. The MED-9 table below is left as originally written; this note is the
+correction.
+
+Of the MED-9 keys that were genuinely missing, the section-scoped ones are now listed
+(Graph `enter`, Remote `d`, Tags `P` and `D`). The rest (`S`, `F`, and eight more) are
+global keys, and putting Global in the overlay collides with three explicit statements in
+the code, tests, and README. That is tracked as its own decision in taskmaster 8.
+
+
 ## Findings
 
 ### HIGH-1 — Stash entries never load
@@ -111,7 +158,7 @@ documented contract is simply unimplemented.)
 | Section | Missing from overlay |
 | --- | --- |
 | Graph | `enter` (open Commit Inspector — the headline feature), `S` (stash list), `F` (sync tag provenance) |
-| Remote | `p` (pull), `d` (delete remote branch) |
+| Remote | ~~`p` (pull)~~ — see correction above, `d` (delete remote branch) |
 | Tags | `P` (push tag), `F` (sync tag provenance) |
 
 `F` matters most: tags do not load without it (HIGH-2), yet it is advertised only in the
