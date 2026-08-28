@@ -4,45 +4,43 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="${GOBIN:-${ROOT}/.bin}"
 GO_CACHE_DIR="${GOCACHE:-${ROOT}/.cache/go-build}"
-GO_TMP_DIR="${GOTMPDIR:-${ROOT}/.cache/tmp}"
 LINT_BIN="${BIN_DIR}/golangci-lint"
-VERSION="${GOLANGCI_LINT_VERSION:-v1.64.8}"
 
-mkdir -p "${BIN_DIR}"
-mkdir -p "${GO_CACHE_DIR}" "${GO_TMP_DIR}"
+# golangci-lint v2. .golangci.yml declares version: "2" and uses the v2
+# `formatters:` block, so a v1 binary refuses the config outright. The module
+# path carries the major version in v2.
+MODULE="github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
+VERSION="${GOLANGCI_LINT_VERSION:-v2.13.2}"
 
+# GOTMPDIR must NOT live in the repo. t.TempDir() derives from it, so a
+# repo-local value puts test scratch directories inside the working tree and any
+# test that walks up looking for .git finds graphkeeper itself. Same reason as
+# scripts/test.
+if [ -n "${GOTMPDIR:-}" ]; then
+	GO_TMP_DIR="${GOTMPDIR}"
+else
+	GO_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/graphkeeper-gotmp-XXXXXX")"
+	trap 'rm -rf "${GO_TMP_DIR}"' EXIT
+fi
+
+mkdir -p "${BIN_DIR}" "${GO_CACHE_DIR}"
+
+# No shim fallback. A previous version wrote a bash stub running only
+# `gofmt -l` + `go vet` whenever `go install` failed, and scripts/lint then
+# reported success while golangci-lint never ran at all. That stub sat in .bin
+# from 2026-07-06 to 2026-08-28 and hid the v1/v2 config break for seven weeks.
+# A lint gate that cannot lint must fail, not pass quietly.
 if [[ ! -x "${LINT_BIN}" ]]; then
-  if ! GOBIN="${BIN_DIR}" GOCACHE="${GO_CACHE_DIR}" GOTMPDIR="${GO_TMP_DIR}" go install "github.com/golangci/golangci-lint/cmd/golangci-lint@${VERSION}"; then
-cat > "${LINT_BIN}" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-if [[ "${1:-}" != "run" ]]; then
-  echo "golangci-lint shim only supports: run ./..." >&2
-  exit 1
-fi
-shift || true
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "${ROOT}"
-
-GOFILES=()
-while IFS= read -r file; do
-  GOFILES+=("${file}")
-done < <(find . -name '*.go' -not -path './.git/*' -not -path './.bin/*' -not -path './.cache/*' | sort)
-
-if [[ "${#GOFILES[@]}" -gt 0 ]]; then
-  GOFMT_OUT="$(gofmt -l "${GOFILES[@]}")"
-  if [[ -n "${GOFMT_OUT}" ]]; then
-    printf '%s\n' "${GOFMT_OUT}"
-    exit 1
-  fi
-fi
-
-go vet ./...
-EOF
-    chmod +x "${LINT_BIN}"
-  fi
+	echo "installing golangci-lint ${VERSION} into ${BIN_DIR}" >&2
+	if ! GOBIN="${BIN_DIR}" GOCACHE="${GO_CACHE_DIR}" GOTMPDIR="${GO_TMP_DIR}" \
+		go install "${MODULE}@${VERSION}"; then
+		echo "" >&2
+		echo "ERROR: could not install golangci-lint ${VERSION}." >&2
+		echo "The lint gate cannot run, so this is a hard failure rather than a pass." >&2
+		echo "Network access is required for the first run. To pin another version:" >&2
+		echo "  GOLANGCI_LINT_VERSION=vX.Y.Z ./scripts/bootstrap" >&2
+		exit 1
+	fi
 fi
 
 cd "${ROOT}"

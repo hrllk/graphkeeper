@@ -7,7 +7,10 @@ formatters:
 
   settings:
     gofumpt:
-      extra-rules: true
+      # v2 renamed extra-rules; the old key emitted a deprecation warning on
+      # every run once golangci-lint v2 actually started running.
+      extra:
+        group-params: true
     goimports:
       local-prefixes:
         - hrllk/graphkeeper
