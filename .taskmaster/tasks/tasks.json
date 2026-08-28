@@ -1460,6 +1460,54 @@
                         "dependencies": [],
                         "parentTaskId": 9,
                         "parentId": "undefined"
+                    },
+                    {
+                        "id": 43,
+                        "taskId": "L1",
+                        "title": "L1 lint baseline 백로그 — unused 49건 삭제 판단",
+                        "description": "scripts/lint 이 d82bcaf 를 baseline 으로 삼아 새 지적만 게이트한다. 그 아래 깔린 49건은 죽은 함수·타입이고, 하나하나 '미래용인가 죽은 것인가' 판단이 필요하다. 설계문서 T14(죽은 popup renderer 감사)와 상당히 겹치므로 같이 처리하는 게 낫다. 확인된 예: renderRawGraphLine, inspectorStatus, screenPath, mergeView, laneSide, inspectorLogicalLineCount, focusCherryPickTarget, cherryPickQueuePosition, graph/navigation.go sign. 전체 목록: ./scripts/lint --all",
+                        "details": "internal/app/; internal/graph/; internal/adapter/out/commitinspector/",
+                        "status": "pending",
+                        "priority": "P2",
+                        "dependencies": [],
+                        "parentTaskId": 9,
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": 44,
+                        "taskId": "L2",
+                        "title": "L2 lint baseline 백로그 — staticcheck 21건",
+                        "description": "QF1002/QF1003 6건은 if-else -> tagged switch 로, 정확성 이득 0 에 회귀 위험이 있는 churn 이라 따로 판단할 것. S1017 4건(TrimPrefix), S1002/S1003 2건은 기계적. SA 계열 7건 중 확인 결과: SA4023 x2 (view_layout.go:330,333) 는 lipgloss GetBorderTopForeground 가 NoColor{} 를 반환해 인터페이스가 non-nil 이라 항상 참인 죽은 가드 — 시각적으로 무해. SA4010 (graph_render_format.go:238) 은 pickCompactBranchName 이 remoteNames 를 채우고 안 읽는다. 코드 모양상 의도는 '로컬 없으면 remote 로 폴백' 이지만, remote 전용 커밋이 그래프에 렌더 자체가 안 돼서 증상 재현 불가 — 잠재적. 고칠 때 그래프 커밋 선택 범위와 함께 판단할 것.",
+                        "details": "internal/app/view_layout.go; internal/app/graph_render_format.go; internal/app/",
+                        "status": "pending",
+                        "priority": "P3",
+                        "dependencies": [],
+                        "parentTaskId": 9,
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": 45,
+                        "taskId": "L3",
+                        "title": "L3 lint baseline 백로그 — errcheck 2건 (쓰기 경로)",
+                        "description": "telemetry.go:66 과 internal/telemetry/telemetry.go:41 의 defer file.Close(). 쓰기 경로라 Close 실패 시 버퍼된 이벤트 줄이 유실될 수 있다. _ = file.Close() 로 덮는 것은 증상 은폐이고, 제대로 하려면 named return 이나 명시적 Close 후 오류 전파가 필요하다. 판단 필요.",
+                        "details": "internal/adapter/out/telemetry/telemetry.go; internal/telemetry/telemetry.go",
+                        "status": "pending",
+                        "priority": "P3",
+                        "dependencies": [],
+                        "parentTaskId": 9,
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": 46,
+                        "taskId": "L4",
+                        "title": "L4 gofumpt 재도입 여부 — 도구 버그 추적",
+                        "description": "golangci-lint v2.13.2 의 gofumpt run 검사가 fmt 이 바꿀 게 없는 파일을 지적한다 (110개 중 41개가 0줄 diff, 69개를 다 적용해도 93건 잔존). 그래서 gofumpt 를 제거했다. 상류에서 고쳐지면 재도입 검토. 현재 기준은 gofmt-clean(0건) 유지.",
+                        "details": ".golangci.yml",
+                        "status": "pending",
+                        "priority": "P3",
+                        "dependencies": [],
+                        "parentTaskId": 9,
+                        "parentId": "undefined"
                     }
                 ]
             }

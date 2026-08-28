@@ -4,14 +4,41 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="${GOBIN:-${ROOT}/.bin}"
 GO_CACHE_DIR="${GOCACHE:-${ROOT}/.cache/go-build}"
-GO_TMP_DIR="${GOTMPDIR:-${ROOT}/.cache/tmp}"
 LINT_BIN="${BIN_DIR}/golangci-lint"
 
-mkdir -p "${GO_CACHE_DIR}" "${GO_TMP_DIR}"
+# See scripts/test for why GOTMPDIR must not be repo-local.
+if [ -n "${GOTMPDIR:-}" ]; then
+	GO_TMP_DIR="${GOTMPDIR}"
+else
+	GO_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/graphkeeper-gotmp-XXXXXX")"
+	trap 'rm -rf "${GO_TMP_DIR}"' EXIT
+fi
+mkdir -p "${GO_CACHE_DIR}"
 
 if [[ ! -x "${LINT_BIN}" ]]; then
-  "${ROOT}/scripts/bootstrap"
+	"${ROOT}/scripts/bootstrap"
 fi
 
+# Baseline. Enabling real golangci-lint on 2026-08-28 surfaced 77 pre-existing
+# findings (49 unused, 21 staticcheck, 3 ineffassign, 2 errcheck, 2 govet). None
+# is a verified correctness bug; the suspicious ones were checked by hand. Rather
+# than hold user-facing work behind 49 dead-code deletion decisions, the gate
+# reports only what is NEW since this revision.
+#
+# This is deliberately NOT a permanent exemption. The backlog is tracked as its
+# own task. The difference from the shim this replaced is that a baseline is
+# visible in version control and cannot silently widen: anything introduced after
+# LINT_BASELINE_REV fails the gate.
+#
+# ./scripts/lint --all  shows every finding including the baseline.
+LINT_BASELINE_REV="${LINT_BASELINE_REV:-d82bcaf847c6760ad848d66a5c1f11b9152de0ed}"
+
 cd "${ROOT}"
-GOCACHE="${GO_CACHE_DIR}" GOTMPDIR="${GO_TMP_DIR}" "${LINT_BIN}" run ./...
+if [[ "${1:-}" == "--all" ]]; then
+	exec env GOCACHE="${GO_CACHE_DIR}" GOTMPDIR="${GO_TMP_DIR}" \
+		"${LINT_BIN}" run --max-same-issues=0 --max-issues-per-linter=0 ./...
+fi
+
+GOCACHE="${GO_CACHE_DIR}" GOTMPDIR="${GO_TMP_DIR}" \
+	"${LINT_BIN}" run --new-from-rev="${LINT_BASELINE_REV}" --whole-files \
+	--max-same-issues=0 --max-issues-per-linter=0 ./...
