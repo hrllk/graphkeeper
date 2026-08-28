@@ -1,0 +1,37 @@
+{
+  "date": "2026-08-28",
+  "window": "3d",
+  "scope": "origin/main..chore/qa-alpha6-triage (18 commits, not yet merged to main)",
+  "metrics": {
+    "commits": 18,
+    "contributors": 1,
+    "prs_merged": 0,
+    "insertions": 3544,
+    "deletions": 1196,
+    "net_loc": 2348,
+    "test_loc": 1012,
+    "production_loc": 351,
+    "docs_task_loc": 2181,
+    "test_ratio": 0.74,
+    "active_days": 3,
+    "sessions": 5,
+    "deep_sessions": 0,
+    "avg_session_minutes": 19,
+    "fix_pct": 0.50,
+    "chore_pct": 0.44,
+    "docs_pct": 0.06,
+    "peak_hour": 18,
+    "ai_assisted_commits": 17
+  },
+  "authors": {
+    "hrllk": { "commits": 18, "insertions": 3544, "deletions": 1196, "test_ratio": 0.74, "top_area": "internal/app/" }
+  },
+  "streak_days": 4,
+  "test_health": {
+    "total_test_files": 66,
+    "test_files_changed": 10,
+    "regression_test_commits": 18
+  },
+  "backlog": { "total_open_taskmaster": 24, "todos_md_open": 5 },
+  "tweetable": "3 days on the alpha.6 QA branch: 18 commits, 9 user-facing fixes, +351 production LOC against +1012 test LOC. Every fix proved RED first. Streak: 4d"
+}
