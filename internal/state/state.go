@@ -58,6 +58,9 @@ const (
 	BlockDirtyTree     BlockReason = "dirty_worktree"
 	BlockUnknown       BlockReason = "unknown"
 	BlockStaleSnapshot BlockReason = "stale_snapshot"
+	// BlockNotLocalPointer marks a graph row that no local branch points at, which
+	// is what the merge and rebase gate actually tests.
+	BlockNotLocalPointer BlockReason = "not_local_pointer"
 )
 
 type ResetMode string

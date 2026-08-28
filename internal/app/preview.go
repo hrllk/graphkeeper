@@ -29,7 +29,7 @@ func buildMergePreview(target string, rs git.Status, currentOnly, targetOnly int
 	case targetOnly == 0:
 		return state.New().WithOutcome(state.ActionMerge, "Target already included.", "Current branch already contains "+target+". "+countDetail(currentOnly, targetOnly), true)
 	default:
-		return state.New().WithOutcome(state.ActionMerge, "Fast-forward unavailable.", "HEAD "+shorten(rs.Head, 12)+" and target "+target+" have diverged. "+countDetail(currentOnly, targetOnly), true)
+		return state.New().WithOutcome(state.ActionMerge, "Merge target into HEAD.", "HEAD "+shorten(rs.Head, 12)+" and target "+target+" have diverged, so a merge commit is created. "+countDetail(currentOnly, targetOnly), true)
 	}
 }
 

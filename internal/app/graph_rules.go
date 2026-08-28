@@ -30,10 +30,13 @@ func isLocalGraphPointer(rs git.Status, cursor int, laneCursor int) bool {
 			if dec == "" || strings.HasPrefix(dec, "origin/") || strings.HasPrefix(dec, "tag: ") {
 				continue
 			}
-			if !strings.Contains(dec, "/") {
-				if _, ok := localSet[dec]; ok {
-					return true
-				}
+			if _, ok := localSet[dec]; ok {
+				return true
+			}
+			// Local branch names are not always loaded. Without the inventory the
+			// only thing left to go on is the shape of the decoration, and
+			// remote refs and tags were already skipped above.
+			if !rs.LocalBranchesKnown {
 				return true
 			}
 		}

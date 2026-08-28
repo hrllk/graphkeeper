@@ -259,7 +259,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "m":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
-			m.status = state.New().WithBlocked(state.BlockUnknown, "Merge unavailable.", "Select a local branch.")
+			m.status = state.New().WithBlocked(state.BlockNotLocalPointer, "Merge unavailable.", "Select a commit a local branch points at.")
 			return m, nil
 		}
 		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
@@ -270,7 +270,7 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, checkGraphActionTarget(m.repo, state.ActionMerge, focus.Hash, m.repoStatus)
 	case "r":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
-			m.status = state.New().WithBlocked(state.BlockUnknown, "Rebase unavailable.", "Select a local branch.")
+			m.status = state.New().WithBlocked(state.BlockNotLocalPointer, "Rebase unavailable.", "Select a commit a local branch points at.")
 			return m, nil
 		}
 		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
