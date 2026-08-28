@@ -155,3 +155,25 @@ Graph 섹션의 `merge` / `rebase` 는 다음 조건을 모두 만족할 때만 
 즉, 실질 조건은 `currentOnly > 0 && targetOnly > 0` 이다.
 
 이 기준으로 바꾸면, fast-forward 나 이미 포함된 커밋을 잘못 활성화하는 일을 줄일 수 있다.
+
+## 구현 결과 (2026-08-28)
+
+이 노트대로 구현했다. 단 fast-forward 한 곳은 의도적으로 따르지 않았다.
+
+| 상태 | 노트 | 구현 |
+| --- | --- | --- |
+| `currentOnly == 0 && targetOnly == 0` | 비활성 | 차단 — "Nothing to merge/rebase." |
+| `currentOnly == 0 && targetOnly > 0` | 비활성 유지 권장, pull 로 | **실행 유지** — "Fast-forward available." |
+| `currentOnly > 0 && targetOnly == 0` | 비활성 | 차단 — "This branch already contains ..." |
+| `currentOnly > 0 && targetOnly > 0` | 활성 | 활성 — 기존 review 그래프 |
+
+fast-forward 를 남긴 이유: 노트가 대안으로 지목한 `pull` 은 upstream 을 요구한다.
+로컬 브랜치를 다른 **로컬** 브랜치의 tip 으로 fast-forward 하는 것은 pull 이 못 한다.
+지금 확인창의 `f` 가 그 유일한 경로이고, 막으면 기능이 옮겨가는 게 아니라 사라진다.
+확인창은 이미 스스로를 merge 가 아니라 "Fast-forward available." 로 부르고 있어서,
+노트가 우려한 "merge 로 오인시키는" 문제는 해당되지 않는다.
+
+구현 위치가 두 곳이라는 점이 중요하다. 같은 네 상태를 `buildActionPreview`
+(target picker) 와 `graphActionCheckMsg` 핸들러 (graph 의 `m`/`r`) 가 각각
+분류한다. 둘이 어긋나면 같은 대상에 대해 두 경로가 다르게 동작한다.
+양쪽 테스트 파일에 이 사실을 적어 두었다.
