@@ -43,3 +43,14 @@
       면이고 `DESIGN.md`가 지배한다. 계획에는 "사용자 대면 문구로 바꿔라"까지만
       있고 어떤 문구인지는 없다. 구현 중에 정하면 `DESIGN.md`와 어그러진다.
       (/plan-eng-review D20에서 A를 고른 대가로 남긴 알림)
+
+- [ ] `hrk-main-design-20260826-145518.md`의 Success Criteria가 excluded tag/stash
+      단언을 "**gone**, not inverted — deleted"라고 쓰는데, 같은 문서의 T7은
+      "invert", T15는 "delete once the dual path is gone"이다. T7 → T15 순서로
+      읽으면 말이 되지만 Success Criteria 문장이 과장돼 있다.
+
+      위험: T7을 집는 사람이 Success Criteria를 먼저 읽으면 단언을 지금 지워버리고,
+      그러면 Phase 3 전까지 듀얼 패스를 지키는 가드가 사라진다.
+
+      고치는 법: Success Criteria를 "T7이 반전하고, 듀얼 패스가 사라지는 T15에서
+      삭제한다"로 바꾼다. 발견: 2026-08-28 /plan-ceo-review (HOLD SCOPE).
