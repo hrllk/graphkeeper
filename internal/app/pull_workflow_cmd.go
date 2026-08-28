@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 

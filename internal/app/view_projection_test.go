@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/graph"
 	"hrllk/graphkeeper/internal/state"

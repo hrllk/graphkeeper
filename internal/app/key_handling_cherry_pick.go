@@ -1,8 +1,10 @@
 package app
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	tea "github.com/charmbracelet/bubbletea"
 
-import "hrllk/graphkeeper/internal/state"
+	"hrllk/graphkeeper/internal/state"
+)
 
 func (m model) handleCherryPickPickKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
