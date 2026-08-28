@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "feature",
         "description": "Graph에서 커밋 전체 메시지와 diff를 빠르게 inspect하는 흐름을 추가한다.",
         "details": "Reddit 피드백 중 커밋 상세 정보 부족 문제를 해결한다.",
@@ -350,7 +350,7 @@
         "updatedAt": "2026-08-23T23:39:24+09:00"
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "refactor",
         "description": "CLI 진입점과 애플리케이션 내부 구조를 현대적인 경계로 점진 개선한다.",
         "details": "--help, --version, 잘못된 옵션 및 저장소 밖 실행을 일관되게 처리한 기반 위에 runtime state, screen state, workflow orchestration, Git adapter, renderer projection 경계를 단계적으로 정리한다. 구조개선 계획은 ~/.gstack/graphkeeper/20260731-0003-modern-architecture-boundary-improvement-plan.md를 따른다. T1 baseline과 T2 snapshot/operation epoch 계약을 먼저 완료하고, refresh 순서 역전과 파괴적 Git 작업의 stale target을 방지한다.",
@@ -557,7 +557,7 @@
         "updatedAt": "2026-08-21T09:03:22.911Z"
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "security",
         "description": "로컬 로그의 개인정보·권한·비활성화 정책을 정비한다.",
         "details": "현재 0644 로그 파일 생성, 로그 비활성화 부재, 전용 테스트 부재를 해결한다.",
@@ -579,7 +579,7 @@
         ]
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "fix",
         "description": "터미널 색상 호환성과 밝은 배경 가독성을 수정한다.",
         "details": "3-bit·256색·truecolor 혼용 문제를 정리하고 밝은 배경에서도 상태가 읽히도록 한다.",
@@ -623,7 +623,7 @@
         "updatedAt": "2026-08-25T12:00:00+09:00"
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "chore",
         "description": "GitHub Release와 Linux 배포 검증을 정비한다.",
         "details": "Release 자동화, Linux 실제 실행 검증, scripts/eval·doctor·hooks 지침 정합성을 처리한다.",
@@ -655,7 +655,7 @@
         ]
       },
       {
-        "id": 6,
+        "id": "6",
         "title": "QA: alpha.6 artifact live TUI QA",
         "description": "Build release artifact from current source (alpha.6 @ 4d8fcbc) and run live pty-driven QA against a synthetic fixture repo; report-only, no fixes.",
         "details": "",
@@ -875,28 +875,78 @@
         "updatedAt": "2026-08-27T09:05:41.329Z"
       },
       {
-        "id": 7,
+        "id": "7",
         "title": "Graph merge/rebase 차단 팝업의 문구·판정·사유를 gate note 기준으로 정리",
         "description": "docs/20260701-0005-feature-graph-section-merge-rebase-gate-note.md 가 규정한 기준과 현재 구현이 어긋난다. 근거 4건.\n\n(1) 가장 정당한 케이스에 가장 부정적인 문구가 붙는다. preview.go:32 — currentOnly>0 && targetOnly>0 은 gate note 가 '진짜 merge 가 필요한 유일한 분기 상태'로 규정한 케이스인데 headline 이 'Fast-forward unavailable.' 이다. 못 하는 것을 말하고 할 것을 말하지 않는다. 같은 조건의 rebase 는 preview.go:42 에서 'Rebase onto target.' 으로 행동을 말한다. 두 경로가 불일치.\n\n(2) gate note 의 결론이 구현되지 않았다. 문서는 merge/rebase 활성 조건을 currentOnly>0 && targetOnly>0 으로 재정의하라고 결론내지만, 실제 gate 는 key_handling_browse.go:261 의 isLocalGraphPointer 뿐이다. buildMergePreview/buildRebasePreview 의 네 갈래가 모두 WithOutcome(..., true) 로 진행 가능을 반환하므로 fast-forward 가능 대상과 이미 포함된 대상도 merge/rebase 를 제안한다. 문서 표에서는 둘 다 '비활성 유지 권장'.\n\n(3) 타입 있는 차단 사유를 버린다. internal/state/state.go:50-60 에 BlockReason 11종이 있는데 internal/app 의 98개 차단 지점 중 48개가 BlockUnknown 이다. BlockDiverged 는 딱 1번 쓰인다. merge/rebase gate(key_handling_browse.go:262)도 BlockUnknown 이라, UI 가 사유별로 다른 다음 행동을 제안할 수 없다.\n\n(4) 안내 문구가 실제 조건과 다르다. key_handling_browse.go:262 는 'Select a local branch.' 라고 하지만 gate note 기준의 실제 요구는 'HEAD 와 분기된 대상' 이다. local 브랜치를 골라도 fast-forward 가능하면 merge 는 의미가 없다.\n\n작업 범위: gate note 의 4행 표를 판정의 단일 출처로 삼고, 네 상태별 headline/detail/proceedable/BlockReason 을 정한다. fast-forward 계열은 문서 권고대로 pull 로 보낸다. 실기 검증 필요 — 픽스처에 hotfix/ff-able(FF 가능)과 origin 보다 뒤진 main 이 이미 있다.",
         "details": "",
         "testStrategy": "",
-        "status": "pending",
+        "status": "review",
         "dependencies": [],
         "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "[완료] 슬래시 포함 브랜치명에서 merge/rebase 게이트가 차단하던 문제",
+            "description": "isLocalGraphPointer 의 strings.Contains(dec,\"/\") 검사가 origin/ 필터와 중복이면서 feature/*, hotfix/*, fix/* 로컬 브랜치를 전부 배제했다. localSet 조회를 실제 판정으로 만들고 inventory 미로드 시 permissive fallback. 테스트 6건 신설(기존 0건). 커밋 6175364.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 7,
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "[완료] 분기 merge headline 과 게이트 알림 문구",
+            "description": "preview.go 분기 케이스가 'Fast-forward unavailable.' → 'Merge target into HEAD.'. 게이트 알림이 'Select a local branch.' → 'Select a commit a local branch points at.' + BlockNotLocalPointer 신설. 커밋 6175364.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 7,
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "[미결] gate note 결론대로 활성 조건을 분기 상태로 좁힐지",
+            "description": "문서는 merge/rebase 활성 조건을 currentOnly>0 && targetOnly>0 으로 재정의하라고 결론내며, fast-forward 계열은 pull 로, 이미 포함된 대상은 비활성으로 보내라고 한다. 현재 buildMergePreview/buildRebasePreview 는 네 갈래 모두 CanExecute=true. 이 변경은 사용자 능력을 제거하므로 결정 필요.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 7,
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "[미결] gate note 가 현행 isLocalGraphPointer 를 잘못 기술함",
+            "description": "문서는 'local lane 이 이어진 그래프 경로 위의 커밋'도 local 로 본다고 적었으나, 코드는 row.Graph != \"\" 인 graph 행에서 그 행의 decoration 만 본다. lane 판정(row.Before[laneCursor].Side)은 row.Graph == \"\" 인 연결선 행에서만 돈다. 문서가 후속 수정의 근거이므로 정정 필요.",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 7,
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-08-28T00:50:42.378Z"
+      },
+      {
+        "id": "8",
+        "title": "동작하는 전역 키 10개가 푸터에도 오버레이에도 없다 — 설계 결정 필요",
+        "description": "증상: 1/2/3/4(섹션 점프), shift+tab, h/l, gg, G, H, f(fetch), F(fetch tags), S(stash list), P(push, Tags 에서는 태그 push) 가 모두 handleBrowseGlobalKey(key_handling_browse.go:57-198) 에서 동작하지만 사용자가 볼 수 있는 곳이 없다.\n\n현재 두 면의 용량:\n- 메인 푸터: globalHotkeyItems() 5개뿐 (tab, k/j, q, ?, ctrl+u/d)\n- ? 오버레이: 활성 섹션 하나만 렌더. Global 섹션은 존재하지만 절대 안 보임.\n\n왜 단순 추가로 못 끝내는가. Global 을 오버레이에 넣는 것은 세 곳에 잠긴 결정을 위반한다.\n  1. internal/app/hidden_hotkeys_test.go:55-58 — 네 섹션 케이스 전부가 'Global' 과 'Moved out:' 을 hide 목록에 넣어 단언\n  2. TestGlobalHotkeyItemsAreMainFooterSource — globalHotkeyItems() 가 메인 푸터의 출처임을 단언\n  3. README '## Keyboard' — 'Global core keys are shown in the main footer; active-section actions are available through the section-aware ? overlay, not as persistent panels'\n따라서 문서화된 설계 아래에서 불완전한 면은 오버레이가 아니라 푸터다. 그런데 80칼럼 푸터에 15개 키는 들어가지 않는다.\n\n즉 이건 배치 문제가 아니라 설계 변경이며, README 와 위 두 테스트를 함께 고쳐야 한다.\n\n선택지(아직 미결):\n  (a) 오버레이가 Global + 활성 섹션을 함께 렌더. visibleHiddenHotkeySections 가 이미 capacity 2 로 잡혀 있어 원래 의도였을 수 있으나, 명시적 진술 셋을 뒤집을 증거는 아니다. README 와 테스트 2건 수정 필요.\n  (b) 푸터를 폭에 따라 축약/확장. 80칼럼에서 무엇을 버릴지 규칙이 필요.\n  (c) ? 오버레이에 Global 전용 페이지를 두고 섹션 페이지와 전환.\n  (d) 현행 유지하고 전역 키는 README 에서만 문서화 — 앱 안에서는 발견 불가를 수용.\n\n배경: renderGlobalContent 가 f/F/S 를 나열하던 유일한 곳이었는데 프로덕션이 렌더하지 않는 죽은 패널이었고 5a61948 에서 제거했다. 그 패널의 테스트는 계속 초록이어서 아무도 눈치채지 못했다. 즉 이 공백은 그 패널이 렌더를 멈춘 시점부터 존재했다.\n\n검증 방법: 각 섹션에서 ? 를 누르고 위 10개 키가 보이는지 확인. 현재는 어느 섹션에서도 안 보인다.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
         "subtasks": []
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-27T09:05:41.330Z",
-      "taskCount": 6,
+      "lastModified": "2026-08-28T00:50:42.378Z",
+      "taskCount": 8,
       "completedCount": 2,
       "tags": [
         "master"
-      ],
-      "created": "2026-08-27T09:19:47.838Z",
-      "description": "Tasks for master context",
-      "updated": "2026-08-27T09:19:47.840Z"
+      ]
     }
   }
 }
