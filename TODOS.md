@@ -5,14 +5,19 @@
 
 - [ ] 실제 Tree-sitter grammar/query bundle과 언어별 라이선스·artifact 크기 정책을
       별도 dependency slice로 결정한다.
+      선행 결정 필요: syntax highlighting 자체가 아직 제품 범위에 없고 `go.mod`에
+      관련 의존성도 없다. highlighting을 도입할지 먼저 정한 뒤에 착수한다.
 - [ ] merge commit parent selector와 combined diff를 first-parent MVP 이후의 별도
       history-inspection 확장으로 설계한다.
 
-- [ ] Git 상태 필드별 조회 오류를 보존하고 `No remote`/`No upstream` 오인 표시를
-      막는 상태 신뢰도 정책을 head, upstream, remote, worktree에 대해 설계한다.
-      현재 `internal/git/repo.go`는 이 네 필드의 조회 오류를 개별적으로 무시하므로,
-      명령 실패와 실제 설정 부재를 구분할 수 없다. 저장소 상태 계약과 파싱 테스트를
-      먼저 정의한 뒤 구현한다.
+- [ ] `git.Status`의 남은 오류 무시 지점을 정리한다. (2026-08-28 재확인)
+      head/upstream/remote 조회 오류는 이미 `TrackingError`/`TrackingFresh`로
+      전파된다. 남은 문제는 다음 네 곳이다.
+      - `noRemote`가 `remote == ""`만 보고 `remoteErr`를 무시하므로 `git remote`
+        실패가 `No remote`로 오인 표시된다.
+      - `worktreeDirty, _ :=` 실패 시 dirty 상태가 clean으로 표시된다.
+      - `remoteBranches, _ :=`와 `lastFetchAt, _ :=`도 오류를 버린다.
+      저장소 상태 계약과 파싱 테스트를 먼저 정의한 뒤 구현한다.
 
       범위 축소 (2026-08-26, /plan-eng-review): tag와 stash 부분은
       `hrk-main-design-20260826-145518.md` 작업에서 닫는다. 그 작업이 `TagsKnown`/

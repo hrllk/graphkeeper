@@ -9,7 +9,7 @@
         "testStrategy": "",
         "status": "in-progress",
         "dependencies": [],
-        "priority": "high",
+        "priority": "medium",
         "subtasks": [
           {
             "id": 1,
@@ -188,14 +188,15 @@
             "id": 15,
             "title": "Working Tree Inspector",
             "description": "Graph의 dirty 상태에서 현재 working tree 변경을 확인하고 일부 또는 전체 파일을 선택해 commit할 수 있는 Inspector를 추가한다.",
-            "details": "Commit Inspector와 동일한 bordered Inspector frame, 고정 header, 변경 파일 목록, unified diff, commit message footer를 공유하되 Working Tree 전용 mode로 분리한다. Graph에서 w로 진입하며 branch와 dirty 상태를 표시한다. 파일 선택 후 Space로 개별 staged 상태를 토글하고 a로 전체 staged 상태를 토글한다. staged 파일을 대상으로 commit message를 입력해 일부 파일 또는 전체 파일을 commit한다. commit 진행 중에는 입력을 잠그고, 성공하면 Working Tree Inspector를 유지한 채 파일 목록과 dirty 상태를 갱신한다. 일부 파일이 남으면 계속 탐색할 수 있고, 전체가 clean이면 clean 상태를 표시한다. q로 종료하면 최신 repository snapshot으로 Graph를 갱신하고 새로 생성된 commit이 있으면 해당 commit에 cursor를 맞추며, commit이 없으면 기존 Graph cursor와 scroll을 복원한다. commit 실패 시 화면과 입력 내용을 유지하고 재시도할 수 있어야 한다. staging/editing/commit action은 Commit Inspector에 섞지 않고 이 subtask 범위에서만 제공한다.",
-            "status": "pending",
+            "details": "Commit Inspector와 동일한 bordered Inspector frame, 고정 header, 변경 파일 목록, unified diff, commit message footer를 공유하되 Working Tree 전용 mode로 분리한다. Graph에서 w로 진입하며 branch와 dirty 상태를 표시한다. 파일 선택 후 Space로 개별 staged 상태를 토글하고 a로 전체 staged 상태를 토글한다. staged 파일을 대상으로 commit message를 입력해 일부 파일 또는 전체 파일을 commit한다. commit 진행 중에는 입력을 잠그고, 성공하면 Working Tree Inspector를 유지한 채 파일 목록과 dirty 상태를 갱신한다. 일부 파일이 남으면 계속 탐색할 수 있고, 전체가 clean이면 clean 상태를 표시한다. q로 종료하면 최신 repository snapshot으로 Graph를 갱신하고 새로 생성된 commit이 있으면 해당 commit에 cursor를 맞추며, commit이 없으면 기존 Graph cursor와 scroll을 복원한다. commit 실패 시 화면과 입력 내용을 유지하고 재시도할 수 있어야 한다. staging/editing/commit action은 Commit Inspector에 섞지 않고 이 subtask 범위에서만 제공한다.\n\n[2026-08-28 review] 보류. README가 file staging과 commit authoring을 'not trying to replace lazygit'과 'intentionally out of scope: a full file-level Git workflow'로 명시하고 있어, 이 subtask의 staging 토글·commit message·commit 실행은 현재 선언된 제품 경계와 충돌한다. 재개 조건: (a) README 제품 경계를 개정해 file-level workflow를 범위에 포함시키거나, (b) staging/commit을 제외한 read-only working tree diff viewer로 범위를 재정의한다. 둘 중 하나를 결정하기 전에는 착수하지 않는다.",
+            "status": "deferred",
             "dependencies": [
               1
             ],
             "parentTaskId": "1",
             "parentId": "undefined",
-            "updatedAt": "2026-08-04T00:40:00.000Z"
+            "updatedAt": "2026-08-28T00:00:00.000Z",
+            "priority": "low"
           },
           {
             "id": 16,
@@ -344,10 +345,12 @@
               18
             ],
             "parentTaskId": "1",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "priority": "medium",
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           }
         ],
-        "updatedAt": "2026-08-23T23:39:24+09:00"
+        "updatedAt": "2026-08-28T00:00:00.000Z"
       },
       {
         "id": "2",
@@ -636,7 +639,7 @@
             "id": 2,
             "title": "표준 스크립트 정합성",
             "description": "AGENTS에 언급된 scripts/eval·scripts/doctor·scripts/hooks를 추가할지 지침을 정정할지 결정",
-            "details": "",
+            "details": "[2026-08-28 review] 전제 소멸로 확정 종료. 이 subtask가 참조하는 AGENTS.md가 저장소에 존재하지 않으므로 'AGENTS 지침을 정정할지' 자체가 무의미하다. 다만 CLAUDE.md가 여전히 없는 AGENTS.md를 가리키는 문제는 5.4에서 함께 처리한다.",
             "status": "cancelled",
             "dependencies": [],
             "parentTaskId": "5",
@@ -648,231 +651,147 @@
             "description": "GitHub Release 자동화와 Linux 실제 실행 검증 추가. Linux cross-build만 가능한 현재 상태를 해소",
             "details": "",
             "status": "pending",
-            "dependencies": [],
+            "dependencies": [
+              4
+            ],
             "parentTaskId": "5",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "priority": "high",
+            "updatedAt": "2026-08-28T00:00:00.000Z"
+          },
+          {
+            "id": 4,
+            "title": "lint toolchain 정합성 복구",
+            "description": "golangci-lint v1/v2 불일치로 상시 실패 중인 scripts/lint·scripts/check를 복구한다.",
+            "details": ".golangci.yml은 `version: \"2\"` 스키마인데 scripts/bootstrap은 GOLANGCI_LINT_VERSION 기본값으로 v1.64.8을 설치하므로 scripts/lint가 \"you are using a configuration file for golangci-lint v2 with golangci-lint v1\"로 항상 실패하고, scripts/check 전체가 죽어 있다. bootstrap의 고정 버전을 v2 계열로 올리거나 .golangci.yml을 v1 스키마로 되돌려 한쪽으로 통일한다. bootstrap의 gofmt+go vet shim fallback이 실제 lint 실패를 침묵시키지 않는지도 함께 확인한다. 부수 정리: CLAUDE.md가 존재하지 않는 AGENTS.md를 가리키는 참조와, docs/reddit-feedback-task-list.md의 'scripts/check가 통과한다' 및 '--help/--version이 없다' 감사 항목이 현재 코드와 어긋난 부분을 바로잡는다. 완료 기준: 깨끗한 환경에서 ./scripts/bootstrap 후 ./scripts/check가 통과한다.",
+            "status": "pending",
+            "dependencies": [],
+            "priority": "high",
+            "parentTaskId": 5,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           }
-        ]
+        ],
+        "updatedAt": "2026-08-28T00:00:00.000Z"
       },
       {
         "id": "6",
-        "title": "QA: alpha.6 artifact live TUI QA",
-        "description": "Build release artifact from current source (alpha.6 @ 4d8fcbc) and run live pty-driven QA against a synthetic fixture repo; report-only, no fixes.",
-        "details": "",
+        "title": "design",
+        "description": "디자인 감사에서 확인된 레이아웃·색·상호작용 계약 결함을 정리한다.",
+        "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md. 2026-08-28 commit 4d8fcbc 기준으로 실제 바이너리를 tmux에서 40/60/72/74/76/78/80/100/120/180 컬럼과 NO_COLOR=1로 렌더해 수집한 21개 발견(high 6, medium 7, polish 5, design-system 3)을 담는다. Design Score D+, AI Slop Score A-. 핵심 구도: Commit Inspector(task 1.20-1.26)는 40/60/80 전 폭에서 정상 렌더되지만 메인 Graph 화면(task 1.2-1.3)은 80컬럼 미만에서 넘치고 잘린다. 두 화면의 수준 차이를 메우는 것이 이 task의 목표다. 잘 되고 있는 것은 건드리지 않는다: 72:28 graph/rail 분할은 DESIGN.md와 일치하고, truecolor/256색 출현이 0건이며, (dirty)/o->/HEAD green/hash yellow는 컬러맵과 맞고, diff 행번호는 tabular pair로 정확하다. AI slop 패턴은 없다. 전역 layout 재설계와 새로운 UI framework 도입은 범위 밖이다.",
         "testStrategy": "",
-        "status": "in-progress",
+        "status": "pending",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
           {
             "id": 1,
-            "title": "HIGH-1 stash entries never load (loadStashState unreachable on RepositoryRead path)",
-            "description": "S list shows '(no stash entries)' and graph has no S marker despite existing stashes. Verified on fixture (3) and real repo (1). update_lifecycle.go:103-104 early-return.",
-            "details": "",
+            "title": "DESIGN.md와 color map 계약 정합",
+            "description": "DESIGN.md의 hex 팔레트와 highlighting-color-map.md의 ANSI-only 정책이 정면 충돌하는 상태를 해소한다.",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). DS-001: DESIGN.md Color는 hex RGB(#E6A23C, #36C2B4, 7단계 뉴트럴 램프, semantic hex)를 지정하는데 docs/highlighting-color-map.md Policy는 RGB와 ANSI-256을 '사용하지 않는다'고 규정하고 코드는 후자를 따른다. 실측 캡처 전체에서 38;2/38;5 출현 0건. CLAUDE.md는 '모든 시각·UI 결정 전에 DESIGN.md를 읽고 QA 모드에서 DESIGN.md와 맞지 않는 코드를 flag하라'고 지시하므로, 그 지시를 그대로 따르면 앱의 모든 색이 오탐이 된다. DESIGN.md Color 절을 터미널 UI 실제 계약(ANSI 0-15 semantic token)으로 재작성하고, hex 값은 preview/docs surface 전용임을 명시하거나 삭제한다. DS-002: DESIGN.md Layout의 '3:7 top split for global/context'는 alpha.6 재설계(task 1.3)로 사라진 레이아웃이다. 72:28 graph/rail 분할은 실측과 일치하므로(80컬럼에서 58/22) 유지하고 top split 기술만 현재 구조로 교체한다. DS-003: Typography(px 스케일, Instrument Serif/Sans, IBM Plex Mono, Google Fonts CDN), Border radius(sm:4px md:8px lg:12px), Motion easing 곡선은 터미널에 적용 불가능한 웹 속성인데 앱 제약처럼 읽힌다. preview/docs surface 전용 절로 분리 표기한다. Decisions Log에 alpha.5/alpha.6 재설계 항목과 이번 정합 결정을 추가한다. 코드 변경 없음. 완료 기준: DESIGN.md만 읽고 앱 UI 결정을 내렸을 때 컬러맵·실제 렌더와 모순이 발생하지 않는다.",
             "status": "pending",
             "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
+            "priority": "high",
+            "parentTaskId": 6,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           },
           {
             "id": 2,
-            "title": "HIGH-2 local tags never load at startup (loadLocalTagStatus only on legacy path)",
-            "description": "Tags panel asserts 'No local tags found.' and graph T markers missing until F pressed. Fixture 2 tags, real repo 6 tags. commands.go:31,111.",
-            "details": "",
+            "title": "80컬럼 미만 레이아웃 overflow 수정",
+            "description": "메인 Graph 화면이 터미널보다 넓게 렌더되어 오른쪽이 잘리는 문제를 고친다.",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-002: 74/76/78 컬럼에서 right rail 하단 테두리가 닫히지 않고 footer가 단어 중간에서 잘린다(scro, scroll). 72에서는 Tags 박스가 '╭── [4]' / '│ No lo'로 잘린다. 60에서는 rail 전체가 아무 표시 없이 사라지고 Graph 박스에 오른쪽 테두리가 없으며 footer가 'ctr'에서 끊긴다. 40에서는 title 컬럼 헤더는 그려지는데 커밋 메시지가 단 하나도 렌더되지 않아 화면이 해시·'-'·'*'만 남는다. 이 모든 폭에서 content가 오른쪽으로 넘치는 동안에도 왼쪽 가운데정렬 여백은 계속 적용된다(60에서 6칸, 74-78에서 7칸). 즉 centering offset을 fit 검사보다 먼저 계산한다. content width >= terminal width일 때 여백을 0으로 클램프하고, 최소 폭 미만에서는 rail을 무음 클립이 아니라 명시적으로 접거나 축약 표시한다. task 1.24/1.26/1.27 명세가 선언한 40/60/80 폭 매트릭스를 메인 화면에도 실제로 적용한다. 참고: Commit Inspector는 40/60/80 전부 정상 렌더되므로 그 폭 계산을 기준으로 삼는다. 완료 기준: 40/60/72/74/76/78/80 각 폭에서 모든 박스 테두리가 닫히고 footer가 잘리지 않으며 focused/full test, vet, build, gofmt/diff-check CLEAN.",
             "status": "pending",
             "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
+            "priority": "high",
+            "parentTaskId": 6,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           },
           {
             "id": 3,
-            "title": "HIGH-3 Commit Inspector diff cannot be scrolled",
-            "description": "800-line diff renders only lines 1-39; no scroll key works and no truncation indicator. commit_inspector_screen.go:144-151 ignores commitInspectorScroll.",
-            "details": "",
-            "status": "done",
+            "title": "색에 의존하지 않는 selection·focus 신호",
+            "description": "NO_COLOR 환경에서 graph 커서 위치와 섹션 포커스가 전혀 보이지 않는 문제를 고친다.",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-001: NO_COLOR=1로 실행하고 j를 세 번 누르면 Details 패널의 focus: 값만 4d8fcbcc에서 b2fd3168로 바뀌고 Graph 목록에서는 아무것도 변하지 않는다. 살아남은 bold 스팬 5개는 전부 섹션 제목이다. 원인: internal/app/theme.go:47 pointerMark = ansiBoldStyle(ansiYellow)는 색만 있고 글리프도 reverse도 없으며 graph_render.go:105에서 hash에만 적용된다. 섹션 포커스는 theme.go:34-35 activeBox(마젠타) 대 baseBox(bright black)의 BorderForeground 차이뿐이라 역시 색 전용이다. docs/highlighting-color-map.md는 모든 토큰에 Non-color signal을 약속하고 pointerMark에 'selected row or pointer'라고 명시하지만 포인터가 존재하지 않는다. Policy의 'NO_COLOR=1 조건에서 visible label과 marker를 보존한다'도 미충족이다. 선택된 graph 행에 Commit Inspector가 이미 쓰는 '>' 거터 패턴을 적용하고, 포커스된 섹션은 제목 텍스트 자체에 마커를 넣어 테두리 색에만 의존하지 않게 한다. 완료 기준: NO_COLOR=1과 monochrome 터미널에서 커서 이동과 섹션 포커스가 식별되고, 회귀 테스트가 색 없는 출력에서 marker 존재를 검증하며 focused/full test, vet, build, gofmt/diff-check CLEAN.",
+            "status": "pending",
             "dependencies": [],
-            "parentTaskId": "6",
+            "priority": "high",
+            "parentTaskId": 6,
             "parentId": "undefined",
-            "updatedAt": "2026-08-27T08:58:44.604Z"
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           },
           {
             "id": 4,
-            "title": "HIGH-4 '?' in Commit Inspector opens invisible overlay that swallows input",
-            "description": "Byte-identical screen after '?', next keypress consumed. commitInspectorHelp gates keys at commit_inspector.go:75-77 but screen renderer never renders it.",
-            "details": "",
-            "status": "done",
-            "dependencies": [],
-            "parentTaskId": "6",
+            "title": "Graph row 컬럼 예산과 폭 성장 재설계",
+            "description": "빈 컬럼이 22칸을 점유하는 동안 커밋 제목이 11자로 잘리는 정보 배분을 바로잡는다.",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-004: state 컬럼은 모든 캡처의 모든 행에서 비어 있다. graph 컬럼은 약 12칸을 잡지만 선형 히스토리에서 '*' 하나, 머지 구간(| \\, * |)에서도 3칸만 쓴다. branches는 o/l->main 때문에 약 15칸을 잡고 나머지 200여 커밋에는 '-'만 찍는다. 180컬럼에서도 제목은 약 44자에서 잘리고 그 왼쪽에 28칸 공백이 남는다. D-003: Graph 패널 내부 폭이 80에서 56, 100에서도 56, 120에서 66, 180에서 98이다. 즉 80-100 구간에서 전혀 성장하지 않고 100컬럼에서는 여백에 20칸을 쓰면서 제목을 11자로 자른다. DESIGN.md의 'Terminal-driven, centered'는 유지하되 계단식이 아닌 연속 성장으로 바꾼다. D-015: 저장소에 stash도 tag도 없는데 'S stash · T tag' 범례가 항상 표시된다. state 컬럼 폭 0과 함께 숨긴다. D-017: 머지 connector '|\\'가 hash/branches/title이 모두 빈 전체 행을 소비한다. 24행 화면에서 머지 하나당 viewport의 4%다. graph 컬럼을 보이는 window의 실제 lane 수에 맞춰 산정하고, stash/tag가 없으면 state를 0폭으로 접고, 회수한 폭을 title에 준다. Reddit 피드백의 '20자 강제 truncation' 지적이 이 subtask의 완료 기준이다. 완료 기준: 100컬럼에서 title 가용폭이 80컬럼 대비 증가하고, stash/tag 없는 저장소에서 state 컬럼과 범례가 사라지며 focused/full test, vet, build, gofmt/diff-check CLEAN.",
+            "status": "pending",
+            "dependencies": [
+              2
+            ],
+            "priority": "high",
+            "parentTaskId": 6,
             "parentId": "undefined",
-            "updatedAt": "2026-08-27T09:05:41.329Z"
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           },
           {
             "id": 5,
-            "title": "MED-5 pure rename renders as whole-file addition",
-            "description": "R file1.txt -> file1-renamed.txt (100% similarity, 0 change) shows @@ -0,0 +1,3 @@ with 3 + lines. File list uses rename detection, diff loader does not.",
-            "details": "",
+            "title": "theme token 정합성 복구",
+            "description": "정의된 semantic token이 실제 렌더에 도달하지 않고 서로 겹치는 상태를 해소한다.",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). ANSI 캡처를 SGR 상태 머신으로 파싱한 결과다. D-005: internal/app/theme.go:37 sectionTitle = ansiBoldStyle(ansiBlue)로 컬러맵과 일치하게 정의되어 있지만, 사용자가 섹션 제목으로 읽는 [1] Graph는 마젠타+bold, [2] Local/[3] Remote/[4] Tags는 bright black+bold로 렌더된다. lipgloss가 테두리 안쪽에 title을 렌더하므로 activeBox/baseBox의 BorderForeground가 제목 텍스트 색을 덮어쓴다. sectionTitle이 실제로 적용된 곳은 컬럼 헤더 행(view_graph.go:50)과 hotkey group 헤더(hidden_hotkeys.go:188), cherry_pick_view.go:79뿐이다. 결과적으로 포커스된 섹션 제목과 hotkey(theme.go:38, 마젠타+bold)가 완전히 동일한 스타일이라 '제목'과 '누를 수 있는 키'를 색으로 구분할 수 없다. D-006: bright black이 마젠타 다음으로 많이 쓰인 색이다(main 화면 34 스팬). 모든 비포커스 박스 테두리와 비포커스 섹션 제목이 bright black(theme.go:34)인데, 컬러맵 Policy는 '밝은 배경·베이지 배경에서 대비가 낮을 수 있으므로 bright black 대신 터미널 기본 전경색을 쓴다'고 규정한다. task 4.1이 done인 화면이다. 또한 박스 테두리는 화면에서 가장 반복되는 시각 요소인데 컬러맵 토큰 표에 항목이 아예 없다. border token을 추가한다. D-012: muted, disabled, popupHelp, popupBody, reviewBranch, reviewMark, reviewFooter 7개 named token이 전부 lipgloss.NewStyle() 빈 스타일이다(theme.go). 렌더가 만들지 않는 구분을 어휘가 주장하고 있어, 나중에 muted를 바꾸면 아무것도 안 바뀌거나 무관한 6개가 함께 바뀐다. 실제 구분이 필요한 것만 남기고 나머지는 별칭임을 명시하거나 통합한다. D-013: 컬러맵 Scope가 follow-up으로 지목한 view_alert.go, stash_popup.go, tagging.go, cherry_pick_view.go, hidden_hotkeys.go 중 hidden_hotkeys.go만 정리되었고 나머지 4개는 여전히 theme.go 밖에서 색을 만든다. 완료 기준: 박스 제목이 sectionTitle로 렌더되어 hotkey와 구분되고, bright black이 구조선에서 제거되며, 색 생성이 theme.go 단일 출처로 모이고, 렌더된 SGR과 컬러맵 토큰 표가 일치함을 검증하는 테스트가 있으며 focused/full test, vet, build, gofmt/diff-check CLEAN.",
             "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
+            "dependencies": [
+              1
+            ],
+            "priority": "high",
+            "parentTaskId": 6,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           },
           {
             "id": 6,
-            "title": "MED-6 changed-files list does not scroll; cursor marker vanishes",
-            "description": "60-file commit: only f01-f40 render; with selection on f60 no '>' marker visible anywhere.",
-            "details": "",
-            "status": "done",
-            "dependencies": [],
-            "parentTaskId": "6",
+            "title": "축약·footer·선 문자 어휘 통일",
+            "description": "화면마다 세 갈래로 갈린 truncation, footer, line 문자 관습을 하나로 모은다.",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-007: 축약이 세 가지다. graph 제목은 '...'(chore(ta...), Details와 Inspector는 '…'(… +2 hidden, …/tasks.json), rail은 마커 없는 하드 컷이다(o->main (default, No local tags fo, Press F to sync tag pr). 하드 컷은 닫는 괄호를 소리 없이 떨어뜨려 짧아진 게 아니라 깨진 것처럼 읽힌다. 공통 truncate helper 하나로 '…' 단일 관습을 적용한다. D-008: footer도 세 가지다. 메인은 'tab: switch · k/j: updown · q: quit · ?: hotkeys'(한 줄, 가운뎃점 구분), Inspector는 'Esc back   ? help'(공백 구분, 콜론 없음), 팝업은 'enter: create'와 'esc: close'를 두 줄 가운데 정렬한다. task 1.5(공통 overlay footer와 q/esc 키 계약), 1.6(Main hotkey footer와 shared registry), 1.23/1.24(modal footer 계약)가 전부 done인데 어휘가 통일되지 않았다. 기존 shared registry를 실제 단일 출처로 만들고 세 화면이 같은 렌더러를 쓰게 한다. D-011: 박스 테두리는 유니코드 box-drawing(│ ╭ ╰ ─)이고 graph lane은 ASCII(|, |\\)다. 머지 구간에서 얇은 ASCII lane이 굵은 유니코드 테두리 옆에 놓이면 디자인 선택이 아니라 렌더링 오류처럼 읽힌다. DESIGN.md의 'Precise'와 어긋난다. 한쪽 어휘로 통일하되 ASCII fallback 조건을 명시한다. 완료 기준: 세 화면의 footer가 같은 렌더러를 거치고, 축약이 전부 '…'이며, 선 문자 어휘가 단일하고 focused/full test, vet, build, gofmt/diff-check CLEAN.",
+            "status": "pending",
+            "dependencies": [
+              2
+            ],
+            "priority": "medium",
+            "parentTaskId": 6,
             "parentId": "undefined",
-            "updatedAt": "2026-08-27T08:58:45.943Z"
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           },
           {
             "id": 7,
-            "title": "MED-7 'q' does not close the Commit Inspector",
-            "description": "Spec requires footer 'q close  Esc back  ? help'; rendered footer is 'Esc back   ? help' and q is a no-op.",
-            "details": "막힌 이유: q/Esc 계약이 spec 안에서 모순된다. spec 은 Inspector 푸터를 'q close  Esc back  ? help' 로 요구하는데, 같은 문서의 modal Esc-first 계약은 q 를 오버레이 닫기에 배정한다. 어느 쪽이 이기는지 정하기 전에는 두 건을 함께 고칠 수 없다. MED-7 과 MED-8 은 같은 결정에 걸려 있으므로 한 번에 처리한다.",
+            "title": "팝업 레이아웃과 입력 affordance",
+            "description": "입력 필드가 읽기 전용 값과 구분되지 않고 가운데 정렬로 밀리는 문제, 팝업 과대 폭과 off-grid 배치를 고친다.",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-009: Create tag 팝업에서 'target: 4d8fcbcc'(읽기 전용 컨텍스트)와 'name:'(편집 가능 필드)이 시각적으로 완전히 동일하다. 박스도 밑줄도 커서 블록도 플레이스홀더도 없어 편집 가능 여부를 알 수 없다. 게다가 두 줄 모두 가운데 정렬이라 타이핑하면 텍스트가 중앙에서 양쪽으로 자라며 필드가 왼쪽으로 밀린다. 폼 라벨과 입력은 공통 왼쪽 정렬 기준선을 갖고 필드는 가시적 경계를 가져야 한다. D-010: Hidden Hotkeys 팝업은 가장 긴 줄이 약 24자인데 50컬럼이고 빈 줄이 4개다. task 1.7(Hidden Hotkeys 폭 축소)이 done인 상태다. Create tag 팝업은 3줄 콘텐츠에 56컬럼, 빈 줄 5개다. 두 팝업 모두 임의 컬럼 오프셋에 떨어져 Graph 박스와 Details/Local 박스 테두리를 동시에 관통한다. 팝업 폭을 콘텐츠 기준으로 산정하고 배치를 박스 그리드에 정렬한다. Hidden Hotkeys의 중앙정렬 제목·부제와 좌측정렬 목록이 섞인 것도 좌측 기준선으로 통일한다. 완료 기준: 입력 필드가 읽기 전용 값과 구분되고 타이핑 중 필드가 이동하지 않으며, 팝업 폭이 콘텐츠에 비례하고 40/60/80 폭에서 테두리 파괴 없이 배치되며 focused/full test, vet, build, gofmt/diff-check CLEAN.",
             "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
+            "dependencies": [
+              6
+            ],
+            "priority": "medium",
+            "parentTaskId": 6,
+            "parentId": "undefined",
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           },
           {
             "id": 8,
-            "title": "MED-8 'q' does not close the '?' hotkey overlay",
-            "description": "README: 'In an open overlay, q closes it'. q is a no-op; only esc closes.",
-            "details": "막힌 이유: q/Esc 계약이 spec 안에서 모순된다. spec 은 Inspector 푸터를 'q close  Esc back  ? help' 로 요구하는데, 같은 문서의 modal Esc-first 계약은 q 를 오버레이 닫기에 배정한다. 어느 쪽이 이기는지 정하기 전에는 두 건을 함께 고칠 수 없다. MED-7 과 MED-8 은 같은 결정에 걸려 있으므로 한 번에 처리한다.",
+            "title": "카피·정보 우선순위 polish",
+            "description": "내부 어휘 노출, 좁은 폭에서의 우선순위 역전, FROM 라벨 비대칭을 정리한다.",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-014: Hidden Hotkeys가 'Visible:'과 'Conditional:'을 사용자 대면 카테고리 라벨로 노출한다. 무엇에 대한 conditional인지 알 수 없어 사용자가 행동할 수 없다. 조건을 명시하거나(needs upstream, needs a remote) 구분을 제거한다. '•' bullet은 의미를 담지 않으면서 매 행 2칸을 쓰므로 DESIGN.md의 'Decoration level: Minimal'에 맞춰 재검토한다. D-016: Commit Inspector가 40컬럼에서 첫 행을 'COMMIT 4d8fcbcc16d09a9d81…'에 쓴다. 34자로 잘린 해시는 identity로 쓸 수 없다. 세 번째 행은 'author: hrllk <heykia3@protonmail.c…'로 이메일 도메인이 잘린다. 정작 커밋 메시지는 그 아래에서 잘린다. decisions.md 2026-08-03 결정('저높이 화면은 commit identity·selected path·FROM/TO·최소 diff·복귀 키를 우선')의 취지에 맞게 좁은 폭에서는 short hash를 쓰고 이메일을 뺀다. D-018: commit_inspector_screen.go:64가 author 행 뒤에 '  FROM ' + snapshot.Parent를 덧붙인다. 대응하는 TO가 없고, author와 이메일이 이미 있는 행에 얹혀서 가장 먼저 잘린다(FROM 26d88da2e637d357253d8f67fec873…). commit_inspector.go:142-144도 같은 구조다. TO와 짝을 맞추거나 parent: 라벨로 바꿔 다른 header 행과 같은 key/value 처리를 준다. header가 COMMIT만 대문자 표제이고 message:/author:/path:는 소문자 key/value인 것도 함께 정리한다. 완료 기준: 40컬럼에서 커밋 메시지가 해시·이메일보다 먼저 확보되고, hotkey help에 내부 어휘가 없으며 focused/full test, vet, build, gofmt/diff-check CLEAN.",
             "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 9,
-            "title": "MED-9 '?' overlay omits documented working keys",
-            "description": "Graph missing enter/S/F, Remote missing p/d, Tags missing P/F. enter opens the Commit Inspector - the headline feature.",
-            "details": "커밋 5a61948 + dd4e8a5. 섹션 스코프 키는 오버레이에 등재: Graph enter, Remote d, Tags P/D. 남은 S/F 등은 전역 키이고, Global 을 오버레이에 넣는 것은 hidden_hotkeys_test.go:55-58 네 케이스, TestGlobalHotkeyItemsAreMainFooterSource, README '## Keyboard' 셋과 충돌한다. Task 8 로 분리해 결정 대기. 원 finding 의 'Remote p (pull) 누락' 주장은 철회: p 는 Current 와 Graph 에서만 분기하며 Remote 에서는 아무 것도 하지 않는다. 오버레이가 옳았고 README 가 틀렸다.",
-            "status": "done",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 10,
-            "title": "LOW-10 binary files not marked in changed-files list",
-            "description": "blob.bin renders as 'A blob.bin'; renderer supports [binary] but adapter never sets Binary/StatusBinary. Diff says 'No textual changes' vs spec 'No textual diff'.",
-            "details": "",
-            "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 11,
-            "title": "LOW-11 inspector header row 1 breaks label convention",
-            "description": "Renders 'COMMIT <hash>'; spec says 'commit: <full hash>'; rows 2-4 use lowercase label: form.",
-            "details": "",
-            "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 12,
-            "title": "LOW-12 'unsupported height' is raw developer text shown in a mixed state",
-            "description": "At 60x12 it appears alongside a rendered diff.",
-            "details": "",
-            "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 13,
-            "title": "LOW-13 inspector width inconsistent with centered main screen",
-            "description": "Main body centers at 180/200; inspector uses full 200, so frame width jumps on open/close.",
-            "details": "",
-            "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 14,
-            "title": "UNREPRODUCED-14 frame overflow to 214x59 in a 200x50 terminal",
-            "description": "Observed once during 60-file navigation; 4 further attempts at 4 keypress speeds did not reproduce. Capture kept at scratchpad qa/shots/09-overflow.txt.",
-            "details": "",
-            "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 15,
-            "title": "N1 (P0) 연속 +/- 그룹이 MaxLines=2000 초과 시 Inspector 영구 Loading",
-            "description": "버그 2개 연쇄. (1) repo_exec.go:276 이 partial 대신 hard error 반환. (2) commit_inspector_reader_commands.go:63 가드의 result.Value.FileID != result.FileID 가 모든 어댑터 에러 결과를 폐기해 diffLoading이 영구 true. 경계 검증: 1999줄 정상 / 2001줄 정지 / 작은 hunk 4999줄 정상. AC 17 위반. T24+T25.",
-            "details": "",
-            "status": "done",
-            "dependencies": [],
-            "parentTaskId": "6",
+            "dependencies": [
+              7
+            ],
+            "priority": "low",
+            "parentTaskId": 6,
             "parentId": "undefined",
-            "updatedAt": "2026-08-27T03:07:21.968Z"
-          },
-          {
-            "id": 16,
-            "title": "N2 (P0) merge commit의 Changed files가 빈 목록",
-            "description": "InspectCommit 파일 목록이 diff-tree 에 hash만 전달. annotateCommitDiffFiles 와 CommitDiffWindow 는 parent,commit 명시. merge는 git이 빈 출력. spec Git Semantics 표 위반, AC 8 위반. finding 05(rename)와 동일한 listing/diff 기준 불일치. T26.",
-            "details": "",
-            "status": "done",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "updatedAt": "2026-08-27T02:38:47.183Z",
-            "parentId": "undefined"
-          },
-          {
-            "id": 17,
-            "title": "N3 (P2) unsupported height 가 터미널 높이 12에서 발동",
-            "description": "spec 필수 snapshot matrix가 (40,12)(60,12)(80,12)을 포함하고 임계값은 'height<12'. 렌더러가 body 높이(12→11)를 터미널 임계값 12와 비교해 한 칸 일찍 접힘. 첫 diff 행을 밀어냄. 높이 13은 정상. AC 15 위반(9조합 중 3개). T27.\n\n[철회 2026-08-27] 측정 착오였음. tmux -y N 은 pane_height N-1 을 준다 (상태바와 무관). 앱은 m.height 를 터미널 높이 그대로 받으므로 12행 터미널에서는 height<12 가 false 이고 unsupported 가 발동하지 않는다. pane 크기를 실제로 맞춰 재측정한 결과 spec 필수 9조합 전부 통과, 프레임 치수도 정확히 일치. AC 15 는 FAIL 이 아니라 PASS. T27 불필요.",
-            "details": "",
-            "status": "cancelled",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined",
-            "updatedAt": "2026-08-27T08:48:06.282Z"
-          },
-          {
-            "id": 18,
-            "title": "N4 (P2) scripts/check 실패 — AC 18의 미충족 절반",
-            "description": "scripts/test 가 GOTMPDIR을 리포 안(.cache/tmp)으로 설정해 t.TempDir()이 워킹트리에 생기고 TestAdapterRejectsDirectoryWithoutRepository 가 graphkeeper 자신을 찾음. GOTMPDIR 리포 밖에서는 통과. 기존 문제이며 이 브랜치와 무관. T28. [완료 2026-08-28, 커밋 c6be7cb — GOTMPDIR 만 리포 밖으로. task 9 의 T28 과 동일 건.]",
-            "details": "",
-            "status": "done",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 19,
-            "title": "spec Testing Plan이 지정한 테스트 파일 5개 중 1개만 존재",
-            "description": "commit_inspector_contract_test.go / state_test.go / view_test.go / stream_test.go 부재. integration_test.go(75줄)만 존재. state_test는 N1 part2를, stream_test는 N1 part1을 잡았을 파일. T30-T33.",
-            "details": "",
-            "status": "pending",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "parentId": "undefined"
-          },
-          {
-            "id": 20,
-            "title": "N5 (P1) continuation 창이 줄번호를 1부터 다시 센다",
-            "description": "activeHunkHeader(repo_exec.go:421)가 원본 hunk header를 그대로 반환하고 :351이 continuation 창 앞에 붙임. 파서는 :523에서 그 헤더로 oldLine/newLine을 초기화하므로 window 2 이후가 실제 오프셋이 아니라 헤더의 원래 시작 번호부터 셈. 관측: 내용은 1334번째 줄인데 '1 — - 1334'로 표시. spec 'parser는 window 시작에 필요한 hunk header와 old/new line cursor를 복원한 뒤 paired rows를 생성한다' 위반. T24 회귀 아님 — 기존 버그이나 T24가 continuation을 실제로 도달 가능하게 만들어 노출 범위가 크게 늘어남. 수정: 창 시작 오프셋만큼 헤더의 시작 번호를 재계산해 합성.",
-            "details": "",
-            "status": "done",
-            "dependencies": [],
-            "parentTaskId": "6",
-            "updatedAt": "2026-08-27T06:39:04.853Z",
-            "parentId": "undefined"
+            "updatedAt": "2026-08-28T00:00:00.000Z"
           }
         ],
-        "updatedAt": "2026-08-27T09:05:41.329Z"
+        "updatedAt": "2026-08-28T00:00:00.000Z"
       },
       {
         "id": "7",
