@@ -2,10 +2,23 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GO_CACHE_DIR="${GOCACHE:-${ROOT}/.cache/go-build}"
-GO_TMP_DIR="${GOTMPDIR:-${ROOT}/.cache/tmp}"
 
-mkdir -p "${GO_CACHE_DIR}" "${GO_TMP_DIR}"
+# The build cache lives in the repo on purpose: it is large, reusable across
+# runs, and gitignored.
+GO_CACHE_DIR="${GOCACHE:-${ROOT}/.cache/go-build}"
+mkdir -p "${GO_CACHE_DIR}"
+
+# GOTMPDIR must NOT live in the repo. t.TempDir() derives from it, so a repo-local
+# value puts every test's scratch directory inside the working tree, and any test
+# that walks up looking for a .git directory then finds graphkeeper itself.
+# TestAdapterRejectsDirectoryWithoutRepository failed for exactly that reason.
+# Honour an explicit GOTMPDIR; otherwise use a throwaway directory outside the repo.
+if [ -n "${GOTMPDIR:-}" ]; then
+	GO_TMP_DIR="${GOTMPDIR}"
+else
+	GO_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/graphkeeper-gotmp-XXXXXX")"
+	trap 'rm -rf "${GO_TMP_DIR}"' EXIT
+fi
 
 cd "${ROOT}"
 GOCACHE="${GO_CACHE_DIR}" GOTMPDIR="${GO_TMP_DIR}" go test ./...
