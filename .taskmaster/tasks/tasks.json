@@ -1508,6 +1508,18 @@
                         "dependencies": [],
                         "parentTaskId": 9,
                         "parentId": "undefined"
+                    },
+                    {
+                        "id": 47,
+                        "taskId": "L5",
+                        "title": "L5 렌더 테스트가 스타일을 검증하지 못한다",
+                        "description": "테스트는 TTY 없이 돌아 lipgloss 가 Ascii 프로파일을 고르고, 색뿐 아니라 bold·reverse 까지 전부 제거한다. 프로브로 확인: graphCursorMark.Render(\"XX\") 와 highlight.Render(\"XX\") 둘 다 맨 \"XX\". 그래서 이 리포의 어떤 렌더 테스트도 스타일 결함을 잡은 적이 없다. 해법은 확인됨: 테스트에서 lipgloss.SetColorProfile(termenv.ANSI) 를 세우면 관측 가능해지고, t.Cleanup 으로 Ascii 로 되돌리면 다른 테스트에 새지 않는다. graph_cursor_signal_test.go 의 withANSIProfile 이 그 관용구다. 나머지 렌더 테스트에 확산시킬 것. 기록된 view-never-called-in-tests 와 같은 계열의 구멍.",
+                        "details": "internal/app/graph_cursor_signal_test.go; internal/app/model_test.go",
+                        "status": "pending",
+                        "priority": "P2",
+                        "dependencies": [],
+                        "parentTaskId": 9,
+                        "parentId": "undefined"
                     }
                 ]
             }

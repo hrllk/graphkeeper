@@ -27,6 +27,31 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, isHandshake, stashCount, "")
 }
 
+// renderGraphHashField owns the commit-hash cell for both the compact and the
+// raw render path, so the cursor signal cannot drift between them.
+//
+// Before this existed, `selected` reached renderSearchField, which forwards it to
+// highlightSearchText, which returns the value untouched when the search query is
+// empty (graph_search_render.go:12-14). Outside a search the flag threaded through
+// eight call sites and did nothing, and the cursor was conveyed by colour alone.
+//
+// Under NO_COLOR lipgloss selects the Ascii profile and emits nothing at all -
+// attributes included - so a lipgloss style cannot carry the signal there. The
+// cell writes reverse video directly instead, matching how the Inspector already
+// handles NO_COLOR itself (commit_inspector.go:352, :441, :466). no-color.org
+// governs colour; reverse is an attribute. A "> " gutter is not an option:
+// 094ca87 (2026-07-07) removed exactly that and locked it with a test.
+func renderGraphHashField(hash, searchQuery string, focused bool) string {
+	field := renderSearchField(hash, searchQuery, graphCommitWidth, focused)
+	if !focused || strings.TrimSpace(searchQuery) != "" {
+		return field
+	}
+	if noColorEnabled() {
+		return "\x1b[7m" + field + "\x1b[0m"
+	}
+	return field
+}
+
 func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
 	if row.Graph != "" {
 		return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, isHandshake, stashCount, searchQuery)
@@ -38,7 +63,7 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		refs = "          "
 	} else {
 		refInfo = compactDecorationInfo(row.Commit.Decorations, renderInventory(inventory))
-		hash = renderSearchField(shorten(row.Commit.Hash, 5), searchQuery, graphCommitWidth, selected && graphActive)
+		hash = renderGraphHashField(shorten(row.Commit.Hash, 5), searchQuery, selected && graphActive)
 		refs = renderSearchField(refInfo.Text, searchQuery, graphBranchFieldWidth, selected && graphActive)
 		isHead := hasHeadDecoration(row.Commit.Decorations)
 		pointerFocused := graphActive && selected
@@ -100,7 +125,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 			cursorLane = width - 1
 		}
 		pointerFocused = graphActive && selected && cursorLane == lane
-		hash = renderSearchField(shorten(row.Commit.Hash, 5), searchQuery, graphCommitWidth, selected && graphActive)
+		hash = renderGraphHashField(shorten(row.Commit.Hash, 5), searchQuery, selected && graphActive)
 		if searchQuery == "" && pointerFocused {
 			hash = pointerMark.Render(hash)
 		}
