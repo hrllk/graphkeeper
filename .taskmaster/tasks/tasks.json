@@ -18,7 +18,7 @@
                         "details": "스펙 문서: ~/.gstack/graphkeeper/20260803-0001-graph-commit-inspector-spec.md. Graph에서 Enter로 기존 화면을 가리는 bordered Inspector를 열고, 4행 고정 header(commit/message/author/path), flat changed-files list, old/new line columns을 가진 unified diff, q/Esc/? footer를 제공한다. Header에는 선택 파일 full path를, 목록에는 ../../filename 축약 경로를 표시한다. MVP keymap은 j/k로 변경 파일을 탐색하고 Ctrl+U/D로 선택 파일 diff를 스크롤한다. 별도 pane focus, fold/unfold, h/l, Enter, Tab/m/r과 message footer는 포함하지 않는다. first-parent/root basis, rename/copy identity, binary/submodule/mode-only 상태, request/epoch stale 폐기, cancellation, bounded diff, ANSI/NO_COLOR semantic marker, narrow/wide frame matrix와 테스트를 포함한다. Tree-sitter grammar/query, word-level diff, 전체 message viewport와 Working Tree staging/commit은 후속 범위다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T09:36:35.048Z"
                     },
@@ -29,7 +29,7 @@
                         "details": "계획 문서: ~/.gstack/graphkeeper/20260731-0002-project-ui-readability-improvement-plan.md. Graph topology의 `*`는 유지하고 branches와 topology 사이의 `state` 컬럼에 `S`, `T`, `S·T`를 표시한다. Graph page 정보 줄 오른쪽에 축약 범례를 노출한다. Graph 제목은 남은 폭 기반으로 계산하고, Graph와 Local/Remote/Tags의 outer height를 일치시킨다. Context·rail·popup의 공통 spacing과 overflow를 정리하며, 항목은 paging·scroll·`… +N`으로 마지막까지 접근할 수 있어야 한다. 구현 전 계획의 사용자 성공 기준, 단계별 게이트, 터미널 폭·색상 profile QA를 따른다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-01T01:00:00.000Z",
                         "parentId": "undefined"
                     },
@@ -39,7 +39,7 @@
                         "description": "Global과 Context Actions를 제거하고 Context Details를 우측 상단 rail로 이동하며 Graph를 전체 높이로 확장한다. Hidden Hotkeys overlay, Graph 제목 폭 우선순위, stash/tag point 색상 누락 경로를 함께 정리한다.",
                         "details": "계획 문서: ~/.gstack/graphkeeper/20260801-0002-main-layout-redesign-plan.md. 최종 레이아웃은 GGGGCC / GGGGLL / GGGGRR / GGGGTT다. Graph와 우측 4개 패널의 outer height를 맞추고, ? overlay와 폭 허용 시 ?: hotkeys hint로 단축키를 안내한다. ANSI/NO_COLOR, low-height, overflow, normal/raw graph point 색상 회귀 테스트를 포함한다.",
                         "dependencies": [],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "status": "done",
                         "updatedAt": "2026-08-01T03:00:00.000Z",
                         "parentId": "undefined"
@@ -51,7 +51,7 @@
                         "details": "계획 문서: ~/.gstack/graphkeeper/20260801-0003-overlay-graph-density-improvement-plan.md T1. overlayLine의 SGR 상태 복원과 ANSI/TrueColor/Ascii/NO_COLOR 회귀 테스트를 포함한다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-01T04:00:00.000Z",
                         "parentId": "undefined"
                     },
@@ -64,7 +64,7 @@
                         "dependencies": [
                             4
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-01T04:00:00.000Z",
                         "parentId": "undefined"
                     },
@@ -77,7 +77,7 @@
                         "dependencies": [
                             5
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-01T04:00:00.000Z",
                         "parentId": "undefined"
                     },
@@ -90,7 +90,7 @@
                         "dependencies": [
                             6
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-01T04:00:00.000Z",
                         "parentId": "undefined"
                     },
@@ -103,7 +103,7 @@
                         "dependencies": [
                             7
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-01T04:00:00.000Z",
                         "parentId": "undefined"
                     },
@@ -116,7 +116,7 @@
                         "dependencies": [
                             8
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-01T04:00:00.000Z",
                         "parentId": "undefined"
                     },
@@ -127,7 +127,7 @@
                         "details": "계획 문서: ~/.gstack/graphkeeper/20260802-0010-add-repository-state-summary-plan.md. 현재 branch·upstream·worktree·divergence·operation 진행 상태를 기존 git.Status에서 재사용하고, 상태 조합별 요약과 low-width fallback을 제공한다. 1.11~1.14가 채우는 상태·추천·이유·영향·결과를 Graph 제목 아래 Unified Decision Card 하나로 묶으며 별도 screen/popup은 만들지 않는다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-04T00:00:00.000Z"
                     },
@@ -140,7 +140,7 @@
                         "dependencies": [
                             10
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-03T00:00:00.000Z"
                     },
@@ -154,7 +154,7 @@
                             10,
                             11
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-19T10:37:34.574Z"
                     },
@@ -167,7 +167,7 @@
                         "dependencies": [
                             12
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-20T04:35:19.962Z"
                     },
@@ -180,7 +180,7 @@
                         "dependencies": [
                             13
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-20T07:18:49.029Z"
                     },
@@ -193,7 +193,7 @@
                         "dependencies": [
                             1
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-04T00:40:00.000Z"
                     },
@@ -206,7 +206,7 @@
                         "dependencies": [
                             12
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-20T04:36:08.999Z"
                     },
@@ -217,7 +217,7 @@
                         "details": "기존 renderConfirmPopup과 handleConfirmKey의 action별 분기를 정리한다. BinaryConfirm은 화면에 y: yes · n: no만 표시하고 q: close를 노출하지 않는다. n과 Esc는 취소 동작으로 유지하되 footer에는 y/n만 표시한다. Pull의 m/r, fast-forward의 enter 등 binary가 아닌 선택지는 별도 choice confirm 계약으로 분리한다. 제목·설명·선택지·footer의 렌더링 모델과 keymap을 공통화하고 branch/delete/tag/stash/clean/checkout/reset confirm의 회귀 테스트를 추가한다. Merge 전용 layout과 공통 Toast/Progress 구현은 별도 task로 둔다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T11:40:37.119Z"
                     },
@@ -230,7 +230,7 @@
                         "dependencies": [
                             "1.17"
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T12:00:28.991Z"
                     },
@@ -243,7 +243,7 @@
                         "dependencies": [
                             "1.18"
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T12:35:43.104Z"
                     },
@@ -254,7 +254,7 @@
                         "details": "계획 문서: ~/.gstack/graphkeeper/20260820-0020-commit-inspector-contract-state-test-plan.md. inspectCommit/loadCommitInspectorDiff가 app-owned reader를 통해서만 요청하도록 최소 production wiring과 projection migration을 수행한다. CommitSnapshot/DiffWindow 또는 동등한 DTO를 model/message 경계에 연결하고, 현재 renderer에 필요한 최소 paired-row projection을 adapter 경계에서 제공한다. cursor index가 아닌 stable FileID로 결과를 적용하며, request ID와 기존 model.repositoryEpoch를 검증한다. Inspector당 active reader operation은 하나인 직렬 lifecycle을 유지한다. context.Canceled는 canceled reader outcome으로 매핑하고, epoch 변경 시 active operation cancel·loading clear·기존 value/error 보존·late result 폐기를 검증한다. deterministic fake reader로 key→command→Update, A→B→A stale response, pane-local error/partial/canceled, q/Esc/?와 loading key contract를 테스트한다. layout matrix, retry UX, continuation UI, streaming, child process lifecycle은 후속 task 범위다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined"
                     },
                     {
@@ -266,7 +266,7 @@
                         "dependencies": [
                             20
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined"
                     },
                     {
@@ -278,7 +278,7 @@
                         "dependencies": [
                             21
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined"
                     },
                     {
@@ -290,7 +290,7 @@
                         "dependencies": [
                             22
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-23T23:39:24+09:00",
                         "parentId": "undefined"
                     },
@@ -303,7 +303,7 @@
                         "dependencies": [
                             23
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-23T23:39:24+09:00",
                         "parentId": "undefined"
                     },
@@ -316,7 +316,7 @@
                         "dependencies": [
                             23
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-23T23:39:24+09:00",
                         "parentId": "undefined"
                     },
@@ -330,7 +330,7 @@
                             24,
                             25
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "updatedAt": "2026-08-23T23:39:24+09:00",
                         "parentId": "undefined"
                     },
@@ -343,7 +343,7 @@
                         "dependencies": [
                             18
                         ],
-                        "parentTaskId": 1,
+                        "parentTaskId": "1",
                         "parentId": "undefined"
                     }
                 ],
@@ -366,7 +366,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "updatedAt": "2026-07-28T10:56:08.352Z",
                         "parentId": "undefined"
                     },
@@ -377,7 +377,7 @@
                         "details": "현재 active section을 기준으로 표시 항목을 선택하고, Graph·Local·Remote·Tags 등 섹션별 목록을 분리한다. ? 입력 시 현재 섹션의 핵심 hotkey만 노출하며 섹션 이동 후에는 새 섹션 기준으로 목록이 갱신되도록 한다. 기존 ? 진입 동작과 overlay 종료 동작을 유지하고 섹션별 표시 항목을 검증하는 테스트를 추가한다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-07-31T08:56:09.503Z"
                     },
@@ -388,7 +388,7 @@
                         "details": "계획 문서: ~/.gstack/graphkeeper/20260731-0003-modern-architecture-boundary-improvement-plan.md. T1~T3 기반 위에 T4 Graph/Section/Context renderer projection, T5 최소 repository adapter/fake contract, T6 projection 테스트·contributor 문서·migration ledger 동기화를 1차 구현했다. 전체 popup projection, 모든 workflow의 OperationResult 통합, 대형 테스트 파일 분리는 후속 slice다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-01T12:45:00.000Z"
                     },
@@ -399,7 +399,7 @@
                         "details": "신규 boundary package의 forbidden import와 현재 legacy coupling baseline을 고정한다. 기존 go test/race/vet baseline을 유지하며 deliberate forbidden fixture가 guard 실패를 검증한다. 기존 internal/app legacy coupling은 baseline 예외로 기록하고 production behavior는 변경하지 않는다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T09:00:17.216Z"
                     },
@@ -412,7 +412,7 @@
                         "dependencies": [
                             4
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T09:01:00.323Z"
                     },
@@ -425,7 +425,7 @@
                         "dependencies": [
                             4
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T09:01:53.268Z"
                     },
@@ -438,7 +438,7 @@
                         "dependencies": [
                             6
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T09:02:13.889Z"
                     },
@@ -451,7 +451,7 @@
                         "dependencies": [
                             7
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T09:02:34.887Z"
                     },
@@ -464,7 +464,7 @@
                         "dependencies": [
                             4
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T09:03:01.362Z"
                     },
@@ -477,7 +477,7 @@
                         "dependencies": [
                             4
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-21T09:03:22.911Z"
                     },
@@ -490,7 +490,7 @@
                         "dependencies": [
                             "4.2"
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined"
                     },
                     {
@@ -502,7 +502,7 @@
                         "dependencies": [
                             "2.11"
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined"
                     },
                     {
@@ -514,7 +514,7 @@
                         "dependencies": [
                             "2.12"
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined"
                     },
                     {
@@ -526,7 +526,7 @@
                         "dependencies": [
                             "2.13"
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined"
                     },
                     {
@@ -538,7 +538,7 @@
                         "dependencies": [
                             "2.14"
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined"
                     },
                     {
@@ -550,7 +550,7 @@
                         "dependencies": [
                             "2.15"
                         ],
-                        "parentTaskId": 2,
+                        "parentTaskId": "2",
                         "parentId": "undefined"
                     }
                 ],
@@ -573,7 +573,7 @@
                         "details": "",
                         "status": "cancelled",
                         "dependencies": [],
-                        "parentTaskId": 3,
+                        "parentTaskId": "3",
                         "parentId": "undefined"
                     }
                 ]
@@ -595,7 +595,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 4,
+                        "parentTaskId": "4",
                         "parentId": "undefined",
                         "updatedAt": "2026-07-31T08:42:11.256Z"
                     },
@@ -606,7 +606,7 @@
                         "details": "P0 QA finding. valid Git repository에서는 loadedSnapshotMsg 이후 repoStatus, graph snapshot, repoSnapshotLoaded, browse status가 일관되게 반영되어야 한다. repository read error와 non-Git directory는 Loading에 머물지 않고 사용자에게 명확한 blocked/error 상태를 보여야 한다. startup loading 중 q의 종료 정책을 명시하고 실제 binary/PTY에서 검증한다. pull·confirm·stale 기능 자체의 범위는 포함하지 않으며, startup lifecycle과 production composition 경계만 수정한다. 완료 기준: valid repo Loading→Browse, invalid repo Loading→error, q/quit 동작, loaded success/error integration test, go test/race/vet, scripts/check.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 4,
+                        "parentTaskId": "4",
                         "parentId": "undefined"
                     },
                     {
@@ -616,7 +616,7 @@
                         "details": "같은 workspace의 다른 창에서 commit/reset/branch 변경이 발생하면 기존 1초 refresh cycle로 main Graph snapshot을 반영하고, 열린 Inspector는 정상 refresh마다 무조건 닫지 않는다. injected refresh는 graphReadSnapshot뿐 아니라 repoStatus, repoSnapshotLoaded, syncBrowseState, deriveStatus를 기존 loaded snapshot 성공 경로와 동일하게 갱신한다. legacy refresh는 applyRepositoryStatus/syncBrowseState/조건부 deriveStatus/loadStashState의 기존 ownership을 유지한다. 현재 commit/file identity를 재검증해 유효하면 active reader를 취소하고 commitInspectorRequest를 metadata 전후로 증가시켜 metadata와 첫 diff를 새 request로 자동 재조회한다. ChangedFile.CanonicalKey를 `(status, oldPath, path, occurrenceIndex)` length-prefixed canonical key로 보존하고 StableID miss 시 정확히 하나의 canonical match만 fallback한다. commit_not_found/file_not_found만 Inspector를 닫고 exact recovery alert를 표시하며, configuration/parse/git_exit/timeout/identity/canceled/reader는 Inspector를 유지한다. commit_not_found는 internal/git/repo_exec.go의 git.ErrCommitNotFound typed boundary와 adapter mapping으로 분류한다. refresh 자체 error/cancel은 Inspector를 보존한다. rejected refresh의 markPullStale pull-side effect는 유지하되 repository projection과 Inspector에는 영향을 주지 않는다. request/epoch/commit/parent/file/window mismatch, continuation, renderer final-output height matrix, 실제 model.Update의 Graph Enter → metadata/diff → Inspector production path를 검증한다. Commit Inspector mutation capability는 추가하지 않으며 tree-sitter grammar/combined diff/Git status reliability는 별도 후속 범위다. 완료 기준: focused/race/full test, vet, build, gofmt/diff-check, PTY smoke 및 independent review CLEAN.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 4,
+                        "parentTaskId": "4",
                         "parentId": "undefined"
                     }
                 ],
@@ -639,7 +639,7 @@
                         "details": "",
                         "status": "cancelled",
                         "dependencies": [],
-                        "parentTaskId": 5,
+                        "parentTaskId": "5",
                         "parentId": "undefined"
                     },
                     {
@@ -649,7 +649,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 5,
+                        "parentTaskId": "5",
                         "parentId": "undefined"
                     }
                 ]
@@ -671,7 +671,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -681,7 +681,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -691,7 +691,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-27T08:58:44.604Z"
                     },
@@ -702,7 +702,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-27T09:05:41.329Z"
                     },
@@ -713,7 +713,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -723,7 +723,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-27T08:58:45.943Z"
                     },
@@ -734,7 +734,7 @@
                         "details": "막힌 이유: q/Esc 계약이 spec 안에서 모순된다. spec 은 Inspector 푸터를 'q close  Esc back  ? help' 로 요구하는데, 같은 문서의 modal Esc-first 계약은 q 를 오버레이 닫기에 배정한다. 어느 쪽이 이기는지 정하기 전에는 두 건을 함께 고칠 수 없다. MED-7 과 MED-8 은 같은 결정에 걸려 있으므로 한 번에 처리한다.",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -744,7 +744,7 @@
                         "details": "막힌 이유: q/Esc 계약이 spec 안에서 모순된다. spec 은 Inspector 푸터를 'q close  Esc back  ? help' 로 요구하는데, 같은 문서의 modal Esc-first 계약은 q 를 오버레이 닫기에 배정한다. 어느 쪽이 이기는지 정하기 전에는 두 건을 함께 고칠 수 없다. MED-7 과 MED-8 은 같은 결정에 걸려 있으므로 한 번에 처리한다.",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -754,7 +754,7 @@
                         "details": "커밋 5a61948 + dd4e8a5. 섹션 스코프 키는 오버레이에 등재: Graph enter, Remote d, Tags P/D. 남은 S/F 등은 전역 키이고, Global 을 오버레이에 넣는 것은 hidden_hotkeys_test.go:55-58 네 케이스, TestGlobalHotkeyItemsAreMainFooterSource, README '## Keyboard' 셋과 충돌한다. Task 8 로 분리해 결정 대기. 원 finding 의 'Remote p (pull) 누락' 주장은 철회: p 는 Current 와 Graph 에서만 분기하며 Remote 에서는 아무 것도 하지 않는다. 오버레이가 옳았고 README 가 틀렸다.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -764,7 +764,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -774,7 +774,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -784,7 +784,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -794,7 +794,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -804,7 +804,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -814,7 +814,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-27T03:07:21.968Z"
                     },
@@ -825,7 +825,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "updatedAt": "2026-08-27T02:38:47.183Z",
                         "parentId": "undefined"
                     },
@@ -836,18 +836,18 @@
                         "details": "",
                         "status": "cancelled",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined",
                         "updatedAt": "2026-08-27T08:48:06.282Z"
                     },
                     {
                         "id": 18,
                         "title": "N4 (P2) scripts/check 실패 — AC 18의 미충족 절반",
-                        "description": "scripts/test 가 GOTMPDIR을 리포 안(.cache/tmp)으로 설정해 t.TempDir()이 워킹트리에 생기고 TestAdapterRejectsDirectoryWithoutRepository 가 graphkeeper 자신을 찾음. GOTMPDIR 리포 밖에서는 통과. 기존 문제이며 이 브랜치와 무관. T28.",
+                        "description": "scripts/test 가 GOTMPDIR을 리포 안(.cache/tmp)으로 설정해 t.TempDir()이 워킹트리에 생기고 TestAdapterRejectsDirectoryWithoutRepository 가 graphkeeper 자신을 찾음. GOTMPDIR 리포 밖에서는 통과. 기존 문제이며 이 브랜치와 무관. T28. [완료 2026-08-28, 커밋 c6be7cb — GOTMPDIR 만 리포 밖으로. task 9 의 T28 과 동일 건.]",
                         "details": "",
-                        "status": "pending",
+                        "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -857,7 +857,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "parentId": "undefined"
                     },
                     {
@@ -867,7 +867,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 6,
+                        "parentTaskId": "6",
                         "updatedAt": "2026-08-27T06:39:04.853Z",
                         "parentId": "undefined"
                     }
@@ -891,7 +891,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 7,
+                        "parentTaskId": "7",
                         "parentId": "undefined"
                     },
                     {
@@ -901,7 +901,7 @@
                         "details": "",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 7,
+                        "parentTaskId": "7",
                         "parentId": "undefined"
                     },
                     {
@@ -911,7 +911,7 @@
                         "details": "커밋 d628759 + 7ec7e9a. 네 상태 표를 두 경로 모두에 적용: graph 의 m/r (update_fetch.go graphActionCheckMsg) 과 target picker (preview.go buildActionPreview). (0,0) 과 (N,0) 은 차단으로 전환 — 각각 아무 일도 하지 않는 merge 와 이미 가진 커밋을 다시 쓰는 rebase 였다. fast-forward 는 노트 권고와 달리 실행 유지: 노트가 대안으로 지목한 pull 은 upstream 을 요구해서 로컬->로컬 fast-forward 를 못 하고, 확인창의 f 가 유일한 경로다. 막으면 기능이 옮겨가는 게 아니라 사라진다. 확인창은 이미 스스로를 'Fast-forward available.' 로 부르므로 merge 오인 우려는 해당 없음. 두 테스트 모두 수정 전 코드에 RED 증명. 4브랜치 픽스처로 네 상태 라이브 확인. 결정과 이유는 게이트 노트 문서 말미에 기록.",
                         "status": "done",
                         "dependencies": [],
-                        "parentTaskId": 7,
+                        "parentTaskId": "7",
                         "parentId": "undefined"
                     },
                     {
@@ -921,7 +921,7 @@
                         "details": "",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 7,
+                        "parentTaskId": "7",
                         "parentId": "undefined"
                     },
                     {
@@ -931,7 +931,7 @@
                         "details": "재현: remote 없는 git init 리포에서 graph 진입 후 임의 행에 m. 판단 필요 — 앱이 remote 중심 도구라 이 기본 상태가 의도된 것인지, 아니면 pull 계열에만 걸려야 할 게이트가 전역 기본 상태로 올라간 것인지.",
                         "status": "pending",
                         "dependencies": [],
-                        "parentTaskId": 7,
+                        "parentTaskId": "7",
                         "parentId": "undefined"
                     }
                 ],
@@ -949,7 +949,7 @@
                 "subtasks": []
             },
             {
-                "id": 9,
+                "id": "9",
                 "title": "alpha.6 실행 계획 — 33-태스크 + 리뷰 파생 (단일 출처)",
                 "description": "승인된 33-태스크 계획(2026-08-26 /plan-eng-review)과 2026-08-28 CEO/eng 리뷰가 파생시킨 C1~C5·E1~E4 를 한 곳에 모았다. 원본 JSONL 3개는 status 필드가 없어 진행을 담지 못하므로 이 항목이 단일 출처다. task 6 은 '무엇이 깨졌나'(QA finding 원장), task 9 는 '무엇을 할까'(실행 계획).",
                 "details": "원본: ~/.gstack/projects/hrllk-graphkeeper/tasks-eng-review-20260826-174947.jsonl (33), tasks-ceo-review-20260828-142657.jsonl (5), tasks-eng-review-20260828-154234.jsonl (4). 상태는 2026-08-28 코드 검증으로 설정. 서술이 코드와 어긋난 T16·T19·T31 은 정정 메모를 달았다.",
@@ -966,7 +966,7 @@
                         "status": "done",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -978,7 +978,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -990,7 +990,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1002,7 +1002,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1014,7 +1014,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1026,7 +1026,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1038,7 +1038,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1050,7 +1050,7 @@
                         "status": "done",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1062,7 +1062,7 @@
                         "status": "done",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1074,7 +1074,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1086,7 +1086,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1098,7 +1098,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1110,7 +1110,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1122,7 +1122,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1134,7 +1134,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1146,7 +1146,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1158,7 +1158,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1170,7 +1170,7 @@
                         "status": "done",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1182,7 +1182,7 @@
                         "status": "pending",
                         "priority": "P3",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1194,7 +1194,7 @@
                         "status": "pending",
                         "priority": "P3",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1206,7 +1206,7 @@
                         "status": "pending",
                         "priority": "P3",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1218,7 +1218,7 @@
                         "status": "pending",
                         "priority": "P3",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1230,7 +1230,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1242,7 +1242,7 @@
                         "status": "done",
                         "priority": "P0",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1254,7 +1254,7 @@
                         "status": "done",
                         "priority": "P0",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1266,7 +1266,7 @@
                         "status": "done",
                         "priority": "P0",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1278,7 +1278,7 @@
                         "status": "cancelled",
                         "priority": "WITHDRAWN",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1290,7 +1290,7 @@
                         "status": "done",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1302,7 +1302,7 @@
                         "status": "pending",
                         "priority": "P3",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1314,7 +1314,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1326,7 +1326,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1338,7 +1338,7 @@
                         "status": "pending",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1350,7 +1350,7 @@
                         "status": "done",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1362,7 +1362,7 @@
                         "status": "cancelled",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1374,7 +1374,7 @@
                         "status": "cancelled",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1386,7 +1386,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1398,7 +1398,7 @@
                         "status": "cancelled",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1410,7 +1410,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1422,7 +1422,7 @@
                         "status": "cancelled",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1434,7 +1434,7 @@
                         "status": "cancelled",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1446,7 +1446,7 @@
                         "status": "cancelled",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1458,7 +1458,7 @@
                         "status": "cancelled",
                         "priority": "P1",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1470,7 +1470,7 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1482,7 +1482,7 @@
                         "status": "pending",
                         "priority": "P3",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1494,7 +1494,7 @@
                         "status": "pending",
                         "priority": "P3",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1506,7 +1506,7 @@
                         "status": "pending",
                         "priority": "P3",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
                         "parentId": "undefined"
                     },
                     {
@@ -1518,7 +1518,126 @@
                         "status": "pending",
                         "priority": "P2",
                         "dependencies": [],
-                        "parentTaskId": 9,
+                        "parentTaskId": "9",
+                        "parentId": "undefined"
+                    }
+                ]
+            },
+            {
+                "id": "10",
+                "title": "디자인 리뷰 파생 (5.x / 6.x)",
+                "description": "외부 디자인 리뷰가 도출한 항목. 2026-08-29 에 우선순위와 함께 공유됨. taskmaster 에 없던 것을 등록한다 — 5.4 와 6.3 은 추적 없이 진행됐다. 6.6~6.8 은 의존 그래프에만 있고 내용이 공유되지 않았다.",
+                "details": "의존: 5.4 -> (6.2 -> 6.4, 6.3, 6.1 -> 6.5) -> 6.6 -> 6.7 -> 6.8. 5.3 은 6.x 와 독립.",
+                "status": "in-progress",
+                "dependencies": [],
+                "priority": "high",
+                "subtasks": [
+                    {
+                        "id": "1",
+                        "taskId": "5.4",
+                        "title": "5.4 lint toolchain 복구",
+                        "description": "golangci-lint v2 설정과 v1 고정 바이너리 불일치. 실제 원인은 bootstrap 이 go install 실패 시 gofmt+vet 만 도는 575바이트 shim 을 쓰고 exit 0 을 낸 것 — 2026-07-06 부터 7주간 lint 가 한 번도 안 돌았다. 완료: 3a58427(v2 설치, shim 제거), d82bcaf(gofumpt 제거), 48eaf00(baseline + L1~L4).",
+                        "details": "",
+                        "status": "done",
+                        "priority": "P1",
+                        "dependencies": [],
+                        "parentTaskId": "10",
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": "2",
+                        "taskId": "6.3",
+                        "title": "6.3 색 없는 selection·focus",
+                        "description": "NO_COLOR 에서 커서가 보이지 않음. 순수 텍스트가 선택 여부와 무관하게 동일. 원인 둘: selected 가 검색어 없으면 무력(graph_search_render.go:12-14), lipgloss 가 Ascii 프로파일에서 속성까지 제거. 완료: df7ed32 — noColorEnabled() 일 때 reverse video 직접 출력. 094ca87 의 화살표 제거 결정은 유지.",
+                        "details": "",
+                        "status": "done",
+                        "priority": "P1",
+                        "dependencies": [],
+                        "parentTaskId": "10",
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": "3",
+                        "taskId": "6.2",
+                        "title": "6.2 80컬럼 미만 overflow",
+                        "description": "실측: 40컬럼에서 title 헤더와 커밋 제목이 통째로 없고 오른쪽 테두리가 안 닫힘. 60컬럼에서 rail 이 사라지고 하단 테두리가 넘치며 footer 가 'ctr' 에서 끊김. 그 상태에서도 왼쪽 여백은 계속 적용된다. 80컬럼은 정상. Commit Inspector 는 40/60/80 전부 정상이라 베낄 폭 계산이 이미 리포 안에 있다.",
+                        "details": "",
+                        "status": "pending",
+                        "priority": "P1",
+                        "dependencies": [],
+                        "parentTaskId": "10",
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": "4",
+                        "taskId": "6.1",
+                        "title": "6.1 DESIGN.md 정합",
+                        "description": "코드 변경 0줄. DESIGN.md:26-29 는 hex 팔레트를 규정하고 docs/highlighting-color-map.md:3 은 'ANSI 기본색(0-15) … 고정 RGB 가 아니라 palette 슬롯' 을 규정한다. 정면 충돌. CLAUDE.md 가 모든 UI 결정 전에 DESIGN.md 를 읽으라고 지시하므로 6.5 전에 정리해야 한다.",
+                        "details": "",
+                        "status": "pending",
+                        "priority": "P2",
+                        "dependencies": [],
+                        "parentTaskId": "10",
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": "5",
+                        "taskId": "6.4",
+                        "title": "6.4 컬럼 예산 재배분",
+                        "description": "state 컬럼이 22칸을 비워둔 채 제목을 11자로 자른다는 지적. 6.2 가 폭 계산을 먼저 정리해야 그 위에서 재배분이 의미가 있다. 주의: 원 리뷰가 인용한 'Reddit 20자 강제 truncation' 은 출처를 확인하지 못했다.",
+                        "details": "",
+                        "status": "pending",
+                        "priority": "P2",
+                        "dependencies": [],
+                        "parentTaskId": "10",
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": "6",
+                        "taskId": "6.5",
+                        "title": "6.5 theme token",
+                        "description": "6.1 선행. 어느 문서가 정답인지 정해진 뒤 착수.",
+                        "details": "",
+                        "status": "pending",
+                        "priority": "P3",
+                        "dependencies": [],
+                        "parentTaskId": "10",
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": "7",
+                        "taskId": "6.6",
+                        "title": "6.6 (내용 미공유)",
+                        "description": "원 우선순위 목록의 의존 그래프에만 등장하고 내용이 공유되지 않았다. 확인 필요.",
+                        "details": "",
+                        "status": "pending",
+                        "priority": "P3",
+                        "dependencies": [],
+                        "parentTaskId": "10",
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": "8",
+                        "taskId": "6.7",
+                        "title": "6.7 (내용 미공유)",
+                        "description": "6.6 과 동일.",
+                        "details": "",
+                        "status": "pending",
+                        "priority": "P3",
+                        "dependencies": [],
+                        "parentTaskId": "10",
+                        "parentId": "undefined"
+                    },
+                    {
+                        "id": "9",
+                        "taskId": "6.8",
+                        "title": "6.8 (내용 미공유)",
+                        "description": "6.6 과 동일.",
+                        "details": "",
+                        "status": "pending",
+                        "priority": "P3",
+                        "dependencies": [],
+                        "parentTaskId": "10",
                         "parentId": "undefined"
                     }
                 ]
