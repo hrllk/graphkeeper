@@ -69,6 +69,13 @@ func graphAndRailWidths(bodyWidth int) (graphWidth, railWidth int) {
 	graphBudget := max(bodyWidth-4, 0)
 	railReserve := min(18, graphBudget*28/100)
 	graphWidth = max(min(int(float64(graphBudget)*0.72), graphBudget-railReserve), 0)
+	// At a budget of 1 the 0.72 truncates to 0 and the rail would end up wider than
+	// the graph, inverting decisions.md:15. Give the graph the larger half whenever
+	// the arithmetic leaves it behind; at every realistic width 0.72 already wins,
+	// so this only fires in the degenerate range.
+	if graphWidth*2 < graphBudget {
+		graphWidth = (graphBudget + 1) / 2
+	}
 	return graphWidth, graphBudget - graphWidth
 }
 

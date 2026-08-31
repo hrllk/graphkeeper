@@ -15,6 +15,12 @@ import (
 // binds, so it guards against regressions at the top end.
 var widthMatrix = []int{20, 30, 40, 60, 80, 140}
 
+// degenerateWidths are the widths where the split arithmetic is at its limits.
+// Found by /review: at terminal 9 the budget is 1, 0.72 truncates the graph to 0,
+// and the rail came out wider than the graph - the inversion decisions.md:15
+// forbids. widthMatrix starts at 20 and never reached it.
+var degenerateWidths = []int{5, 6, 7, 8, 9, 10, 12, 15}
+
 // widthFixture is the shared model for the width assertions. Two commits, one
 // local branch, snapshot marked loaded so the graph renders rows rather than the
 // empty state.
@@ -89,7 +95,7 @@ func TestNarrowFooterDoesNotCutMidWord(t *testing.T) {
 // shrinks the rail yields first. Before the fix the opposite happened: the rail
 // held a hard 18 columns and the graph was squeezed to 2 at terminal 30.
 func TestGraphNeverNarrowerThanRail(t *testing.T) {
-	for _, width := range widthMatrix {
+	for _, width := range append(append([]int{}, widthMatrix...), degenerateWidths...) {
 		m := widthFixture(width)
 		hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 		bodyWidth, _ := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
