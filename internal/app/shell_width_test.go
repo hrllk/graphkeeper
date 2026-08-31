@@ -116,7 +116,7 @@ func TestGraphRailSplitPerWidth(t *testing.T) {
 		{30, 14, 6},
 		{40, 20, 8},
 		{60, 31, 13},
-		{80, 54, 22},
+		{80, 43, 17},
 		{140, 77, 31},
 	} {
 		m := widthFixture(tt.width)

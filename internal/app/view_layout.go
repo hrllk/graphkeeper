@@ -10,6 +10,14 @@ import (
 
 const layoutSectionGap = 1
 
+// shellRowsReservedForContent is how many rows the vertical margins refuse to
+// take from the body. Both numbers here are measured, not derived: the shell
+// cannot draw in fewer than five rows (two borders, one content row, the section
+// gap, the footer), and reserving four is what makes the rendered height match
+// the terminal exactly from five rows up. Reserving five instead leaves the body
+// a row short of the terminal at some heights - safe, but wasteful.
+const shellRowsReservedForContent = 4
+
 func joinLayoutSections(sections ...string) string {
 	nonEmpty := make([]string, 0, len(sections))
 	for _, section := range sections {
@@ -34,14 +42,27 @@ func layoutShellMargins(m model) (hMargin, topMargin, bottomMargin int) {
 	if bottomMargin < 2 {
 		bottomMargin = 2
 	}
-	if maxMargin := (m.width - 80) / 2; maxMargin >= 0 && hMargin > maxMargin {
-		hMargin = maxMargin
-	}
+	// There used to be a cap of (m.width - 80) / 2 here, the matched pair of the
+	// 80-column body floor removed with the graph-width fix. With the floor gone it
+	// no longer protected anything - a body below 80 is now normal - and its only
+	// remaining effect was to freeze the body at 80 columns for every terminal
+	// between 80 and 100 wide while the margin absorbed the rest. The margin is a
+	// flat 10% at every width now.
 	if maxTop := m.height - 20; maxTop >= 0 && topMargin > maxTop {
 		topMargin = maxTop
 	}
 	if maxBottom := m.height - topMargin - 19; maxBottom >= 0 && bottomMargin > maxBottom {
 		bottomMargin = maxBottom
+	}
+	// The two caps above only engage from height 20 up, so below that the floor of 2
+	// on each vertical margin stood even when the terminal could not pay for it: the
+	// shell needs five rows before any margin is paid for, and that plus two
+	// margins of 2 is already more than an eight-row terminal has. lipgloss.Place then centres the
+	// oversized frame and the Graph title is what scrolls off the top. The margins
+	// yield first; the content is what the user came for.
+	if budget := m.height - shellRowsReservedForContent; budget < topMargin+bottomMargin {
+		topMargin = max(min(topMargin, budget/2), 0)
+		bottomMargin = max(min(bottomMargin, budget-topMargin), 0)
 	}
 	return hMargin, topMargin, bottomMargin
 }
@@ -91,8 +112,13 @@ func layoutShellBodySize(m model, hMargin, topMargin, bottomMargin int) (width, 
 		width = 1
 	}
 	height = m.height - topMargin - bottomMargin
-	if height < 12 {
-		height = 12
+	// Same defect the width axis had, found by /review on the width fix: a floor of
+	// 12 raised the body above what the terminal has, and lipgloss.Place then
+	// centres the oversized frame so the top rows scroll off. At terminal height 10
+	// the frame was 15 rows and the Graph title was the part that vanished. The
+	// floor of 1 is where rendering stops meaning anything, matching the width axis.
+	if height < 1 {
+		height = 1
 	}
 	return width, height
 }

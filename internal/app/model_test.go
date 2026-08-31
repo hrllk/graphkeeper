@@ -2093,6 +2093,10 @@ func TestRenderHiddenHotkeySectionTitleHighlightsActiveSection(t *testing.T) {
 
 func TestRenderCherryPickPopupShowsQueueOrderAndHelp(t *testing.T) {
 	got := ansi.Strip(renderCherryPickPopup(model{
+		// The popup height comes from the model, and this fixture used to leave it at
+		// zero: the old floor of 12 on the body height silently supplied one. With the
+		// floor gone the height has to be stated, the way a real terminal states it.
+		navigationState: navigationState{width: 100, height: 40},
 		repositoryState: repositoryState{
 			repoStatus: git.Status{
 				Branch: "main",
