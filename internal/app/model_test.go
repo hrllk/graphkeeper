@@ -367,21 +367,28 @@ func TestSplitThreeHeightsUseStackedLayout(t *testing.T) {
 	}
 }
 
+// The bodyWidth half of this assertion is the contract 6.2 is about: the body is
+// the terminal minus its margins, at every width. It used to run only at 140,
+// where layoutShellBodySize's 80-column floor does not bind, so the floor
+// violated a contract this very test states and nothing noticed.
 func TestShellLayoutUsesFullHeightForGraphAndRightRail(t *testing.T) {
-	m := model{
-		navigationState: navigationState{
-			width:  140,
-			height: 60,
-		}}
-	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
-	bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
-	graphHeight := graphBoxHeightForModel(&m)
+	for _, width := range widthMatrix {
+		m := model{
+			navigationState: navigationState{
+				width:  width,
+				height: 60,
+			}}
+		hMargin, topMargin, bottomMargin := layoutShellMargins(m)
+		bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
+		graphHeight := graphBoxHeightForModel(&m)
 
-	if bodyWidth != m.width-2*hMargin {
-		t.Fatalf("expected body width to respect horizontal margin, got %d", bodyWidth)
-	}
-	if graphHeight != bodyHeight {
-		t.Fatalf("expected Graph to use full body height, got %d vs %d", graphHeight, bodyHeight)
+		if bodyWidth != m.width-2*hMargin {
+			t.Fatalf("width %d: expected body width to respect horizontal margin, got %d (want %d)",
+				width, bodyWidth, m.width-2*hMargin)
+		}
+		if graphHeight != bodyHeight {
+			t.Fatalf("width %d: expected Graph to use full body height, got %d vs %d", width, graphHeight, bodyHeight)
+		}
 	}
 }
 

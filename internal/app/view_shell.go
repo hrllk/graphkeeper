@@ -51,21 +51,7 @@ func renderAppView(m model) string {
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)
 
-	graphBudget := bodyWidth - 4
-	if graphBudget < 0 {
-		graphBudget = 0
-	}
-	graphWidth := int(float64(graphBudget) * 0.72)
-	if graphWidth < 56 {
-		graphWidth = 56
-	}
-	if graphWidth > graphBudget-18 {
-		graphWidth = graphBudget - 18
-	}
-	if graphWidth < 0 {
-		graphWidth = 0
-	}
-	rightWidth := graphBudget - graphWidth
+	graphWidth, rightWidth := graphAndRailWidths(bodyWidth)
 	graphContentHeight := graphContentHeightForModel(&m)
 	graphBox := renderFloatingTitleFrame(
 		m.getBoxStyle(sectionGraph).Width(graphWidth).Height(bodyHeight),

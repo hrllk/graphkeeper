@@ -46,10 +46,42 @@ func layoutShellMargins(m model) (hMargin, topMargin, bottomMargin int) {
 	return hMargin, topMargin, bottomMargin
 }
 
+// graphBoxWidthForBodyWidth splits the body between the Graph pane and the right
+// rail. Both view_shell.go and cherry_pick_view.go go through here; the shell used
+// to inline a byte-identical copy, which is how the two could have drifted.
+//
+// The rail reservation is proportional rather than a hard 18 columns because
+// decisions.md:15 makes Graph the primary full-height surface: when the body
+// shrinks, the rail yields first. With the old hard 18 the graph was squeezed to
+// 2 columns at terminal 30 while the rail kept its full width.
+//
+// The old `if graphWidth < 56` floor is gone. At width 80 that floor was what
+// produced 56, so removing it moves the split to 54/22 - a deliberate 2-column
+// shift rather than a special case, since the number it preserved was the floor's
+// own output. Width 140 and above are unaffected.
+func graphBoxWidthForBodyWidth(bodyWidth int) int {
+	graphWidth, _ := graphAndRailWidths(bodyWidth)
+	return graphWidth
+}
+
+// graphAndRailWidths owns the whole split so no caller recomputes the budget.
+func graphAndRailWidths(bodyWidth int) (graphWidth, railWidth int) {
+	graphBudget := max(bodyWidth-4, 0)
+	railReserve := min(18, graphBudget*28/100)
+	graphWidth = max(min(int(float64(graphBudget)*0.72), graphBudget-railReserve), 0)
+	return graphWidth, graphBudget - graphWidth
+}
+
 func layoutShellBodySize(m model, hMargin, topMargin, bottomMargin int) (width, height int) {
+	// The body is the terminal minus its margins. This used to clamp up to 80
+	// whatever the terminal was, so every layout below 80 columns was computed for
+	// a body the terminal could not show and lipgloss.Place (view_shell.go) centred
+	// the oversized result: measured 64 columns off screen at terminal 20, 32 at 60.
+	// decisions.md:91 forbids exactly that. The floor of 1 is where rendering stops
+	// meaning anything - fitVisibleWidth returns "" for width <= 0.
 	width = m.width - hMargin*2
-	if width < 80 {
-		width = 80
+	if width < 1 {
+		width = 1
 	}
 	height = m.height - topMargin - bottomMargin
 	if height < 12 {

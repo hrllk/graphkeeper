@@ -10,24 +10,6 @@ import (
 	"hrllk/graphkeeper/internal/state"
 )
 
-func graphBoxWidthForBodyWidth(bodyWidth int) int {
-	graphBudget := bodyWidth - 4
-	if graphBudget < 0 {
-		graphBudget = 0
-	}
-	graphWidth := int(float64(graphBudget) * 0.72)
-	if graphWidth < 56 {
-		graphWidth = 56
-	}
-	if graphWidth > graphBudget-18 {
-		graphWidth = graphBudget - 18
-	}
-	if graphWidth < 0 {
-		graphWidth = 0
-	}
-	return graphWidth
-}
-
 func renderCherryPickPopup(m model, bodyWidth int) string {
 	graphWidth := graphBoxWidthForBodyWidth(bodyWidth)
 	graphHeight := graphBoxHeightForModel(&m)
