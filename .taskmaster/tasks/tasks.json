@@ -1630,12 +1630,146 @@
             "testStrategy": "RED 증명이 되는 기존 단언들 (삭제하지 말고 뒤집을 것 — 총 11곳):\n  model_test.go:1620 (enter: dismiss + esc: close, Alert)\n  model_test.go:1651 (f: fast-forward + esc: close)\n  model_test.go:1749 (Create branch + esc: close)\n  model_test.go:2071 (findLine(\"esc: close\"))\n  model_test.go:3291 / 3393 / 3412 (enter: jump / stash / create + esc: close)\n  model_test.go:4089 (Reset mode + esc: close)\n  hidden_hotkeys_test.go:230 / 262\n  task215_confirmation_projection_test.go:61 (esc: cancel)\n추가로 '표시는 없어도 기능은 산다' 를 지키는 새 테스트가 필요하다: footer 문자열에 esc 가 없는 상태에서 esc 키가 여전히 팝업을 닫는지 단언 (CancelKeys 경유). 이게 없으면 다음 사람이 표시를 지우면서 바인딩까지 지운다.\n범위 밖: hidden_hotkeys.go:26 hiddenHotkeyPopupFooter = \"esc: close\" (? 오버레이) 는 사용자가 요청하지 않았으므로 유지."
           }
         ]
+      },
+      {
+        "id": "11",
+        "title": "Graph 날짜 노출과 두 커밋 구간 경로 하이라이팅",
+        "description": "세 요청을 한 계획으로 묶었다. (1) graph에 날짜 노출, (2) Commit Inspector 날짜 상세, (3) 두 커밋을 선택해 그 사이 조상 경로를 하이라이팅. 계획 문서: docs/20260907-0001-graph-dates-and-commit-range-plan.md. 설계 문서: ~/.gstack/projects/hrllk-graphkeeper/hrk-main-design-20260907-224500.md.\n\n확정된 결정 2건. D4: 구간은 git rev-list --ancestry-path A..B(경로만)로 정의한다. 요청 문구가 '두커밋 길 확인'이었고 graph가 --all --topo-order이므로 화면상 인접 행은 조상 관계를 보장하지 않는다. D5: 날짜는 Details 패널에 먼저 넣고 graph yymmdd 컬럼은 task 6.4에 편입한다.\n\n미결 3건이 blocking이다. O1 Inspector 헤더 날짜 행 배치, O2 author date와 commit date 중 무엇, O3 하이라이팅 다음에 무엇을 할 수 있어야 하나. 각각 권고안이 계획 문서에 있다. 11.1~11.4는 미결과 무관하게 착수 가능하고 11.5~11.9는 해당 미결이 풀린 뒤다.\n\n등록 위치를 task 1(feature) 하위가 아니라 top-level로 둔 이유: 세 요청이 서로 독립적이고 task 6.4/6.8과 교차 의존을 갖는다.",
+        "details": "/plan-ceo-review 2026-09-08 (HOLD SCOPE)에서 13건을 반영했다. 그중 계획의 핵심 근거를 뒤집은 것 2건.\n\n(1) 자기모순. D4를 고른 근거가 '결과가 비어 있으면 분기했다는 뜻'이었는데 --ancestry-path A..B가 비는 경우는 셋이다: 진짜 분기, 사용자가 방향을 거꾸로 고름, 두 커밋이 동일. 초안대로 구현하면 최신 커밋을 먼저 찍고 오래된 커밋을 나중에 찍었을 때 '분기했다'고 표시한다. D4를 고른 이유가 '화면상 행 범위는 사용자에게 거짓을 가르치므로 기각'이었으므로 기각한 대안과 같은 죄를 짓는다. 해소: 잠정 P4로 방향 자동 판정 + 4상태. 클로드와 코덱스가 독립적으로 같은 결론에 도달한 항목이다.\n\n(2) 사실 오류. 초안이 80컬럼 title 가용폭을 11자로 적었으나 그건 2d9c4c4 이전 값이다. 실측은 -2칸(고정 컬럼만으로 이미 초과). 코덱스가 지적했고 shell_width_test.go:113-118로 확인했다. D5를 뒤집지 않고 더 강하게 만든다.\n\nCRITICAL GAP 1건: repo_parse.go의 필드 수 불일치는 오류를 만들지 않고 continue하므로 코드가 잘못돼도 조용하다. 완화는 테스트뿐이다.\n\n아웃사이드 보이스: codex-cli 0.153.3, 12건 중 10건 수용. 기각한 2건은 코덱스가 task 10 아래의 스텁 항목('내용 미공유')을 실제 6.4/6.8로 오인한 것이며, 그 자체가 tasks.json 중복 결함을 드러내 TODOS.md에 등록했다.\n\n다음 리뷰: 구현 전 /plan-eng-review 필수(유일한 ship 게이트). 11.6 착수 전 /plan-design-review(마커 우선순위 표 없음).",
+        "testStrategy": "이 저장소의 테스트 파일 64개 중 model.View()를 호출하는 것은 0개다(prior learning view-never-called-in-tests, 9/10, 2026-08-26). 세 요청이 전부 '상태를 바꾸고 결과가 화면에 나타나는지'가 본질이므로 이 공백에 정면으로 걸린다.\n\n필수 8항목. (1) 11.6에 raw 경로 테스트 필수 — row.Graph != \"\" fixture로 renderRawGraphLineWithSearch를 직접 검증. non-raw만 검증한 테스트는 완료 근거로 인정하지 않는다. (2) NO_COLOR 단언 — df7ed32가 커서에 대해 한 것을 참고. (3) P4의 4상태를 각각 단언 — 정방향/역방향/동일 커밋/진짜 분기/조회 실패. 3상태만 단언하면 자기모순을 통과시킨다. (4) 파서 필드 수 회귀 단언 — '커밋 수가 0이 아니다'. 이 테스트가 없으면 무음 스킵이 빈 그래프로만 드러난다. (5) 폭 40/60/80과 높이 12/20/30을 11.2, 11.5, 11.7에 적용. (6) epoch 무효화 단언 — anchor를 세운 뒤 repositoryEpoch를 올리고 하이라이트가 지워지는지. (7) 빈 ref 가드 단언 — AncestryPath(ctx, \"\", \"abc\")가 오류를 반환하는지. (8) VIRTUAL_CONFLICT_HASH를 anchor로 시도하면 거부되고 git 서브프로세스에 도달하지 않는지.\n\n각 subtask 완료 조건에 scripts/check(test + vet + build + gofmt/diff-check) CLEAN 포함.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": "1",
+            "title": "T1 graph log 포맷에 절대 날짜 필드 추가",
+            "description": "GraphCommit에 날짜 필드를 넣고 파서·graph 패키지 재조립까지 전부 올린다. 화면 변화는 없다.",
+            "details": "계획: docs/20260907-0001-graph-dates-and-commit-range-plan.md T1. 손대야 하는 6개 지점: (1) repo_parse.go:186 포맷 문자열 + placeholder 결정(%cs 기본, --date 인자 불필요), (2) repo_parse.go:132 SplitN 인자와 len(parts) 검사를 함께 올림 — 하나만 바꾸면 모든 커밋이 continue로 조용히 스킵됨, (3) repo_parse.go:137-145 위치 인덱스가 parts[2:6]로 하드코딩되어 있으므로 새 필드는 맨 끝에 붙임, (4) internal/graph/graph.go:19,35 Commit/Node 필드, (5) internal/graph/graph.go:72-84 Nodes와 :174-180 rowsFromGraph의 Node 재조립 — 빠뜨리면 값이 zero value로 조용히 소실, (6) startup_projection.go:28, navigation_graph.go:128, cherry_pick.go:31 필드 복사. 완료 기준: rows 통과 후 값 보존 단언 + 커밋 수가 0이 아님을 단언(무음 스킵 감지) + 기존 렌더 결과 바이트 동일 + scripts/check CLEAN.",
+            "status": "pending",
+            "dependencies": [],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          },
+          {
+            "id": "2",
+            "title": "T2 Details 패널 graph 섹션에 date 행 추가",
+            "description": "선택한 커밋의 날짜를 우측 Details에 표시한다. 폭 비용 0. 사용자에게 보이는 첫 변화다.",
+            "details": "계획 T2 / 결정 D5 전반부. view_detail.go:27-38 graph 섹션에 focus 다음 줄로 넣는다. 현재 이 섹션은 focus/branches/stashes/tags만 있고 날짜가 없는데 같은 파일 :78 tags 섹션에는 age:가 있어 비대칭이다. key/value 관습은 view_detail.go:110에 이미 있다. 형식은 계획 P1(YYYY-MM-DD HH:MM + 상대시간, 폭 부족 시 상대시간 먼저 버림). 완료 기준: 커서 이동에 따라 값이 바뀌고 폭 40/60/80에서 Details 박스를 넘치지 않음. tags의 age:와 어휘 이원화는 task 6.6 범위이므로 여기서 통일하지 않고 세 번째 어휘를 만들지 않는 것까지만 지킨다.",
+            "status": "pending",
+            "dependencies": [
+              "11.1"
+            ],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          },
+          {
+            "id": "3",
+            "title": "T3 Commit Inspector 날짜 데이터 계층 통과",
+            "description": "CommitSnapshot에 날짜가 없어서 표시가 없다. git → contract → adapter까지 4계층을 관통시킨다. 표시는 T5.",
+            "details": "계획 T3. (1) repo.go:110 CommitInspection에 필드, (2) repo_exec.go:162 포맷 문자열 + SplitN(meta, \"\\x00\", 5)와 len(parts) != 5를 함께 올림 — 포맷만 바꾸면 즉시 invalid commit metadata로 Inspector 전체가 죽는다. 새 개수는 미결 O2가 정함(날짜 1개면 6, 둘이면 7). P2에 따라 --date=iso-strict로 원본 오프셋 유지, (3) commitinspector/contract.go:93 CommitSnapshot에 필드, (4) adapter/out/commitinspector/reader.go:86 필드 단위 수동 매핑에 추가. 완료 기준: adapter 테스트가 날짜가 계층 4까지 도달함을 단언. 이 단계에서 화면 변화 없음.",
+            "status": "pending",
+            "dependencies": [
+              "11.1"
+            ],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          },
+          {
+            "id": "4",
+            "title": "T4 ancestry-path 조회와 구간 상태",
+            "description": "두 커밋 사이 경로를 git에 물어보고 방향까지 판정한다. 하이라이트 렌더는 T6.",
+            "details": "계획 T4 / 결정 D4 + 잠정 P4, P5. internal/git에 AncestryPath(ctx, from, to)를 추가하고 rev-list --ancestry-path from..to를 쓴다. 필수: 빈 ref 가드(Divergence repo_exec.go:830-832와 동일 — git에서 ..B는 HEAD..B로 해석되어 조용히 다른 질문에 답한다), VIRTUAL_CONFLICT_HASH 제외(graph_search.go:23 관습). 상태: navigationState(model.go:114)에 graphRangeAnchor string + graphRangeEpoch uint64. 오류 전달은 3상태 프로젝션(repository_read.go:42)이 아니라 checkGraphActionTarget(commands.go:536-548)의 msg err 관용구를 쓴다 — 일회성 비동기 질의이므로. epoch 폐기는 update_lifecycle.go:42,62,77 패턴. GraphProjection(view_projection.go:28)에 RangeMembers map[string]bool을 더하되 구조체 필드만으로는 화면에 아무 일도 안 일어난다: view_projection.go:84 수동 조립부를 채우고 view_graph.go:52-58에서 행별로 렌더러 인자로 넘겨야 한다(StashCounts/Handshake와 같은 형태). 완료 기준: P4의 4상태(same commit / path n (방향) / diverged / unavailable)를 각각 단언. 3상태로는 미완 — 방향 역전과 동일 커밋이 분기로 읽히면 자기모순이 남는다.",
+            "status": "pending",
+            "dependencies": [],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          },
+          {
+            "id": "5",
+            "title": "T5 Inspector 헤더에 날짜 표시 — 미결 O1, O2 선행",
+            "description": "헤더 4행 고정 계약과 pending 6.8이 둘 다 걸려 있어 배치 결정이 먼저 필요하다.",
+            "details": "계획 T5 + 미결 O1(5행으로 늘리기 / FROM 자리 교체 / 6.8로 이월, 권고: 5행), O2(다를 때만 둘 다 / author만 / 항상 둘 다, 권고: 다를 때만 둘 다). O1은 task 1.21의 4행 고정 헤더 계약과 pending 6.8을 건드린다. commit_inspector_screen.go의 renderCommitInspectorScreen 경로만 고친다 — commit_inspector.go:122 renderCommitInspectorPopup은 프로덕션 호출자가 0개인 죽은 렌더러다(view_shell.go:49는 screen만 호출, 호출자는 commit_inspector_test.go:74,98뿐). 계획 초안의 '두 경로를 모두 고친다'는 철회됐다. 높이 12/20/30 매트릭스 재확인 필요(5행 선택 시 diff에서 1줄 감소).",
+            "status": "pending",
+            "dependencies": [
+              "11.3"
+            ],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          },
+          {
+            "id": "6",
+            "title": "T6 구간 하이라이트 렌더 — 미결 O3 선행",
+            "description": "경로 상의 커밋을 graph에서 강조한다. 색에만 의존하면 안 되고 마커 우선순위 표가 먼저 필요하다.",
+            "details": "계획 T6 + 미결 O3(표시+요약만 / 구간 diff를 Inspector로 / 구간 대상 액션, 권고: 표시+요약만). graph_render.go의 renderGraphLineWithSearch(:55)와 renderRawGraphLineWithSearch(:100) 둘 다 고친다 — 후자가 실사용 경로이므로 전자만 고치면 테스트는 초록이고 화면은 안 바뀐다. 색 비의존 신호 필수: theme.go searchMatchMark(underline+bold) 재사용 또는 df7ed32의 거터 마커 패턴. highlighting-color-map.md Policy와 pending 6.3이 이를 요구한다. 선행 조건: 마커 우선순위 표. 한 행에 HEAD 마커/커서 포인터/검색 매치/stash·tag 마커가 이미 겹칠 수 있고 range가 다섯 번째다. 착수 전 /plan-design-review 권고. 완료 기준: raw 경로 테스트 필수(non-raw만 검증한 테스트는 완료 근거로 인정 안 함) + NO_COLOR 단언.",
+            "status": "pending",
+            "dependencies": [
+              "11.4"
+            ],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          },
+          {
+            "id": "7",
+            "title": "T7 구간 요약을 Details에 표시 — 미결 O3 선행",
+            "description": "경로 길이와 방향을 문장으로 알려준다. 방향을 빼면 이 기능의 교육 가치가 사라진다.",
+            "details": "계획 T7. T4의 4상태를 그대로 노출한다: 'range: same commit' / 'range: 7 commits (4d8fcbc -> b2fd316)' / 'range: diverged (no ancestry path)' / 'range: unavailable'. 방향 표시가 P4의 핵심 — 개수만 보여주면 사용자가 어느 쪽이 조상인지 알 수 없고 그걸 알려주는 것이 이 기능의 목적이다. 관측성: AncestryPath 실패는 이벤트 싱크와 UI 양쪽에 도달해야 한다. update_stash.go:16-19가 싱크로만 보내고 '(no stash entries)'를 표시한 사고(24e6e63에서 수정)와 같은 실수를 반복하지 않는다.",
+            "status": "pending",
+            "dependencies": [
+              "11.4"
+            ],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          },
+          {
+            "id": "8",
+            "title": "T8 v 키를 ? 오버레이에 등록 — task 8과 충돌",
+            "description": "문서화되지 않은 키를 11개로 늘리지 않으려면 키 구현과 등록이 같은 커밋이어야 한다.",
+            "details": "계획 T8 + 잠정 P3(키 = v, vim visual mode와 의미 동일. 현재 바인딩된 33개 키에 v는 없음). hidden_hotkeys.go의 graph 섹션(:231-249)에만 등록한다. 메인 footer에는 넣지 않는다 — decisions.md:8-9가 'Keep only Global core navigation keys in the main footer'로 못 박았고 코드도 footer를 globalHotkeyItems(hidden_hotkeys.go:33-50)만 소스로 쓴다. v는 graph 섹션 전용 액션이다. 계획 초안의 'footer에도 등록' 지시는 철회됐다. task 8(전역 키 10개가 어디에도 없음)이 미결이므로 키를 먼저 넣고 문서화를 나중에 하는 순서를 금지한다.",
+            "status": "pending",
+            "dependencies": [
+              "11.4"
+            ],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          },
+          {
+            "id": "9",
+            "title": "T9 yymmdd 컬럼을 task 6.4에 편입 — 코드와 결정 기록 동시 갱신",
+            "description": "80컬럼 이하에서는 고정 컬럼만으로 이미 폭을 초과하므로 지금 컬럼을 넣을 수 없다. 6.4가 폭을 회수한 뒤다.",
+            "details": "계획 T9 / 결정 D5 후반부 + R2, R2-bis. 실측(shell_width_test.go:113-118 + view_shell.go:56): 80컬럼에서 graph 패널 43, 렌더러가 받는 content 39, 고정폭 합계 41 → title 가용폭 -2. 40컬럼에서 -25, 60컬럼에서 -14. 즉 날짜 컬럼은 '빠듯'이 아니라 불가능하고, task 6.2(80컬럼 미만 overflow 수정)가 선행이다. 6.4의 기존 완료 기준('100컬럼에서 title 가용폭이 80컬럼 대비 증가')은 유지한다 — 날짜는 회수한 폭 안에서 해결하고 title을 희생해 얻지 않는다. 필수 조건: docs/decisions.md에 반전 항목을 코드와 같은 커밋에서 적는다. 지금 기록은 2026-08-01 'title은 나머지 폭 전부를 받는다'(열거 목록에 날짜 없음)와 2026-07-10 'graph 행은 컬럼이 아니라 compact marker로 해결한다'이다. 안 적으면 코드와 결정 기록이 어긋난 채 남는다.",
+            "status": "pending",
+            "dependencies": [
+              "11.1"
+            ],
+            "priority": "medium",
+            "parentTaskId": "11",
+            "parentId": "undefined",
+            "updatedAt": "2026-09-08"
+          }
+        ]
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-08-28T00:50:42.378Z",
-      "taskCount": 8,
+      "lastModified": "2026-09-08T00:30:00Z",
+      "taskCount": 11,
       "completedCount": 2,
       "tags": [
         "master"
