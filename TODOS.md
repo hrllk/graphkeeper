@@ -59,3 +59,34 @@
 
       고치는 법: Success Criteria를 "T7이 반전하고, 듀얼 패스가 사라지는 T15에서
       삭제한다"로 바꾼다. 발견: 2026-08-28 /plan-ceo-review (HOLD SCOPE).
+
+- [ ] Commit Inspector의 죽은 렌더러를 정리한다. (2026-09-08 /plan-ceo-review C7)
+      `internal/app/commit_inspector.go:122` `renderCommitInspectorPopup`은 프로덕션
+      호출자가 0개다. `view_shell.go:49`는 `renderCommitInspectorScreen`만 호출한다.
+      호출자는 `commit_inspector_test.go:74`와 `:98` 둘뿐이므로, 테스트가 죽은 코드를
+      살아 있는 것처럼 고정하고 있다.
+
+      위험: "일관성을 위해 두 렌더 경로를 모두 고쳐라"라는 지시를 따르는 사람이
+      죽은 코드를 유지보수한다. `20260907-0001` 계획 초안이 실제로 그 지시를 적었고
+      리뷰에서 철회했다.
+
+      같은 파일 `:456` `inspectorStatus`는 호출자가 0개다(테스트 포함). 함께 정리한다.
+
+      순서: 렌더러와 그 테스트를 같은 커밋에서 지운다. 테스트만 남기면 컴파일이
+      깨지고, 렌더러만 남기면 다음 사람이 다시 속는다.
+
+- [ ] `.taskmaster/tasks/tasks.json`의 스텁 중복을 제거한다. (2026-09-08 /plan-ceo-review C13)
+      task 6.1~6.8이 두 번 표현되어 있다. task 6의 subtasks에는 실제 내용(감사 리포트
+      인용과 완료 기준)이 있고, task 10의 subtasks 9개는 같은 taskId를 빈 껍데기로
+      갖는다: `taskId: "6.4"`, `title: "6.4 (내용 미공유)"`,
+      `description: "원 우선순위 목록의 의존 그래프에만 등장하고 내용이 공유되지 않았다."`
+
+      실제로 터진 사례: 2026-09-08 아웃사이드 보이스(codex)가 스텁을 먼저 읽고
+      "task 6.4에는 완료 기준이 없고 6.8은 author 이메일 잘림을 지적하지 않는다"는
+      반대 결론을 냈다. 두 지적 모두 실제 항목을 보면 사실이 아니다. 독립 리뷰가
+      빈 껍데기를 근거로 계획을 반박하게 만드는 구조다.
+
+      task 9에도 같은 형태의 스텁이 47개 있다 (T1~T33, C1~C5, E1~E4, L1~L5).
+
+      고치는 법: 하나의 taskId가 한 곳에만 존재하게 한다. 의존 그래프가 필요하면
+      스텁을 복제하지 말고 dependencies 필드로 참조한다.
