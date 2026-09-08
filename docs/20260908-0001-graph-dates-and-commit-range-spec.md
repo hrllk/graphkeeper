@@ -429,22 +429,76 @@ marks := graphRowMarks{
 
 **마커 우선순위 (높은 것이 이긴다).** 한 행에 여러 신호가 겹치므로 순서를 못 박는다.
 
-| 순위 | 신호 | 표현 |
-|---|---|---|
-| 1 | 검색 포커스 | `searchFocusMark` (reverse+bold) |
-| 2 | 커서 (선택 행) | 기존 거터 마커 (`df7ed32`) |
-| 3 | **range anchor** | 거터에 `▏` + `searchMatchMark` |
-| 4 | **range 멤버** | `searchMatchMark` (underline+bold) |
-| 5 | HEAD | `headMark` |
-| 6 | stash/tag | state 컬럼 `S`/`T`/`S·T` |
+| 순위 | 신호 | 표현 | 어디에 |
+|---|---|---|---|
+| 1 | 검색 포커스 | `searchFocusMark` (reverse+bold) | 검색 필드 |
+| 2 | 커서 (선택 행) | `\x1b[7m` 직접 (reverse) | hash 셀 |
+| 3 | **road anchor** | `\x1b[4m\x1b[1m` 직접 (underline+bold) | hash 셀 |
+| 4 | **road 멤버** | `\x1b[4m` 직접 (underline) | hash 셀 |
+| 5 | HEAD | `headMark` | branches 셀 |
+| 6 | stash/tag | `S`/`T`/`S·T` 문자 | state 컬럼 |
 
-3과 4가 신규다. 새 색을 만들지 않고 `theme.go`의 기존 토큰을 재사용한다 —
-`highlighting-color-map.md` Policy가 ANSI 0-15만 허용하고, task 6.5가 미사용 토큰
-정리를 대기 중이므로 토큰을 늘리지 않는다.
+**정정 (eng-review E-7, P1). 초안의 3·4번 설계는 잠긴 테스트를 위반하고 NO_COLOR
+계약이 거짓이었다.** 초안은 anchor를 "거터에 `▏`", 멤버를 "`searchMatchMark`
+(underline+bold)"로 적었다. 둘 다 틀렸다.
 
-**NO_COLOR 계약.** range 멤버는 `underline`이 색이 아니라 terminal attribute이므로
-`NO_COLOR=1`에서도 남는다. anchor는 거터 글리프 `▏`를 쓰므로 색과 무관하다.
-색 전용 표현은 계약 위반이다 — `highlighting-color-map.md` Policy와 task 6.3이 요구한다.
+**(a) 거터를 쓸 수 없다.** `094ca87` "Remove graph selection arrow"가 graph 행의
+선택 화살표를 제거하면서 **테스트로 잠갔다**.
+
+```
+internal/app/model_test.go
+  TestRenderGraphContentOmitsSelectionArrow
+  TestRenderGraphContentStartsAtLeftEdge
+```
+
+거터 글리프를 넣으면 두 테스트가 동시에 깨진다. `df7ed32`의 코드 주석도 같은 말을
+한다: "A \"> \" gutter is not an option: 094ca87 (2026-07-07) removed exactly that
+and locked it with a test."
+
+**(b) lipgloss 스타일은 NO_COLOR에서 아무것도 남기지 못한다.**
+`searchMatchMark`는 `theme.go:74`에서 `lipgloss.NewStyle().Underline(true).Bold(true)`다.
+`df7ed32` 주석이 이유를 적어 두었다: "Under NO_COLOR lipgloss selects the Ascii
+profile and emits nothing at all - attributes included - so a lipgloss style cannot
+carry the signal there."
+
+즉 초안의 "underline은 색이 아니라 attribute이므로 NO_COLOR에서도 남는다"는 **거짓**이다.
+lipgloss를 거치는 순간 attribute도 함께 사라진다.
+
+**(c) 실제로 작동하는 관용구는 하나다.** `graph_render.go:44-53`:
+
+```go
+func renderGraphHashField(hash, searchQuery string, focused bool) string {
+	field := renderSearchField(hash, searchQuery, graphCommitWidth, focused)
+	if !focused || strings.TrimSpace(searchQuery) != "" {
+		return field
+	}
+	if noColorEnabled() {
+		return "\x1b[7m" + field + "\x1b[0m"
+	}
+	return field
+}
+```
+
+`noColorEnabled()` 분기에서 **escape를 직접 쓴다.** no-color.org는 색을 규율하고
+reverse/underline은 attribute이므로 이 방법은 규격에 어긋나지 않는다. Inspector도
+같은 패턴이다 (`commit_inspector.go:352`, `:441`).
+
+**(d) 그래서 3·4번은 hash 셀에 직접 escape를 쓴다.** `renderGraphHashField`를 확장해
+cursor / anchor / member를 한 곳에서 결정한다. 셀 하나에서 결정하므로 두 렌더 경로
+사이에 신호가 어긋날 수 없고 — `renderGraphHashField`가 존재하는 이유가 정확히
+그것이다 — 거터도 만들지 않고 topology 정렬도 건드리지 않는다.
+
+attribute는 합성된다. anchor가 커서 행이기도 하면 `\x1b[7m\x1b[4m\x1b[1m`이 함께
+적용되고 `\x1b[0m`이 한 번에 되돌린다.
+
+**(e) `applyHandshakePoint`를 흉내내지 않는다.** `graph_render.go:176-187`은 `*`
+글리프를 유지한 채 색 스타일만 입히므로 **NO_COLOR에서 사라진다.** 이건 따라야 할
+관용구가 아니라 task 6.3이 지적한 기존 구멍이다. 새 마커를 같은 방식으로 만들면
+구멍을 하나 더 판다.
+
+**NO_COLOR 계약.** anchor와 멤버는 `noColorEnabled()` 분기에서 직접 escape를 쓰므로
+`NO_COLOR=1`에서 남는다. lipgloss 스타일로 표현하면 계약 위반이다 —
+`highlighting-color-map.md` Policy와 task 6.3이 요구한다.
 
 ### C-11. `internal/app/view_detail.go` — Details 두 행
 
