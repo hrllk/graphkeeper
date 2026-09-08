@@ -265,7 +265,7 @@ internal/app/commit_inspector_test.go:98   m.renderCommitInspectorPopup(60, 20)
 변환하면 "이 사람 새벽 3시에 커밋했네"라는 정보가 사라진다. 되돌리는 비용은
 포맷 인자 하나다.
 
-### P3 — 구간 선택 키는 `v`, 해제는 `v` 또는 `esc`
+### P3 — 기능명은 `road`, 키는 `w`, 해제는 `esc`
 
 지금 바인딩된 키를 전부 열거한 결과 사용 중인 키는 다음이다.
 
@@ -274,8 +274,18 @@ internal/app/commit_inspector_test.go:98   m.renderCommitInspectorPopup(60, 20)
 j k l left m n N o p P q r right s S shift+tab space t tab up x y
 ```
 
-`v`는 비어 있고, vim의 visual mode와 의미가 정확히 같다. anchor를 세우고 커서를
-옮기는 동작이 vim visual 선택과 동일하므로 학습 비용이 0에 가깝다.
+비어 있는 소문자는 `b e i u v w z`다.
+
+**확정 (2026-09-09, 사용자 결정).** 기능명을 `road`로 하고 키는 `w`(way)로 한다.
+
+- **`road`라는 이름을 쓴다.** 사용자가 처음 쓴 단어가 "두커밋 **길** 확인"이었고,
+  `--ancestry-path`가 정확히 그 대상이다. `range`보다 기억에 남고 제품 어휘와 붙는다.
+- **`r`은 쓸 수 없다** — rebase가 이미 점유했다.
+- **`R`도 쓰지 않는다.** 비어 있지만 이 앱은 대문자를 소문자의 *변종*으로 쓰는 관습이
+  있다 (`f` fetch / `F` fetch tags, `d` delete tag / `D` delete remote tag, `n`/`N`
+  검색 방향). `r`=rebase인데 `R`=road는 그 관습을 깬다.
+- **`w`(way)를 쓴다.** road와 의미가 붙고, vim에서 word-motion이라 그래프 문맥에서
+  충돌 연상이 없다. `?` 오버레이에 `w: road`로 떠도 연상이 된다.
 
 되돌리는 비용: 키 문자 하나와 `hidden_hotkeys.go` 항목 하나.
 
@@ -343,6 +353,46 @@ ancestry-path(anchor..cursor) 비었나?
 가드가 조용히 결과를 버려 Inspector가 영원히 Loading에 걸린 사고다. 같은 계층의 문제다.
 
 ---
+
+### P6 — anchor만 세운 상태에 보이는 힌트를 준다. 조용한 상태를 만들지 않는다
+
+**확정 (2026-09-09, 사용자 결정).** 초안은 `w`를 한 번 누르면 anchor가 조용히
+세팅되고 화면에 거의 변화가 없었다. 사용자가 자기가 선택 중이라는 것을 기억해야 한다.
+
+이건 이 저장소의 design audit이 이미 지적한 결함과 **같은 종류**다. D-009: "Create tag
+팝업에서 읽기 전용 컨텍스트와 편집 가능 필드가 시각적으로 완전히 동일해서 편집 가능
+여부를 알 수 없다." 교육을 목적으로 적은 도구에서 상태를 숨기는 것이 가장 나쁘다.
+
+따라서 `rangeAnchorOnly` 상태에 보이는 힌트를 붙인다.
+
+```
+anchor 없음        -> 힌트 없음
+rangeAnchorOnly    -> "road: FROM 4d8fcbcc · TO를 고르세요 (esc 취소)"
+경로 확정          -> "range: 7 commits (4d8fcbcc -> b2fd3168)"
+```
+
+**새 `state.Mode`를 만들지 않는다.** `state.Mode`를 추가하면
+`modal_contract_test.go`, footer registry, task 1.23의 Esc-first close 계약을 전부
+건드려 blast radius가 커진다. 그리고 TO를 고르려면 j/k 이동이 살아 있어야 하므로
+애초에 입력을 막는 modal이 아니다. 필요한 것은 상태 힌트 한 줄이고, 자리는 이미
+있다 — `repository_state_hint.go`와 `GraphProjection.StateHint`.
+
+### P7 — 역방향일 때 조용히 뒤집지 않고 "방향 반대"를 명시한다
+
+**확정 (2026-09-09, 사용자 결정이 드러낸 문제).** P6의 UX가 FROM/TO를 명시적으로
+고르게 만드는 순간, 사용자는 **방향을 직접 선언한** 것이 된다. 그런데 P4는 방향을
+자동으로 뒤집는다. 최신 커밋을 FROM으로 고른 사용자에게 조용히 반대 경로를 보여주게
+된다.
+
+"분기했다"는 거짓말보다는 낫지만, 여전히 사용자가 선언한 것과 다른 것을 보여준다.
+그래서 문구로 명시한다.
+
+```
+range: 7 commits (방향 반대 - b2fd3168 -> 4d8fcbcc)
+```
+
+조용히 뒤집는 대신 "당신이 거꾸로 골랐고, 경로는 이쪽입니다"라고 말한다. 그게 이
+기능이 가르칠 수 있는 가장 좋은 화면이다.
 
 ## 미결 — 해소됨 (2026-09-08)
 
