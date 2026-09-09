@@ -953,10 +953,12 @@
             "taskId": "T7",
             "title": "T7 Invert the two excluded tag/stash state assertions to require loading",
             "description": "tests · 1h / CC 10min\n\n근거: Test review (D15) — composition_wiring_test.go:153 and repository_read_test.go:243 currently assert the bug\n\n**재정의 (eng-review 결정 4).** '단언 반전' 이 아니라 '메시지 계약 단언' 으로. loadStashState 는 tea.Cmd 라 핸들러 직후 stashEntries 는 여전히 nil 이고, composition_wiring_test.go:146 의 cmd != nil 가드가 :153 보다 먼저 깨진다.\n\n[E1 흡수] Redefine T7 to assert the message contract, not populated state\n  Section 2, confidence 9/10 - composition_wiring_test.go:146 blocks any returned command, so T6 breaks there first, not at :153. loadStashState is a tea.Cmd, so stashEntries is still nil right after Update(loadedSnapshotMsg); inverting the assertion literally produces a test that fails against correc",
-            "details": "internal/app/composition_wiring_test.go; internal/app/repository_read_test.go",
+            "details": "internal/app/composition_wiring_test.go; internal/app/repository_read_test.go\n\n2026-09-10: 착수 시도 중 T6 의존이 드러났다. T7 은 '메시지 계약 단언'으로 재정의됐는데, 그 계약을 만드는 것이 T6 이다. 오늘 Update(loadedSnapshotMsg) 는 명령을 반환하지 않고 composition_wiring_test.go:146 이 그것을 cmd != nil 로 단언한다. T6 전에 T7 을 하면 (a) 같은 말을 다르게 적어 아무것도 안 바꾸거나 (b) 아직 없는 명령을 단언해 올바른 코드에 실패하는 테스트가 된다. 순서 선호가 아니라 의존이다. docs/20260910-0005-t6-t7-t13-t15-ordering.md",
             "status": "pending",
             "priority": "P1",
-            "dependencies": [],
+            "dependencies": [
+              6
+            ],
             "parentTaskId": "9",
             "parentId": "undefined"
           },
@@ -1049,10 +1051,12 @@
             "taskId": "T15",
             "title": "T15 Delete the excluded-state assertions once the dual path is gone",
             "description": "tests · 30min / CC 5min\n\n근거: Test review (D15) — the gate takes over their job in Phase 3",
-            "details": "internal/app/composition_wiring_test.go; internal/app/repository_read_test.go",
+            "details": "internal/app/composition_wiring_test.go; internal/app/repository_read_test.go\n\n2026-09-10: T13 하드 의존을 기록한다. 이중 경로가 남은 채 가드를 지우면 보호 없는 구간이 생긴다. docs/20260910-0004-c5-excluded-state-guard-ordering.md 참조.",
             "status": "pending",
             "priority": "P2",
-            "dependencies": [],
+            "dependencies": [
+              13
+            ],
             "parentTaskId": "9",
             "parentId": "undefined"
           },
