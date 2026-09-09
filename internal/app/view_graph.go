@@ -90,7 +90,7 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 }
 
 func fitRepositoryStateHint(hint string, width int) string {
-	return fitVisibleWidth(warn.Render(hint), width)
+	return truncateText(warn.Render(hint), width)
 }
 
 func renderGraphHeader(width int, cols graphColumnWidths) string {

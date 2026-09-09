@@ -52,8 +52,8 @@ func renderCherryPickList(m model, width, height int) string {
 	}
 
 	lines := make([]string, 0, height)
-	lines = append(lines, fitVisibleWidth(muted.Render(fmt.Sprintf("destination: current %s", cherryPickDestination(m.repoStatus))), width))
-	lines = append(lines, fitVisibleWidth(muted.Render(fmt.Sprintf("selected: %d / %d", len(m.status.SelectedQueue), len(targets))), width))
+	lines = append(lines, truncateText(muted.Render(fmt.Sprintf("destination: current %s", cherryPickDestination(m.repoStatus))), width))
+	lines = append(lines, truncateText(muted.Render(fmt.Sprintf("selected: %d / %d", len(m.status.SelectedQueue), len(targets))), width))
 	lines = append(lines, fitVisibleWidth(sectionTitle.Render(renderCherryPickHeader(width)), width))
 
 	for i := start; i < len(targets); i++ {

@@ -32,16 +32,16 @@ func renderSectionProjection(p SectionProjection, section graphSection, tagSyncA
 			// tagSyncAttempted only gated the hint below it.
 			var lines []string
 			if tagSyncAttempted {
-				lines = []string{fitVisibleWidth(muted.Render("No local tags found."), width)}
+				lines = []string{truncateText(muted.Render("No local tags found."), width)}
 			} else {
 				lines = []string{
-					fitVisibleWidth(muted.Render("Tags not loaded yet."), width),
-					fitVisibleWidth(muted.Render("Press F to sync tag provenance."), width),
+					truncateText(muted.Render("Tags not loaded yet."), width),
+					truncateText(muted.Render("Press F to sync tag provenance."), width),
 				}
 			}
 			return fitBlockLines(lines, height)
 		}
-		return fitVisibleWidth(muted.Render("(empty)"), width)
+		return truncateText(muted.Render("(empty)"), width)
 	}
 	cursor := p.Cursor
 	start := 0

@@ -9,6 +9,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
+
+	"hrllk/graphkeeper/internal/git"
 )
 
 // The app used two glyphs for four jobs. "•" was both a list bullet and an
@@ -126,4 +130,43 @@ func appStringLiterals(t *testing.T) []sourceLiteral {
 		t.Fatal("found no string literals to check; the walk is broken, not the vocabulary")
 	}
 	return literals
+}
+
+// Prose that outgrows its box has to say it was cut. This was found by looking
+// at a rendered frame rather than by a test: at 80 columns the footer read
+// "ctrl + u/d: s" and the Tags panel "Press F to sy", which read as broken
+// rather than shortened -- the exact thing DESIGN.md's truncation rule and
+// D-007 exist to prevent.
+//
+// fitVisibleWidth stays the primitive for text already built to fit, like the
+// graph header and the "… +N hidden" indicators, where a marker would be noise.
+func TestNarrowFramesMarkTheirProseCuts(t *testing.T) {
+	status := git.Status{
+		Root: "/repo", Branch: "main", Head: "a39d548",
+		GraphCommits: []git.GraphCommit{{Hash: "a39d548", Subject: "a commit"}},
+	}
+	for _, width := range []int{60, 70, 80, 90} {
+		m := model{repositoryState: repositoryState{repoStatus: status}}
+		m.width, m.height = width, 28
+		rendered := ansi.Strip(renderAppView(m))
+
+		for _, sentence := range []struct{ full, prefix string }{
+			{"ctrl + u/d: scroll", "ctrl + u/d: "},
+			{"Tags not loaded yet.", "Tags not loa"},
+			{"Press F to sync tag provenance.", "Press F to s"},
+		} {
+			for _, line := range strings.Split(rendered, "\n") {
+				trimmed := strings.TrimRight(strings.Trim(line, "│ "), " ")
+				if !strings.Contains(trimmed, sentence.prefix) {
+					continue
+				}
+				if strings.HasSuffix(trimmed, sentence.full) {
+					continue // it fit whole
+				}
+				if !strings.HasSuffix(trimmed, ellipsis) {
+					t.Errorf("width %d: %q was cut without a marker", width, trimmed)
+				}
+			}
+		}
+	}
 }

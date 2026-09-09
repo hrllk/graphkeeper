@@ -54,7 +54,9 @@ func renderMainHotkeyFooter(width int) string {
 		parts = append(parts, renderHotkey(item.key)+": "+item.desc)
 	}
 	footer := strings.Join(parts, " · ")
-	return fitVisibleWidth(muted.Render(footer), width)
+	// The footer is a sentence that outgrows a narrow terminal, so the cut is
+	// marked. It read "ctrl + u/d: s" at 80 columns -- broken, not shortened.
+	return truncateText(muted.Render(footer), width)
 }
 
 func (m model) handleHiddenHotkeysKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
