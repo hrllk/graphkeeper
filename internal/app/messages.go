@@ -18,9 +18,23 @@ type loadedSnapshotMsg struct{ result ReadSnapshotResult }
 
 type tickMsg time.Time
 
+// The epoch is what lets a load that was in flight across a repository change
+// be discarded. Every sibling message carries one; this did not, which was
+// survivable while the load ran once at startup and is not once it runs on
+// every tick.
 type stashLoadedMsg struct {
 	entries []git.StashEntry
 	err     error
+	epoch   uint64
+}
+
+// tagStateLoadedMsg carries local tag state loaded outside the repository read.
+// The neutral startup path projects a snapshot that does not include tags, so
+// they arrive by their own command the way stashes do.
+type tagStateLoadedMsg struct {
+	status git.Status
+	err    error
+	epoch  uint64
 }
 
 type refreshedMsg struct {

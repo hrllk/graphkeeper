@@ -150,8 +150,14 @@ func TestCompositionInitUsesInjectedRepositoryReadPort(t *testing.T) {
 	if got.repoStatus.Root != "/sentinel/repository" || got.repoStatus.Head != "sentinel-head" || !got.repoSnapshotLoaded || got.status.Mode != state.ModeBrowse || got.startupReadPending || got.startupFailed {
 		t.Fatalf("injected snapshot was not projected: %#v", got)
 	}
-	if got.tagEntries != nil || got.stashEntries != nil || got.tagSyncAttempted {
-		t.Fatalf("startup populated excluded state: %#v", got)
+	// This used to assert that startup left tag and stash state empty, which
+	// was the defect written down as a contract. What it can honestly say now
+	// is the message contract: this fixture injects no *git.Repo, so there is
+	// nothing for the local-state loads to read and the handler issues no
+	// command. TestNeutralStartupLoadsStashAndTagState covers the case where a
+	// repository is present.
+	if got.repo == nil && loadLocalStateCmd(got) != nil {
+		t.Fatal("a startup without a repository should not issue a local-state load")
 	}
 	if got.sectionCursor[sectionGraph] < 0 {
 		t.Fatalf("graph cursor not initialized: %#v", got.sectionCursor)

@@ -114,10 +114,21 @@ func refreshRepoState(repo *git.Repo, limit int, args ...interface{}) tea.Cmd {
 	}
 }
 
-func loadStashState(repo *git.Repo) tea.Cmd {
+func loadStashState(repo *git.Repo) tea.Cmd { return loadStashStateForEpoch(repo, 0) }
+
+func loadStashStateForEpoch(repo *git.Repo, epoch uint64) tea.Cmd {
 	return func() tea.Msg {
 		entries, err := repo.Stashes(context.Background())
-		return stashLoadedMsg{entries: entries, err: err}
+		return stashLoadedMsg{entries: entries, err: err, epoch: epoch}
+	}
+}
+
+// loadTagState reads local tags and their provenance without going through a
+// repository read. The neutral path's snapshot does not carry them.
+func loadTagState(repo *git.Repo, store TagProvenanceStore, epoch uint64) tea.Cmd {
+	return func() tea.Msg {
+		status, err := loadLocalTagStatus(repo, git.Status{}, store)
+		return tagStateLoadedMsg{status: status, err: err, epoch: epoch}
 	}
 }
 

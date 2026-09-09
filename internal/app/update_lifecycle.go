@@ -57,7 +57,7 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.startupFailed = false
 		syncBrowseState(&m, m.repoStatus)
 		m.status = deriveStatus(m.repoStatus)
-		return m, nil
+		return m, loadLocalStateCmd(m)
 	case refreshedSnapshotMsg:
 		if msg.refreshGeneration != m.refreshGeneration || msg.result.RepositoryEpoch != m.repositoryEpoch {
 			return markPullStale(m)
@@ -69,7 +69,7 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.graphReadSnapshot = msg.result.Snapshot.Graph
-		return m, nil
+		return m, loadLocalStateCmd(m)
 	case loadedMsg:
 		if m.repositoryRead != nil {
 			return m, nil
@@ -140,4 +140,21 @@ func handleLifecycleUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+// loadLocalStateCmd batches the two reads the repository snapshot does not
+// carry. The legacy path loaded stashes from its own handler and tags from
+// inside the refresh command; the neutral path's snapshot has neither, which
+// is why the stash list and the Tags panel came up empty on it.
+//
+// Both are stamped with the current epoch so a load still in flight across a
+// repository change is discarded rather than applied to a different repository.
+func loadLocalStateCmd(m model) tea.Cmd {
+	if m.repo == nil {
+		return nil
+	}
+	return tea.Batch(
+		loadStashStateForEpoch(m.repo, m.repositoryEpoch),
+		loadTagState(m.repo, m.tagProvenance, m.repositoryEpoch),
+	)
 }

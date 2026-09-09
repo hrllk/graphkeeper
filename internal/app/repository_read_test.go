@@ -240,8 +240,12 @@ func TestNeutralStartupInitBatchIntegration(t *testing.T) {
 	if got.sectionCursor[sectionGraph] < 0 || got.sectionCursor[sectionCurrent] != 0 || got.sectionCursor[sectionRemote] != -1 || got.sectionCursor[sectionTags] != -1 || got.graphLaneCursor < 0 {
 		t.Fatalf("syncBrowseState cursors were not initialized: %#v", got.sectionCursor)
 	}
-	if got.tagEntries != nil || got.tagSyncAttempted || got.stashEntries != nil {
-		t.Fatalf("neutral startup loaded excluded tag/stash state: %#v", got)
+	// Same reshaping as composition_wiring_test.go: the old assertion pinned the
+	// absence of the tag and stash load as if it were intended. With no
+	// *git.Repo in this fixture there is nothing to read, so the contract is
+	// that no load is issued -- not that the state stays empty forever.
+	if got.repo == nil && loadLocalStateCmd(got) != nil {
+		t.Fatal("a startup without a repository should not issue a local-state load")
 	}
 }
 

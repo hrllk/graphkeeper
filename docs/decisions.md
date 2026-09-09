@@ -737,3 +737,34 @@ DESIGN.md 가 레이아웃으로 감당한다고 주장하지 않는 구간이�
 
 그리고 헤더가 무엇을 보여주는지 말하는지 — commit/message/author/parent/path 와
 두 pane 라벨 — 도 이제 배포되는 화면에 대해 한 테스트가 붙든다.
+
+## 2026-09-10 — neutral startup 이 stash·tag 를 로드한다 (task 9.6/T6, 9.7/T7)
+
+**결함의 위치.** `Update` 는 startup·refresh 를 두 벌 갖는다. legacy 는
+`loadedMsg`/`refreshedMsg`, neutral 은 `loadedSnapshotMsg`/`refreshedSnapshotMsg`.
+neutral 핸들러는 `return m, nil` 로 끝나 명령을 하나도 내지 않았다. 그리고
+**프로덕션이 neutral 을 탄다** — `refreshedMsg` 분기 첫 줄이
+`if m.repositoryRead != nil { return m, nil }` 인데 프로덕션은 그 포트를 주입한다.
+즉 legacy 의 `loadStashState` 는 주입 없는 구성에서만 실행됐다.
+
+**고침.** `loadLocalStateCmd` 가 두 명령을 배치한다. stash 는 기존
+`loadStashState` 를 epoch 를 실어 부르고, tag 는 새 `loadTagState` 가
+`loadLocalTagStatus` 를 명령 밖에서 부른다 — neutral 의 스냅샷은 태그를 나르지
+않기 때문이다(태그를 DTO 에 싣는 것은 T12 의 몫이다).
+
+**epoch 를 배선했다.** `stashLoadedMsg` 만 epoch 가 없었고 형제 메시지는 전부
+갖고 있었다. startup 에서 한 번 돌 때는 드러나지 않지만, **매 refresh 마다 돌면
+stale 경합이 실사용 빈도가 된다.** epoch 0 은 "호출자가 찍지 않음"으로 두어
+legacy 호출부를 건드리지 않는다.
+
+**성능은 이미 답이 나와 있었다.** C3(9.36): tag 500 + stash 50 이 더하는 비용은
+약 9ms(5%)이고 호출 수는 규모와 무관하다.
+
+**T7 — 결함을 고정하던 단언 둘.** `composition_wiring_test.go` 와
+`repository_read_test.go` 가 `tagEntries == nil && stashEntries == nil` 을
+단언하고 있었다. 반전이 아니라 **메시지 계약**으로 바꿨다(eng-review 결정 4):
+이 픽스처들은 `*git.Repo` 를 주입하지 않으므로 읽을 대상이 없고, 따라서
+**명령이 나가지 않는 것**이 계약이다. 저장소가 있는 경우는
+`TestNeutralStartupLoadsStashAndTagState` 가 따로 덮는다.
+T15 는 이중 경로가 사라진 뒤(T13) 이 가드를 지운다 —
+`docs/20260910-0004` 와 `-0005` 참조.

@@ -13,6 +13,12 @@ func handleStashUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	// A load that started before the repository changed describes a repository
+	// that is no longer on screen. Epoch 0 means the caller did not stamp one,
+	// which the legacy call sites still do.
+	if msg2.epoch != 0 && msg2.epoch != m.repositoryEpoch {
+		return m, nil
+	}
 	// A failed load is still an attempt. Publishing to the event sink and
 	// returning left stashEntries nil, which the popup rendered the same way as a
 	// repository with no stashed work, so a failing `git stash list` was invisible.

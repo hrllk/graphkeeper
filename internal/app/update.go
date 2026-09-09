@@ -26,6 +26,8 @@ func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return handleLifecycleUpdate(m, msg)
 	case stashLoadedMsg:
 		return handleStashUpdate(m, msg)
+	case tagStateLoadedMsg:
+		return handleTagStateUpdate(m, msg)
 	case tagCreatedMsg, tagToastDoneMsg:
 		return handleTagUpdate(m, msg)
 	case fetchedMsg, preparedMsg, pullCheckedMsg, previewMsg, graphActionCheckMsg, pushFetchedMsg, pullToastDoneMsg, branchToastDoneMsg:
