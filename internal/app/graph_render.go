@@ -88,7 +88,7 @@ func renderGraphHashField(hash, searchQuery string, focused bool, marks graphRow
 	}
 	attrs := ""
 	if focused {
-		attrs += "\x1b[7m"
+		attrs += cursorSignalPrefix
 	}
 	switch {
 	case marks.RangeAnchor:
@@ -105,7 +105,7 @@ func renderGraphHashField(hash, searchQuery string, focused bool, marks graphRow
 	if focused && !marks.RangeAnchor && !marks.RangeMember && !noColorEnabled() {
 		return field
 	}
-	return attrs + field + "\x1b[0m"
+	return attrs + field + cursorSignalReset
 }
 
 func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, marks graphRowMarks, searchQuery string) string {

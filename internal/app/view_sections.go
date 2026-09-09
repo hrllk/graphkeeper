@@ -134,10 +134,17 @@ func renderSelectableSectionItem(label string, selected bool, width int) string 
 }
 
 func renderSelectableSectionText(label string, selected bool) string {
-	if selected {
-		return branchMark.Render(label)
+	if !selected {
+		return label
 	}
-	return label
+	if noColorEnabled() {
+		// branchMark is a lipgloss style, and lipgloss emits nothing at all
+		// under NO_COLOR - attributes included - so the rail's selected row was
+		// indistinguishable from the rest. The graph has written reverse video
+		// directly since df7ed32; this is the same decision, shared.
+		return cursorSignal(label)
+	}
+	return branchMark.Render(label)
 }
 
 func formatTargetItem(t state.TargetItem) string {

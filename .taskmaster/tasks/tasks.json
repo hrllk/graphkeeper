@@ -1572,11 +1572,11 @@
           {
             "id": 11,
             "title": "W6 rail 에는 NO_COLOR 커서 신호가 없다",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "priority": "medium",
             "description": "df7ed32(6.3)가 graph 만 고쳐서 graph 와 rail 의 커서 표시 방식이 어긋났다.",
-            "details": "6.3 은 noColorEnabled() 일 때 graph 의 hash 필드에 raw reverse video(\\x1b[7m)를 직접 출력한다. rail 쪽 커서에는 같은 처리가 없어 NO_COLOR 에서 rail 의 선택 위치가 보이지 않는다.\n같은 결정을 두 곳에 쓰면 갈라진다는 이 리포의 반복 패턴 — graph 와 rail 이 커서 신호를 공유 헬퍼로 받게 하는 편이 낫다.\n테스트 주의: TTY 없이 돌면 lipgloss 가 Ascii 프로파일을 골라 스타일을 전부 제거한다. graph_cursor_signal_test.go 의 withANSIProfile 관용구를 쓸 것.",
+            "details": "6.3 은 noColorEnabled() 일 때 graph 의 hash 필드에 raw reverse video(\\x1b[7m)를 직접 출력한다. rail 쪽 커서에는 같은 처리가 없어 NO_COLOR 에서 rail 의 선택 위치가 보이지 않는다.\n같은 결정을 두 곳에 쓰면 갈라진다는 이 리포의 반복 패턴 — graph 와 rail 이 커서 신호를 공유 헬퍼로 받게 하는 편이 낫다.\n테스트 주의: TTY 없이 돌면 lipgloss 가 Ascii 프로파일을 골라 스타일을 전부 제거한다. graph_cursor_signal_test.go 의 withANSIProfile 관용구를 쓸 것. [완료 2026-09-10] 기록이 제안한 대로 공유 헬퍼로 묶었다. cursorSignal / cursorSignalPrefix / cursorSignalReset 을 commit_inspector.go 의 noColorEnabled 옆에 두고 graph(renderGraphHashField)와 rail(renderSelectableSectionText)이 함께 쓴다. rail 은 branchMark(lipgloss)만 쓰고 있었는데 NO_COLOR 에서 lipgloss 는 Ascii 프로파일을 골라 attribute 까지 전부 버리므로 선택 행이 나머지와 구분되지 않았다. 색이 있을 때는 기존 표현을 그대로 유지하므로 restyle 이 아니라 NO_COLOR 수리다. 테스트 3개: rail 이 NO_COLOR 에서 구분되는가, 색이 있을 때 기존 스타일을 쓰는가, 그리고 graph 와 rail 을 한 테스트에서 함께 단언한다 — 각 면이 결정을 따로 소유해서 갈라졌으므로 함께 단언하는 것이 재발 방지의 핵심이다.",
             "testStrategy": "NO_COLOR=1 에서 rail 렌더 출력에 커서 위치를 나타내는 시퀀스가 있는지 단언. 수정 전 RED."
           },
           {

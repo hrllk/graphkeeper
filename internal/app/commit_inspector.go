@@ -503,3 +503,23 @@ var (
 )
 
 func noColorEnabled() bool { return os.Getenv("NO_COLOR") != "" }
+
+const (
+	cursorSignalPrefix = "\x1b[7m"
+	cursorSignalReset  = "\x1b[0m"
+)
+
+// cursorSignal marks the row the cursor is on in a way that survives NO_COLOR.
+//
+// Both the graph and the right rail call this so the two cannot drift apart
+// again. 6.3 taught the graph to survive NO_COLOR (df7ed32) and left the rail on
+// a lipgloss style; under NO_COLOR lipgloss selects the Ascii profile and drops
+// attributes along with colour, so the rail's cursor vanished and the two
+// surfaces disagreed about how selection looks.
+//
+// no-color.org governs colour. Reverse is an attribute, so writing it directly
+// is within the spec, and it is the only presentation that reaches the screen
+// once styles are stripped.
+func cursorSignal(text string) string {
+	return cursorSignalPrefix + text + cursorSignalReset
+}
