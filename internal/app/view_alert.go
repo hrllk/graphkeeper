@@ -33,21 +33,22 @@ func blockedAlertContent(s state.Status) alertContent {
 	}
 }
 
+// renderAlertPopup uses the shared popup tokens rather than building its own
+// styles. It used to reach for lipgloss.Color("252"), ("241") and ("205"), which
+// are ANSI-256 values; highlighting-color-map.md's Policy allows only ANSI 0-15,
+// and D-013 lists this file as one of the places still making colour outside
+// theme.go.
+//
+// Neither "enter: dismiss" nor "esc: close" is drawn any more. Both keys still
+// work; the alert just stops spending two of its rows saying so.
 func renderAlertPopup(alert alertContent, bodyWidth int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 28, 50)).
 		Align(lipgloss.Center)
 
 	lines := []string{
-		descStyle.Render(alert.Description),
-		"",
-		helpStyle.Render("enter: dismiss"),
-		renderPopupFooter(popupWidthForBody(bodyWidth, 28, 50) - 4),
+		popupBody.Render(alert.Description),
 	}
 	return renderFloatingTitlePopup(
 		popupBox,

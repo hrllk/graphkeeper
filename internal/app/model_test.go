@@ -1617,8 +1617,11 @@ func TestRenderBlockedShowsAlertOverlay(t *testing.T) {
 	if !strings.Contains(got, "Alert") || !strings.Contains(got, "Select a local branch.") || !strings.Contains(got, "Move to a branch line.") {
 		t.Fatalf("expected blocked alert overlay, got %q", got)
 	}
-	if !strings.Contains(got, "enter: dismiss") || !strings.Contains(got, "esc: close") {
-		t.Fatalf("expected blocked alert dismiss help, got %q", got)
+	// The alert no longer spends rows advertising its keys. enter still
+	// dismisses and esc still closes; task 10.15 asked for the labels to go and
+	// the behaviour to stay.
+	if strings.Contains(got, "enter: dismiss") || strings.Contains(got, "esc: close") {
+		t.Fatalf("expected the alert to stop advertising its keys, got %q", got)
 	}
 }
 
@@ -1648,8 +1651,16 @@ func TestRenderFastForwardConfirmShowsConciseHelp(t *testing.T) {
 	if strings.Contains(got, "Current:") || strings.Contains(got, "Target:") {
 		t.Fatalf("expected fast-forward popup to omit count detail, got %q", got)
 	}
-	if !strings.Contains(got, "f: fast-forward") || strings.Contains(got, "enter: fast-forward") || strings.Contains(got, "esc: close") == false {
+	if !strings.Contains(got, "f: fast-forward") || strings.Contains(got, "enter: fast-forward") {
 		t.Fatalf("expected fast-forward confirm help, got %q", got)
+	}
+	// esc appears once, in the popup's own footer as "esc: cancel". The generic
+	// "esc: close" row underneath it made esc read twice (task 10.12).
+	if strings.Contains(got, "esc: close") {
+		t.Fatalf("expected no second esc row, got %q", got)
+	}
+	if strings.Count(got, "esc:") != 1 {
+		t.Fatalf("expected esc to appear exactly once, got %d in %q", strings.Count(got, "esc:"), got)
 	}
 }
 
@@ -4086,8 +4097,13 @@ func TestRenderResetModePopupUsesSingleModeList(t *testing.T) {
 	if strings.Count(got, "s: soft") != 1 || strings.Count(got, "m: mixed") != 1 || strings.Count(got, "h: hard") != 1 {
 		t.Fatalf("expected single-line mode list, got %q", got)
 	}
-	if !strings.Contains(got, "Reset mode") || !strings.Contains(got, "Choose a reset mode.") || !strings.Contains(got, "esc: close") {
-		t.Fatalf("expected reset popup to include title, body, and esc help, got %q", got)
+	if !strings.Contains(got, "Reset mode") || !strings.Contains(got, "Choose a reset mode.") {
+		t.Fatalf("expected reset popup to include title and body, got %q", got)
+	}
+	// The mode list is the whole affordance now; esc closes without being listed
+	// (task 10.14).
+	if strings.Contains(got, "esc: close") {
+		t.Fatalf("expected the reset popup to drop the esc row, got %q", got)
 	}
 	if strings.Contains(got, "\nReset mode\n") {
 		t.Fatalf("expected reset popup title to sit on the border, got %q", got)

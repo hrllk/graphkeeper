@@ -126,7 +126,10 @@ func renderDivergentConfirmPopup(projection confirmationProjection, bodyWidth in
 	} else if width < 54 && footer == "m: merge · r: rebase · esc: cancel" {
 		footer = "m: merge\nr: rebase · esc: cancel"
 	}
-	body = joinLayoutSections(body, popupHelp.Render(footer), renderPopupFooter(width-4))
+	// No generic "esc: close" line. These popups name their own keys, and esc
+	// already appears there as "esc: cancel", so the extra row showed esc twice.
+	// Esc still closes; task 1.23's Esc-first contract is untouched.
+	body = joinLayoutSections(body, popupHelp.Render(footer))
 	return renderFloatingTitlePopup(popupBox, projection.Title, centerReviewFooterLine(body, width-4), width)
 }
 
@@ -174,8 +177,10 @@ func renderConfirmPopup(m model, bodyWidth int) string {
 		popupTitle,
 		centerReviewFooterLine(joinLayoutSections(
 			popupBody.Render(detail),
+			// The projection's own footer already carries the answer keys
+			// ("y: yes • n: no", "y: delete • n: cancel"). esc keeps working
+			// without being advertised on a second row.
 			popupHelp.Render(projection.FooterText),
-			renderPopupFooter(width-4),
 		), width-4),
 		width,
 	)
@@ -243,7 +248,6 @@ func renderResetModePopup(bodyWidth int) string {
 		strings.Join([]string{
 			bodyStyle.Render("Choose a reset mode."),
 			bodyStyle.Render("s: soft  •  m: mixed  •  h: hard"),
-			renderPopupFooter(popupWidthForBody(bodyWidth, 32, 50) - 4),
 		}, "\n\n"),
 		popupWidthForBody(bodyWidth, 32, 50),
 	)
