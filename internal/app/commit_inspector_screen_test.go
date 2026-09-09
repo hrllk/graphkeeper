@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestCommitInspectorScreenMatrixKeepsFrameAndPartialFooter(t *testing.T) {
@@ -341,4 +342,35 @@ func TestInspectorHelpEscClosesHelpAndSwallowsQuietly(t *testing.T) {
 func withFrame(m model, width, height int) model {
 	m.width, m.height = width, height
 	return m
+}
+
+// A long diff line must be cut at the pane edge, not folded onto the next row.
+// Folding breaks the alignment between the two panes and silently changes how
+// many diff rows the reader is looking at.
+//
+// The popup renderer had this test and the screen -- the renderer actually in
+// production -- did not. See task 12.
+func TestInspectorScreenDoesNotWrapLongDiffCode(t *testing.T) {
+	const long = "+a very long line of code that must stay on one terminal row no matter how narrow the pane gets"
+	for _, size := range [][2]int{{40, 16}, {60, 20}, {80, 30}} {
+		m := model{}
+		m.width, m.height = size[0], size[1]
+		m.commitInspectorSnapshot = CommitSnapshot{
+			FullHash: "abc123", Subject: "change", AuthorName: "dev",
+			Files: []ChangedFile{{StableID: "f", Status: StatusModified, Path: "main.go"}},
+		}
+		m.commitInspectorLines = []string{"@@ -1 +1 @@", "-old", long}
+
+		got := renderCommitInspectorScreen(m)
+		if lipgloss.Width(got) != size[0] || lipgloss.Height(got) != size[1] {
+			t.Fatalf("%dx%d rendered as %dx%d", size[0], size[1], lipgloss.Width(got), lipgloss.Height(got))
+		}
+		// A wrapped line puts the tail at the start of a row of its own.
+		for _, line := range strings.Split(ansi.Strip(got), "\n") {
+			trimmed := strings.TrimLeft(strings.Trim(line, "│ "), " ")
+			if strings.HasPrefix(trimmed, "no matter how narrow") {
+				t.Fatalf("%dx%d wrapped the long diff line: %q", size[0], size[1], line)
+			}
+		}
+	}
 }

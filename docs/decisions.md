@@ -578,3 +578,24 @@ macOS 에서 컨테이너로 같은 검증을 돌린다. **debian stable-slim am
 **통일 여부는 사용자 결정으로 남긴다.**
 
 **태그를 밀지 않았다.** 릴리스는 바깥으로 나가는 행위이므로 워크플로만 넣는다.
+
+## 2026-09-10 — popup Inspector 렌더러를 지운다 (task 12.1)
+
+`renderCommitInspectorPopup` 은 프로덕션 호출부가 없었다. `view_shell.go` 는
+`renderCommitInspectorScreen` 만 부르고, popup 은 자기 테스트 두 개로만 살아
+있었다. `renderRawGraphLine` 때와 같은 상황이고 같은 판단을 한다.
+
+**지우기 전에 커버리지부터 옮겼다.** popup 테스트 둘 중
+`TestCommitInspectorDiffDoesNotWrapLongCode` 는 **screen 경로에 대응물이 없었다.**
+긴 diff 줄이 접히면 두 pane 의 정렬이 깨지고 독자가 보는 diff 행 수가 조용히
+달라진다. 실제로 프로덕션에서 도는 렌더러에 대해 40/60/80 폭으로 다시 썼다.
+나머지 하나(프레임 치수·헤더·트리·푸터)는 screen 쪽에 이미 대응물이 있다.
+
+**곁다리 정정.** task 12.2 는 트리가 상태 글리프를 `?` 로 그리는 원인을
+`inspectorStatus` 로 지목했는데, `inspectorStatus` 는 **삭제 전에도 이미 unused**
+였다. 즉 popup 트리는 그 함수를 거치지 않았고 진단이 틀렸다. popup 이 사라졌으므로
+항목 자체가 없어졌지만, 틀린 진단을 기록에 남겨두지 않는다.
+
+삭제로 새로 죽은 것은 `commitInspectorSelectedPath` 하나뿐이라 같이 지웠다.
+`inspectorStatus`·`screenPath` 등은 2026-08-28 lint 베이스라인이 이미 안고 있던
+빚이고, 이 작업의 범위가 아니다.

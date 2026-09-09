@@ -121,59 +121,6 @@ func (m model) selectInspectorFile() (tea.Model, tea.Cmd) {
 	return m.startInspectorDiff()
 }
 
-func (m model) renderCommitInspectorPopup(width, height int) string {
-	if width < 1 {
-		width = 1
-	}
-	if height < 1 {
-		height = 1
-	}
-	innerWidth := max(width-4, 1)
-	contentHeight := max(height-2, 1)
-
-	lines := make([]string, 0, contentHeight)
-	lines = append(lines,
-		truncateInspector(inspectorCommitText(m.commitInspector.FullHash, innerWidth), innerWidth),
-		truncateInspector("message: "+truncateInspector(m.commitInspector.Subject, min(100, max(innerWidth-lipgloss.Width("message: "), 1))), innerWidth),
-		truncateInspector(inspectorAuthorText(m.commitInspector.AuthorName, m.commitInspector.AuthorEmail, innerWidth), innerWidth),
-		truncateInspector(inspectorParentText(m.commitInspector.Parent, m.commitInspector.IsRoot, innerWidth), innerWidth),
-		truncateInspector("path: "+m.commitInspectorSelectedPath(), innerWidth),
-	)
-	if m.commitInspectorStale {
-		lines = append(lines, truncateInspector("Repository changed; close and reopen to refresh.", innerWidth))
-	}
-	lines = append(lines, strings.Repeat("─", innerWidth))
-
-	bodyHeight := max(contentHeight-len(lines)-1, 1)
-	if m.commitInspectorHelp {
-		lines = append(lines, "Inspector help", "j/k changed files   Ctrl+U/D diff scroll", "Esc close   ? help")
-	} else if m.commitInspectorMetadataLoading {
-		lines = append(lines, "Loading…")
-	} else if m.commitInspectorError != "" {
-		lines = append(lines, "Metadata error: "+truncateInspector(m.commitInspectorError, innerWidth))
-	} else if len(m.commitInspector.Files) == 0 {
-		lines = append(lines, "No changed files")
-	} else {
-		lines = append(lines, m.renderInspectorBody(innerWidth, bodyHeight)...)
-	}
-	for len(lines) < contentHeight-1 {
-		lines = append(lines, "")
-	}
-	if len(lines) > contentHeight-1 {
-		lines = lines[:contentHeight-1]
-	}
-	lines = append(lines, truncateInspector("Esc close   ? help", innerWidth))
-	for len(lines) < contentHeight {
-		lines = append(lines, "")
-	}
-	if len(lines) > contentHeight {
-		lines = lines[:contentHeight]
-	}
-
-	style := popupBorder.Width(max(width-2, 0)).Height(max(height-2, 0)).Padding(0, 1)
-	return style.Render(strings.Join(lines, "\n"))
-}
-
 func (m model) renderInspectorBody(width, height int) []string {
 	if height < 1 {
 		return nil
@@ -263,17 +210,6 @@ func inspectorFileLabel(file ChangedFile, width int) string {
 	available := max(width-lipgloss.Width(prefix), 1)
 	path = fitInspectorPath(path, available)
 	return prefix + path
-}
-
-func (m model) commitInspectorSelectedPath() string {
-	if m.commitInspectorCursor < 0 || m.commitInspectorCursor >= len(m.commitInspector.Files) {
-		return "-"
-	}
-	file := m.commitInspector.Files[m.commitInspectorCursor]
-	if file.OldPath != "" && file.OldPath != file.Path {
-		return file.OldPath + " → " + file.Path
-	}
-	return file.Path
 }
 
 func compactInspectorPath(path string) string {

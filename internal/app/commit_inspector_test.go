@@ -55,60 +55,6 @@ func TestCommitInspectorJKMovesChangedFileSelection(t *testing.T) {
 	}
 }
 
-func TestCommitInspectorRendersBorderedTreeAndUnifiedRows(t *testing.T) {
-	m := model{
-		navigationState: navigationState{
-			width:  80,
-			height: 20,
-		},
-		inspectorState: inspectorState{
-			commitInspectorOpen:   true,
-			commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+new"},
-			commitInspectorCursor: 0,
-			commitInspector: CommitSnapshot{
-				FullHash: "abc123", Subject: "change", AuthorName: "dev", Parent: "parent",
-				Files: []ChangedFile{{Status: "M", Path: "internal/app/main.go"}},
-			},
-		},
-	}
-	got := m.renderCommitInspectorPopup(80, 20)
-	if lipgloss.Width(got) != 80 || lipgloss.Height(got) != 20 {
-		t.Fatalf("expected exact frame dimensions, got %dx%d", lipgloss.Width(got), lipgloss.Height(got))
-	}
-	// "M" used to be in this list as the modified-file marker. It never checked
-	// that: the only M in the frame was the one in "FROM parent", so the
-	// assertion passed on the author row's tail. The tail is a parent: row now,
-	// and the tree still renders "?" for this file -- tracked separately rather
-	// than papered over with another substring that happens to match.
-	for _, want := range []string{"commit: abc123", "message: change", "author: dev", "parent: parent", "path: internal/app/main.go", "Changed files", "Diff", "@@", "old", "new", "Esc close"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("expected %q in Inspector frame: %q", want, got)
-		}
-	}
-	if strings.Contains(got, "q close") {
-		t.Fatalf("Inspector must not advertise q close: %q", got)
-	}
-}
-
-func TestCommitInspectorDiffDoesNotWrapLongCode(t *testing.T) {
-	m := model{
-		inspectorState: inspectorState{commitInspector: CommitSnapshot{
-			FullHash: "abc123", Subject: "change", AuthorName: "dev",
-			Files: []ChangedFile{{Status: "M", Path: "main.go"}},
-		},
-			commitInspectorLines:  []string{"@@ -1 +1 @@", "-old", "+a very long line that must stay on one terminal row"},
-			commitInspectorCursor: 0,
-		},
-	}
-	got := m.renderCommitInspectorPopup(60, 20)
-	if lipgloss.Width(got) != 60 || lipgloss.Height(got) != 20 {
-		t.Fatalf("expected fixed no-wrap frame, got %dx%d", lipgloss.Width(got), lipgloss.Height(got))
-	}
-	if strings.Contains(got, "\n+a very") {
-		t.Fatal("long diff code should be horizontally truncated, not wrapped")
-	}
-}
-
 func TestCommitInspectorKeepsDividerAlignedWithANSISelectedRow(t *testing.T) {
 	m := model{
 		inspectorState: inspectorState{commitInspector: CommitSnapshot{Files: []ChangedFile{
