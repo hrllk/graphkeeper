@@ -94,7 +94,10 @@ func screenStampText(value string, budget int) string {
 		return ""
 	}
 	switch {
-	case budget >= 25:
+	// "2026-09-08 23:15:16 +09:00" is 26 columns, not 25. At exactly 25 the row
+	// overflowed by one and fitScreenText clipped the offset to "+09:0", which is
+	// the misleading render this whole step-down exists to avoid.
+	case budget >= 26:
 		return parsed.Format("2006-01-02 15:04:05 -07:00")
 	case budget >= 16:
 		return parsed.Format("2006-01-02 15:04")
@@ -170,14 +173,32 @@ func screenPath(path string) string {
 // tail of the diff pane with no error and no marker. Deriving it from the header
 // the renderer actually built keeps the two from drifting apart again.
 func inspectorBodyRowsFor(height, headerRows int) int {
-	const nonHeaderChrome = 3 // separator + padding + footer
-	return max(max(height-2, 1)-headerRows-nonHeaderChrome, 1)
+	// separator + the "Changed files │ Diff" pane header screenBody prepends +
+	// the footer. screenBody then appends exactly bodyRows rows after its pane
+	// header, so this is the count the frame keeps.
+	const nonHeaderChrome = 3
+	// Clamping to 1 was wrong: at height 11 with a six-row header the true
+	// budget is 0, and reporting 1 made the clamp and the page size believe a
+	// row existed while renderCommitInspectorScreen's lines[:contentHeight-1]
+	// had already dropped it. Nothing visible has to report zero.
+	return max(max(height-2, 1)-headerRows-nonHeaderChrome, 0)
 }
 
-// inspectorBodyRows keeps the four-row-header arithmetic for callers that only
-// know the height. Prefer inspectorBodyRowsFor wherever the header is in hand.
-func inspectorBodyRows(height int) int {
-	return inspectorBodyRowsFor(height, 4)
+// inspectorBodyRowCount is the single source of truth for how many diff rows the
+// Inspector shows. The renderer draws that many and the scroll keys move by that
+// many, and inspectorDiffLines states that invariant: "the renderer draws them
+// and the scroll keys measure them, so both must agree on the count."
+//
+// It derives from the header the renderer actually builds because the header
+// height varies with the snapshot (a rebased commit adds a committed: row) and
+// with the width (a narrow frame drops the date rows entirely). A constant here
+// is what produced the T8 regression the first time, where the clamp ran two
+// rows ahead of what the frame kept and the last lines of a scrolled diff could
+// not be reached. Counting the real header is slightly wasteful and the only
+// version that cannot drift.
+func (m model) inspectorBodyRowCount() int {
+	header := screenHeaderLines(m.commitInspectorSnapshot, ChangedFile{}, max(m.width-4, 1))
+	return inspectorBodyRowsFor(m.height, len(header))
 }
 
 // inspectorFileOffset scrolls the changed-files list only as far as needed to keep
@@ -226,7 +247,13 @@ func (m model) inspectorDiffLines(unsupported bool) []string {
 // maxInspectorDiffScroll is the furthest the diff pane can scroll before the last
 // line reaches the bottom of the viewport.
 func (m model) maxInspectorDiffScroll() int {
-	visible := inspectorBodyRows(m.height)
+	visible := m.inspectorBodyRowCount()
+	if visible < 1 {
+		// No diff row is drawn, so there is nowhere to scroll to. Without this
+		// the clamp becomes len(diffLines) and Ctrl+D would walk the offset
+		// through a pane that shows nothing.
+		return 0
+	}
 	return max(len(m.inspectorDiffLines(m.height < 12))-visible, 0)
 }
 

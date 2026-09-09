@@ -88,13 +88,62 @@ func inspectorBodyLines(rendered string) []string {
 // than the frame keeps and rely on truncation to trim them, so the scroll clamp
 // was two rows too generous and the last lines of a scrolled diff could never be
 // reached. Generation and the clamp must agree.
+//
+// The date rows made this sharper. The header is 5 rows with a date and 6 once
+// the author and committer stamps diverge, so a clamp derived from a constant
+// four-row header runs ahead of the frame again. The subtests below cover all
+// three header shapes; the undated one alone would pass against a constant and
+// hide the regression, which is how it got through the first time.
+//
+// m.width and m.height are set to the values handed to the renderer because
+// production does exactly that (view_shell.go:49 passes m.width, m.height), and
+// inspectorBodyRowCount reads them off the model.
 func TestInspectorBodyRowsMatchesWhatTheFrameKeeps(t *testing.T) {
+	const (
+		authored  = "2026-09-08T23:15:16+09:00"
+		committed = "2026-09-09T01:02:03+09:00"
+	)
+	for _, tt := range []struct {
+		name                   string
+		authorDate, commitDate string
+	}{
+		{"no dates, 4-row header", "", ""},
+		{"one date, 5-row header", authored, authored},
+		{"diverged dates, 6-row header", authored, committed},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, height := range []int{12, 14, 20, 30, 40, 41, 50} {
+				m := scrollFixture(500, 3)
+				m.commitInspectorSnapshot.AuthorDate = tt.authorDate
+				m.commitInspectorSnapshot.CommitDate = tt.commitDate
+				m.width, m.height = 120, height
+				body := inspectorBodyLines(renderCommitInspectorScreen(m, m.width, m.height))
+				if want := m.inspectorBodyRowCount(); len(body) != want {
+					t.Fatalf("height %d rendered %d body rows, inspectorBodyRowCount says %d", height, len(body), want)
+				}
+			}
+		})
+	}
+}
+
+// The clamp and the page size have to come from the same count the frame keeps,
+// or Ctrl+D pages past what was drawn and silently skips diff lines. This is the
+// behavioural half of the same invariant.
+func TestInspectorScrollPageMatchesTheVisibleRows(t *testing.T) {
+	const authored = "2026-09-08T23:15:16+09:00"
 	m := scrollFixture(500, 3)
-	for _, height := range []int{12, 14, 20, 30, 40, 41, 50} {
-		body := inspectorBodyLines(renderCommitInspectorScreen(m, 120, height))
-		if want := inspectorBodyRows(height); len(body) != want {
-			t.Fatalf("height %d rendered %d body rows, inspectorBodyRows says %d", height, len(body), want)
-		}
+	m.commitInspectorSnapshot.AuthorDate = authored
+	m.commitInspectorSnapshot.CommitDate = "2026-09-09T01:02:03+09:00"
+	m.width, m.height = 120, 30
+
+	visible := len(inspectorBodyLines(renderCommitInspectorScreen(m, m.width, m.height)))
+	if page := m.inspectorScrollPage(); page != visible {
+		t.Fatalf("Ctrl+U/D pages by %d rows but only %d are drawn", page, visible)
+	}
+	total := len(m.inspectorDiffLines(m.height < 12))
+	if want := max(total-visible, 0); m.maxInspectorDiffScroll() != want {
+		t.Fatalf("scroll clamp is %d, want %d for %d diff lines over %d visible rows",
+			m.maxInspectorDiffScroll(), want, total, visible)
 	}
 }
 

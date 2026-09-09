@@ -10,7 +10,7 @@ import "testing"
 
 func TestParseGraphCommitLinesKeepsCommitDate(t *testing.T) {
 	got := parseGraphCommitLines([]string{
-		"* \x00abc\x1fparent\x1f5 minutes ago\x1fdev\x1fHEAD -> main\x1fsubject\x1f2026-09-08T23:15:16+09:00",
+		"* \x00abc\x1fparent\x1f5 minutes ago\x1fdev\x1fHEAD -> main\x1f2026-09-08T23:15:16+09:00\x1fsubject",
 	})
 	if len(got) != 1 {
 		t.Fatalf("expected one commit, got %d: %+v", len(got), got)
@@ -28,7 +28,7 @@ func TestParseGraphCommitLinesRejectsShortLineLoudly(t *testing.T) {
 	if got := parseGraphCommitLines([]string{short}); len(got) != 0 {
 		t.Fatalf("expected a six-field line to be rejected, got %+v", got)
 	}
-	full := short + "\x1f2026-09-08T23:15:16+09:00"
+	full := "* \x00abc\x1fparent\x1f5 minutes ago\x1fdev\x1fHEAD -> main\x1f2026-09-08T23:15:16+09:00\x1fsubject"
 	if got := parseGraphCommitLines([]string{full}); len(got) != 1 {
 		t.Fatalf("expected a seven-field line to parse, got %+v", got)
 	}
@@ -56,5 +56,41 @@ func TestGraphLogArgsFieldCountMatchesParser(t *testing.T) {
 	}
 	if fields != 7 {
 		t.Fatalf("expected the graph format to carry 7 fields, got %d from %q", fields, format)
+	}
+}
+
+// The subject must stay the last field in both formats. SplitN with a field cap
+// leaves everything after the last split in the final part, so whichever field
+// is last absorbs a stray delimiter instead of shifting the fields after it.
+// With the date placed after the subject, a subject carrying the delimiter
+// truncated the subject and contaminated the date while the length check still
+// passed, so it corrupted silently.
+
+func TestGraphFormatKeepsSubjectLastSoDelimitersCannotShiftFields(t *testing.T) {
+	args := graphLogArgs([]string{"main"}, 0)
+	format := ""
+	for _, arg := range args {
+		if len(arg) > len("--format=") && arg[:len("--format=")] == "--format=" {
+			format = arg[len("--format="):]
+		}
+	}
+	if got := format[len(format)-2:]; got != "%s" {
+		t.Fatalf("expected the graph format to end with the subject, got %q from %q", got, format)
+	}
+}
+
+func TestParseGraphCommitLinesSurvivesADelimiterInTheSubject(t *testing.T) {
+	// A subject carrying the unit separator. The date precedes it, so the date
+	// is read correctly and the subject keeps everything that follows.
+	line := "* \x00abc\x1fparent\x1f5 minutes ago\x1fdev\x1fHEAD -> main\x1f2026-09-08T23:15:16+09:00\x1fsub\x1fject"
+	got := parseGraphCommitLines([]string{line})
+	if len(got) != 1 {
+		t.Fatalf("expected one commit, got %d: %+v", len(got), got)
+	}
+	if got[0].CommitDate != "2026-09-08T23:15:16+09:00" {
+		t.Fatalf("a delimiter in the subject corrupted the date: %q", got[0].CommitDate)
+	}
+	if got[0].Subject != "sub\x1fject" {
+		t.Fatalf("expected the subject to absorb the delimiter, got %q", got[0].Subject)
 	}
 }

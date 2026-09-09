@@ -13,9 +13,11 @@ import (
 )
 
 // inspectorScrollPage is one viewport worth of diff rows, so Ctrl+U and Ctrl+D
-// page by exactly what the user can see.
-func inspectorScrollPage(height int) int {
-	return inspectorBodyRows(height)
+// page by exactly what the user can see. It takes the model rather than a height
+// because the visible row count depends on the header, which varies with the
+// snapshot and the width; paging by a height-only guess skips diff lines.
+func (m model) inspectorScrollPage() int {
+	return m.inspectorBodyRowCount()
 }
 
 func (m model) cancelInspector() model {
@@ -100,9 +102,9 @@ func (m model) handleCommitInspectorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.selectInspectorFile()
 		}
 	case "ctrl+u":
-		m.commitInspectorScroll = max(m.commitInspectorScroll-inspectorScrollPage(m.height), 0)
+		m.commitInspectorScroll = max(m.commitInspectorScroll-m.inspectorScrollPage(), 0)
 	case "ctrl+d":
-		m.commitInspectorScroll = min(m.commitInspectorScroll+inspectorScrollPage(m.height), m.maxInspectorDiffScroll())
+		m.commitInspectorScroll = min(m.commitInspectorScroll+m.inspectorScrollPage(), m.maxInspectorDiffScroll())
 	}
 	return m, nil
 }

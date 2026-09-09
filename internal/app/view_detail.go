@@ -190,10 +190,22 @@ func compactWhenTime(t time.Time) string {
 func compactWhenISO(value string, budget int) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return "-"
+		// Nothing is known, so there is nothing to say. Returning "-" here added
+		// a "date: -" row to every commit without a stamp, including the
+		// synthetic conflict node (graph.go injectVirtualConflictNode), which
+		// has no date by construction.
+		return ""
+	}
+	// The placeholder has to fit too. It used to be returned before the budget
+	// was consulted, so at a zero or negative budget the row was wider than the
+	// space for it and got clipped by fitBlockWidth.
+	if budget < 1 {
+		return ""
 	}
 	parsed, err := time.Parse(time.RFC3339, value)
 	if err != nil {
+		// The value exists but cannot be read. That is worth one cell of signal,
+		// unlike a missing value, which says nothing.
 		return "-"
 	}
 	switch {

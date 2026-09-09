@@ -41,13 +41,21 @@ func TestCompactWhenISOKeepsTheRecordedOffset(t *testing.T) {
 // A value that is present but unparseable costs one cell, not a commit, so it
 // renders the panel's existing placeholder rather than dropping the row.
 func TestCompactWhenISODistinguishesMissingFromUnparseable(t *testing.T) {
-	if got := compactWhenISO("", 16); got != "-" {
-		t.Fatalf("expected an empty stamp to render %q, got %q", "-", got)
+	// A missing stamp says nothing, so it drops the row rather than adding
+	// "date: -" to every commit without one - the synthetic conflict node
+	// included, which has no date by construction.
+	if got := compactWhenISO("", 16); got != "" {
+		t.Fatalf("expected a missing stamp to drop the row, got %q", got)
 	}
+	// A value that exists but cannot be read is worth one cell of signal.
 	if got := compactWhenISO("not a date", 16); got != "-" {
 		t.Fatalf("expected an unparseable stamp to render %q, got %q", "-", got)
 	}
-	if got := compactWhenISO("", 4); got != "-" {
-		t.Fatalf("expected a missing stamp to stay %q even at a tiny budget, got %q", "-", got)
+	// The placeholder has to fit the budget too. It used to be returned before
+	// the budget was consulted, so the row overflowed and got clipped.
+	for _, budget := range []int{0, -1, -5} {
+		if got := compactWhenISO("not a date", budget); got != "" {
+			t.Fatalf("budget %d has no room for a placeholder, got %q", budget, got)
+		}
 	}
 }

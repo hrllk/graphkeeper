@@ -48,7 +48,7 @@ func TestInspectorBodyRowsTracksTheHeaderItIsGiven(t *testing.T) {
 		{20, 6, 9},
 		{12, 5, 2},
 		{12, 6, 1},
-		{12, 20, 1}, // never negative, never zero
+		{12, 20, 0}, // a header taller than the frame keeps nothing
 	} {
 		if got := inspectorBodyRowsFor(tt.height, tt.headerRows); got != tt.want {
 			t.Fatalf("inspectorBodyRowsFor(%d, %d) = %d, want %d", tt.height, tt.headerRows, got, tt.want)
@@ -64,8 +64,13 @@ func TestScreenStampTextStepsDownWithBudget(t *testing.T) {
 		budget int
 		want   string
 	}{
-		{25, "2026-09-08 23:15:16 +09:00"},
+		// The full form is 26 columns. A 25-column guard clipped the offset to
+		// "+09:0", which is exactly the wrong-looking value this step-down exists
+		// to prevent, so 25 must fall through to the shorter form.
+		{26, "2026-09-08 23:15:16 +09:00"},
+		{25, "2026-09-08 23:15"},
 		{16, "2026-09-08 23:15"},
+		{15, "2026-09-08"},
 		{10, "2026-09-08"},
 		{9, ""},
 	} {
@@ -85,11 +90,46 @@ func TestScreenStampTextStepsDownWithBudget(t *testing.T) {
 // the screen at a width that can hold it.
 func TestCommitInspectorScreenShowsTheDate(t *testing.T) {
 	m := inspectorDateFixture("2026-09-08T23:15:16+09:00", "2026-09-08T23:15:16+09:00")
-	got := renderCommitInspectorScreen(m, 80, 30)
+	m.width, m.height = 80, 30
+	got := renderCommitInspectorScreen(m, m.width, m.height)
 	if !strings.Contains(got, "date: 2026-09-08 23:15:16 +09:00") {
 		t.Fatalf("expected the full stamp in the header, got %q", got)
 	}
 	if strings.Contains(got, "committed:") {
 		t.Fatalf("expected no committed: row when the stamps match, got %q", got)
+	}
+}
+
+// Nothing drawn has to report zero. Clamping to one made the scroll clamp and
+// the page size believe a row existed at heights where
+// renderCommitInspectorScreen had already dropped it.
+func TestInspectorBodyRowsReportsZeroWhenTheFrameKeepsNothing(t *testing.T) {
+	for _, tt := range []struct{ height, headerRows int }{
+		// max(max(h-2,1)-H-3, 0). Only these actually reach zero:
+		// (11,6)=0  (8,4)=-1  (1,4)=-6  (5,6)=-6
+		// (11,5) and (10,4) legitimately keep one row, so they are not listed.
+		{11, 6}, {8, 4}, {1, 4}, {5, 6},
+	} {
+		if got := inspectorBodyRowsFor(tt.height, tt.headerRows); got != 0 {
+			t.Fatalf("inspectorBodyRowsFor(%d, %d) = %d, want 0", tt.height, tt.headerRows, got)
+		}
+	}
+}
+
+// The invariant has to hold below height 12 too, where the frame keeps no diff
+// rows at all. The earlier test started at 12 and missed this band.
+func TestInspectorBodyRowsMatchesTheFrameAtUnsupportedHeights(t *testing.T) {
+	for _, height := range []int{1, 4, 8, 10, 11} {
+		m := scrollFixture(500, 3)
+		m.commitInspectorSnapshot.AuthorDate = "2026-09-08T23:15:16+09:00"
+		m.commitInspectorSnapshot.CommitDate = "2026-09-09T01:02:03+09:00"
+		m.width, m.height = 120, height
+		drawn := len(inspectorBodyLines(renderCommitInspectorScreen(m, m.width, m.height)))
+		if want := m.inspectorBodyRowCount(); drawn != want {
+			t.Fatalf("height %d drew %d body rows, inspectorBodyRowCount says %d", height, drawn, want)
+		}
+		if m.maxInspectorDiffScroll() != 0 {
+			t.Fatalf("height %d has nothing to scroll but the clamp is %d", height, m.maxInspectorDiffScroll())
+		}
 	}
 }

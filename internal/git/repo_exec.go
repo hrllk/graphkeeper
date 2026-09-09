@@ -159,10 +159,13 @@ func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection
 	if hash == "" {
 		return CommitInspection{}, fmt.Errorf("commit hash is empty")
 	}
-	// %aI and %cI are appended, and the SplitN count and the length check move
-	// with them. Changing the format alone makes every call return
-	// "invalid commit metadata" and the Inspector stops opening.
-	meta, err := r.git(ctx, "show", "-s", "--format=%H%x00%P%x00%an%x00%ae%x00%s%x00%aI%x00%cI", hash)
+	// %aI and %cI go BEFORE %s so the subject stays the last field and absorbs a
+	// stray \x00 instead of shifting the dates out from under their indexes.
+	// With the dates after the subject, len(parts) still hit 7 and the Inspector
+	// opened with a truncated subject and wrong dates. The SplitN count and the
+	// length check move with the format; changing the format alone makes every
+	// call return "invalid commit metadata" and the Inspector stops opening.
+	meta, err := r.git(ctx, "show", "-s", "--format=%H%x00%P%x00%an%x00%ae%x00%aI%x00%cI%x00%s", hash)
 	if err != nil {
 		return CommitInspection{}, err
 	}
@@ -194,10 +197,10 @@ func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection
 	}
 	r.annotateCommitDiffFiles(ctx, files, parent, commit)
 	return CommitInspection{
-		Hash: commit, Subject: sanitizeTerminalText(parts[4]), Author: sanitizeTerminalText(author),
+		Hash: commit, Subject: sanitizeTerminalText(parts[6]), Author: sanitizeTerminalText(author),
 		Message: sanitizeTerminalText(message), Parent: parent, IsRoot: parent == "", Parents: parents, Files: files,
-		AuthorDate: sanitizeTerminalText(strings.TrimSpace(parts[5])),
-		CommitDate: sanitizeTerminalText(strings.TrimSpace(parts[6])),
+		AuthorDate: sanitizeTerminalText(strings.TrimSpace(parts[4])),
+		CommitDate: sanitizeTerminalText(strings.TrimSpace(parts[5])),
 	}, nil
 }
 

@@ -142,8 +142,8 @@ func parseGraphCommitLines(lines []string) []GraphCommit {
 		if decorations := strings.TrimSpace(parts[4]); decorations != "" {
 			entry.Decorations = splitDecorations(decorations)
 		}
-		entry.Subject = strings.TrimSpace(parts[5])
-		entry.CommitDate = strings.TrimSpace(parts[6])
+		entry.CommitDate = strings.TrimSpace(parts[5])
+		entry.Subject = strings.TrimSpace(parts[6])
 		if entry.Hash != "" {
 			commits = append(commits, entry)
 		}
@@ -184,10 +184,14 @@ func graphLogArgs(refs []string, limit int) []string {
 		"--decorate-refs=refs/heads/*",
 		"--decorate-refs=refs/remotes/*",
 		"--topo-order",
-		// %cI is appended, never inserted: the parser reads parts[2..5] by
-		// position, so a field in the middle would shift subject out from under
-		// it. %cI needs no --date argument and keeps the time %cs drops.
-		"--format=%x00%H%x1f%P%x1f%ar%x1f%an%x1f%D%x1f%s%x1f%cI",
+		// %cI goes BEFORE %s so the subject stays the last field. SplitN with a
+		// field cap leaves everything after the last split in the final part, so
+		// whichever field is last absorbs a stray delimiter instead of shifting
+		// the ones after it. Putting %cI after %s made a subject containing \x1f
+		// truncate the subject and contaminate the date, and len(parts) still
+		// passed, so it corrupted silently. %cI needs no --date argument and
+		// keeps the time %cs drops.
+		"--format=%x00%H%x1f%P%x1f%ar%x1f%an%x1f%D%x1f%cI%x1f%s",
 	}
 	if limit > 0 {
 		args = append(args, fmt.Sprintf("--max-count=%d", limit))
