@@ -1027,7 +1027,7 @@
             "taskId": "T13",
             "title": "T13 REGRESSION: remove only the startup call sites; keep the 4 tag-CUD and 3 execute-refresh call sites with tests",
             "description": "consolidation · 1d / CC 1h\n\n근거: Arch #1 (D7) — the plan said delete the functions; 7 non-startup call sites depend on them",
-            "details": "internal/app/commands.go; internal/app/update_lifecycle.go; internal/app/tagging.go; internal/app/update_execute.go",
+            "details": "internal/app/commands.go; internal/app/update_lifecycle.go; internal/app/tagging.go; internal/app/update_execute.go\n\n2026-09-10 파장 측정, 착수 보류. T6/T7 은 끝났고 사슬상 다음이지만 규모가 다르다. legacy loadedMsg/refreshedMsg 분기를 쓰는 테스트가 6개 파일 17곳(model_test 2, repository_read_test 1, operation_result_refresh_test 1, task212_refresh_lifecycle_test 4, task214_characterization_test 3, update_lifecycle_epoch_test 6)이고, 프로덕션도 아직 닿는다 - model.go:217 의 Init 이 loadRepoState 를 배치하고 commands.go:84 의 refreshCmd 가 refreshRepoState 를 부른다. 즉 '테스트에만 남은 죽은 경로'가 아니라 배선에 따라 살아 있는 경로다. 야간 자동 진행분이 이미 27커밋이라, 리뷰 전에 구조 변경을 하나 더 얹기보다 여기서 멈춘다. 착수 시 확인할 것: Init 과 refreshCmd 가 repositoryRead 유무로 분기하는지, 분기한다면 주입 없는 구성을 어떻게 처리할지(테스트 픽스처 다수가 그 구성이다).",
             "status": "pending",
             "priority": "P1",
             "dependencies": [],
