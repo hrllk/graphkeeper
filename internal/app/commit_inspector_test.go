@@ -75,7 +75,12 @@ func TestCommitInspectorRendersBorderedTreeAndUnifiedRows(t *testing.T) {
 	if lipgloss.Width(got) != 80 || lipgloss.Height(got) != 20 {
 		t.Fatalf("expected exact frame dimensions, got %dx%d", lipgloss.Width(got), lipgloss.Height(got))
 	}
-	for _, want := range []string{"commit: abc123", "message: change", "author: dev", "path: internal/app/main.go", "Changed files", "Diff", "@@", "old", "new", "M", "Esc close"} {
+	// "M" used to be in this list as the modified-file marker. It never checked
+	// that: the only M in the frame was the one in "FROM parent", so the
+	// assertion passed on the author row's tail. The tail is a parent: row now,
+	// and the tree still renders "?" for this file -- tracked separately rather
+	// than papered over with another substring that happens to match.
+	for _, want := range []string{"commit: abc123", "message: change", "author: dev", "parent: parent", "path: internal/app/main.go", "Changed files", "Diff", "@@", "old", "new", "Esc close"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected %q in Inspector frame: %q", want, got)
 		}

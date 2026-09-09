@@ -46,7 +46,7 @@ func (m model) View() string {
 
 func renderAppView(m model) string {
 	if m.commitInspectorOpen {
-		return renderCommitInspectorScreen(m, m.width, m.height)
+		return renderCommitInspectorScreen(m)
 	}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)

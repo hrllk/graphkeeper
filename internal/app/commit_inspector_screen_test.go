@@ -24,15 +24,18 @@ func TestCommitInspectorScreenMatrixKeepsFrameAndPartialFooter(t *testing.T) {
 		},
 	}
 	for _, size := range [][2]int{{40, 12}, {60, 20}, {80, 30}} {
-		got := renderCommitInspectorScreen(m, size[0], size[1])
+		got := renderCommitInspectorScreen(withFrame(m, size[0], size[1]))
 		if lipgloss.Width(got) != size[0] || lipgloss.Height(got) != size[1] {
 			t.Fatalf("size %dx%d rendered as %dx%d", size[0], size[1], lipgloss.Width(got), lipgloss.Height(got))
 		}
 		if !strings.Contains(got, "n next") {
 			t.Fatalf("partial screen %dx%d omitted n next: %q", size[0], size[1], got)
 		}
-		if !strings.Contains(got, "FROM parent") {
-			t.Fatalf("screen %dx%d omitted parent direction", size[0], size[1])
+		// The parent has its own key/value row now. As a "FROM <hash>" tail on
+		// the author row it had no matching TO and was the first thing cut --
+		// at 80 columns, not only at 40.
+		if !strings.Contains(got, "parent: parent") {
+			t.Fatalf("screen %dx%d omitted the parent row", size[0], size[1])
 		}
 	}
 }
@@ -40,8 +43,8 @@ func TestCommitInspectorScreenMatrixKeepsFrameAndPartialFooter(t *testing.T) {
 func TestCommitInspectorScreenNoColorPreservesContextAndPathIdentity(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	m := model{inspectorState: inspectorState{commitInspectorSnapshot: CommitSnapshot{FullHash: "abc", Subject: "subject", AuthorName: "dev", IsRoot: true, Files: []ChangedFile{{StableID: "f", Status: StatusAdded, Path: "src/한글/very_long_file.go"}}}, commitInspectorDiffWindow: DiffWindow{FileID: "f", Hunks: []DiffHunk{{Header: "@@", Rows: []PairedRow{{Kind: "context", From: CodeLine{Number: 1, Text: "same"}, To: CodeLine{Number: 1, Text: "same"}, FromPresent: true, ToPresent: true}}}}}}}
-	got := renderCommitInspectorScreen(m, 40, 12)
-	if !strings.Contains(got, "ROOT COMMIT") || !strings.Contains(got, "very_long_file.go") || !strings.Contains(got, "same") {
+	got := renderCommitInspectorScreen(withFrame(m, 40, 12))
+	if !strings.Contains(got, "(root commit)") || !strings.Contains(got, "very_long_file.go") || !strings.Contains(got, "same") {
 		t.Fatalf("no-color screen lost identity/context: %q", got)
 	}
 }
@@ -117,7 +120,7 @@ func TestInspectorBodyRowsMatchesWhatTheFrameKeeps(t *testing.T) {
 				m.commitInspectorSnapshot.AuthorDate = tt.authorDate
 				m.commitInspectorSnapshot.CommitDate = tt.commitDate
 				m.width, m.height = 120, height
-				body := inspectorBodyLines(renderCommitInspectorScreen(m, m.width, m.height))
+				body := inspectorBodyLines(renderCommitInspectorScreen(m))
 				if want := m.inspectorBodyRowCount(); len(body) != want {
 					t.Fatalf("height %d rendered %d body rows, inspectorBodyRowCount says %d", height, len(body), want)
 				}
@@ -136,7 +139,7 @@ func TestInspectorScrollPageMatchesTheVisibleRows(t *testing.T) {
 	m.commitInspectorSnapshot.CommitDate = "2026-09-09T01:02:03+09:00"
 	m.width, m.height = 120, 30
 
-	visible := len(inspectorBodyLines(renderCommitInspectorScreen(m, m.width, m.height)))
+	visible := len(inspectorBodyLines(renderCommitInspectorScreen(m)))
 	if page := m.inspectorScrollPage(); page != visible {
 		t.Fatalf("Ctrl+U/D pages by %d rows but only %d are drawn", page, visible)
 	}
@@ -151,13 +154,13 @@ func TestInspectorScrollPageMatchesTheVisibleRows(t *testing.T) {
 // indexed from zero, so an 800-line diff showed its first screen and nothing else.
 func TestInspectorDiffPaneScrollsWithTheOffset(t *testing.T) {
 	m := scrollFixture(500, 1)
-	first := renderCommitInspectorScreen(m, 120, 40)
+	first := renderCommitInspectorScreen(withFrame(m, 120, 40))
 	if !strings.Contains(first, "line 1") {
 		t.Fatalf("unscrolled pane missing the first row: %q", first)
 	}
 
 	m.commitInspectorScroll = 100
-	scrolled := renderCommitInspectorScreen(m, 120, 40)
+	scrolled := renderCommitInspectorScreen(withFrame(m, 120, 40))
 	if strings.Contains(inspectorBodyLines(scrolled)[0], "line 1 ") {
 		t.Fatal("scrolled pane still starts at the first row")
 	}
@@ -169,10 +172,11 @@ func TestInspectorDiffPaneScrollsWithTheOffset(t *testing.T) {
 // The last diff line must be reachable. It is the line the reader is usually
 // looking for, and it was the one the off-by-two hid.
 func TestInspectorDiffPaneReachesTheLastLine(t *testing.T) {
-	m := scrollFixture(500, 1)
-	m.height = 40
+	// The frame has to be set before the clamp is read: both come from the
+	// model, which is the point of taking the size parameters away.
+	m := withFrame(scrollFixture(500, 1), 120, 40)
 	m.commitInspectorScroll = m.maxInspectorDiffScroll()
-	got := renderCommitInspectorScreen(m, 120, 40)
+	got := renderCommitInspectorScreen(m)
 	if !strings.Contains(got, "line 500") {
 		t.Fatalf("max scroll did not reveal the last line: %q", got)
 	}
@@ -206,7 +210,7 @@ func TestInspectorFilePaneKeepsTheCursorVisible(t *testing.T) {
 	m := scrollFixture(10, 60)
 	for _, cursor := range []int{0, 45, 59} {
 		m.commitInspectorCursor = cursor
-		got := renderCommitInspectorScreen(m, 120, 40)
+		got := renderCommitInspectorScreen(withFrame(m, 120, 40))
 		want := fmt.Sprintf("> A many/f%02d.txt", cursor+1)
 		if !strings.Contains(got, want) {
 			t.Fatalf("cursor %d: %q not rendered", cursor, want)
@@ -237,9 +241,9 @@ func TestInspectorFileOffsetScrollsOnlyAsNeeded(t *testing.T) {
 // Inspector looked frozen. Whatever the help says, the screen must change.
 func TestInspectorHelpChangesTheScreen(t *testing.T) {
 	m := scrollFixture(500, 3)
-	closed := renderCommitInspectorScreen(m, 120, 30)
+	closed := renderCommitInspectorScreen(withFrame(m, 120, 30))
 	m.commitInspectorHelp = true
-	open := renderCommitInspectorScreen(m, 120, 30)
+	open := renderCommitInspectorScreen(withFrame(m, 120, 30))
 	if closed == open {
 		t.Fatal("? produced a byte-identical screen while swallowing input")
 	}
@@ -254,7 +258,7 @@ func TestInspectorHelpChangesTheScreen(t *testing.T) {
 func TestInspectorHelpListsOnlyWorkingKeys(t *testing.T) {
 	m := scrollFixture(500, 3)
 	m.commitInspectorHelp = true
-	got := renderCommitInspectorScreen(m, 120, 30)
+	got := renderCommitInspectorScreen(withFrame(m, 120, 30))
 	for _, want := range []string{"j / k", "Ctrl+U / D", "Esc", "?"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("help omitted %q: %q", want, got)
@@ -328,4 +332,13 @@ func TestInspectorHelpEscClosesHelpAndSwallowsQuietly(t *testing.T) {
 	if !got.commitInspectorOpen {
 		t.Fatal("esc closed the Inspector instead of the help")
 	}
+}
+
+// withFrame sets the frame size on the model, which is the only place the
+// Inspector reads it from. Tests used to pass a size alongside a model that
+// carried a different one; the renderer honoured the argument and the scroll
+// clamp honoured the model, and the last diff lines went out of reach.
+func withFrame(m model, width, height int) model {
+	m.width, m.height = width, height
+	return m
 }

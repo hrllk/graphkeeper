@@ -133,19 +133,12 @@ func (m model) renderCommitInspectorPopup(width, height int) string {
 
 	lines := make([]string, 0, contentHeight)
 	lines = append(lines,
-		truncateInspector("commit: "+m.commitInspector.FullHash, innerWidth),
+		truncateInspector(inspectorCommitText(m.commitInspector.FullHash, innerWidth), innerWidth),
 		truncateInspector("message: "+truncateInspector(m.commitInspector.Subject, min(100, max(innerWidth-lipgloss.Width("message: "), 1))), innerWidth),
-		truncateInspector("author: "+m.commitInspector.AuthorName, innerWidth),
+		truncateInspector(inspectorAuthorText(m.commitInspector.AuthorName, m.commitInspector.AuthorEmail, innerWidth), innerWidth),
+		truncateInspector(inspectorParentText(m.commitInspector.Parent, m.commitInspector.IsRoot, innerWidth), innerWidth),
 		truncateInspector("path: "+m.commitInspectorSelectedPath(), innerWidth),
 	)
-	for len(lines) < 3 {
-		lines = append(lines, "")
-	}
-	if m.commitInspector.IsRoot {
-		lines[2] = truncateInspector(lines[2]+"  FROM ROOT COMMIT", innerWidth)
-	} else if m.commitInspector.Parent != "" {
-		lines[2] = truncateInspector(lines[2]+"  FROM "+m.commitInspector.Parent, innerWidth)
-	}
 	if m.commitInspectorStale {
 		lines = append(lines, truncateInspector("Repository changed; close and reopen to refresh.", innerWidth))
 	}

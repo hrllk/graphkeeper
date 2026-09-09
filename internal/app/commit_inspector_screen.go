@@ -7,7 +7,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func renderCommitInspectorScreen(m model, width, height int) string {
+// The frame's size comes from the model and nowhere else. It used to be passed
+// in as well, and the two could disagree: inspectorBodyRowCount derives the
+// diff pane's budget from m.width while the renderer drew at the width it was
+// handed, so a caller that set one and not the other made the scroll clamp and
+// the render disagree about how many rows exist -- and the last diff lines
+// became unreachable. Taking the parameters away makes that unwritable.
+func renderCommitInspectorScreen(m model) string {
+	width := m.width
+	height := m.height
 	if width < 1 {
 		width = 1
 	}
@@ -56,43 +64,78 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 //
 // The row count is 5, or 6 when the author and committer dates disagree, which
 // only happens once a commit has been rebased or cherry-picked.
+// Header rows in the order they are given up. decisions.md (2026-08-03) puts
+// commit identity, the selected path and a minimum diff ahead of everything
+// else on a short screen, and a header that eats the whole frame leaves
+// screenBody with nothing to draw at all -- so rows are dropped from the bottom
+// of this list until the diff pane has a row.
+const (
+	headerRowCommitted = iota // the rarest row: only present when the dates disagree
+	headerRowDate
+	headerRowParent
+	headerRowAuthor
+	headerRowPath
+	headerRowMessage
+	headerRowCommit
+)
+
 func screenHeaderFor(snapshot CommitSnapshot, selected ChangedFile, innerWidth, height int) []string {
-	full := screenHeaderLines(snapshot, selected, innerWidth)
-	if inspectorBodyRowsFor(height, len(full)) >= 1 {
-		return full
+	rows := screenHeaderRows(snapshot, selected, innerWidth)
+	// The first pass drops nothing: the full header is what the frame gets when
+	// the frame can afford it.
+	for drop := headerRowCommitted - 1; ; drop++ {
+		lines := screenHeaderTexts(rows, drop)
+		// The ladder has a floor. Author, path, message and the identity row are
+		// not negotiable -- a header that drops them buys diff rows by making
+		// the Inspector unable to say which commit it is showing, and the
+		// heights below the floor are the ones the frame already treats as
+		// unsupported.
+		if inspectorBodyRowsFor(height, len(lines)) >= 1 || drop >= headerRowParent {
+			return lines
+		}
 	}
-	// The frame cannot afford the date rows, so they go first. decisions.md
-	// (2026-08-03) puts commit identity, the selected path and a minimum diff
-	// ahead of everything else on a short screen, and a header that eats the
-	// whole frame leaves screenBody with nothing to draw at all.
-	return screenHeaderLinesWithDates(snapshot, selected, innerWidth, false)
 }
 
 func screenHeaderLines(snapshot CommitSnapshot, selected ChangedFile, innerWidth int) []string {
-	return screenHeaderLinesWithDates(snapshot, selected, innerWidth, true)
+	return screenHeaderTexts(screenHeaderRows(snapshot, selected, innerWidth), -1)
 }
 
-func screenHeaderLinesWithDates(snapshot CommitSnapshot, selected ChangedFile, innerWidth int, withDates bool) []string {
-	lines := []string{
-		fitScreenText("COMMIT "+snapshot.FullHash, innerWidth),
-		fitScreenText("message: "+snapshot.Subject, innerWidth),
-		fitScreenText(screenAuthorLine(snapshot), innerWidth),
+type screenHeaderRow struct {
+	kind int
+	text string
+}
+
+// screenHeaderTexts renders the rows whose kind outranks dropBelow.
+func screenHeaderTexts(rows []screenHeaderRow, dropBelow int) []string {
+	lines := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if row.kind <= dropBelow || row.text == "" {
+			continue
+		}
+		lines = append(lines, row.text)
 	}
-	if !withDates {
-		return append(lines, fitScreenText("path: "+screenSelectedPath(selected, max(innerWidth-6, 1)), innerWidth))
+	return lines
+}
+
+func screenHeaderRows(snapshot CommitSnapshot, selected ChangedFile, innerWidth int) []screenHeaderRow {
+	rows := []screenHeaderRow{
+		{headerRowCommit, fitScreenText(inspectorCommitText(snapshot.FullHash, innerWidth), innerWidth)},
+		{headerRowMessage, fitScreenText("message: "+snapshot.Subject, innerWidth)},
+		{headerRowAuthor, fitScreenText(inspectorAuthorText(snapshot.AuthorName, snapshot.AuthorEmail, innerWidth), innerWidth)},
+		{headerRowParent, fitScreenText(inspectorParentText(snapshot.Parent, snapshot.IsRoot, innerWidth), innerWidth)},
 	}
 	if when := screenStampText(snapshot.AuthorDate, innerWidth-len("date: ")); when != "" {
-		lines = append(lines, fitScreenText("date: "+when, innerWidth))
+		rows = append(rows, screenHeaderRow{headerRowDate, fitScreenText("date: "+when, innerWidth)})
 		// A separate committed: row only earns its line when it differs. On an
 		// ordinary commit the two stamps are identical and a second copy would
 		// cost a diff row for nothing.
 		if snapshot.CommitDate != "" && snapshot.CommitDate != snapshot.AuthorDate {
 			if committed := screenStampText(snapshot.CommitDate, innerWidth-len("committed: ")); committed != "" {
-				lines = append(lines, fitScreenText("committed: "+committed, innerWidth))
+				rows = append(rows, screenHeaderRow{headerRowCommitted, fitScreenText("committed: "+committed, innerWidth)})
 			}
 		}
 	}
-	return append(lines, fitScreenText("path: "+screenSelectedPath(selected, max(innerWidth-6, 1)), innerWidth))
+	return append(rows, screenHeaderRow{headerRowPath, fitScreenText("path: "+screenSelectedPath(selected, max(innerWidth-6, 1)), innerWidth)})
 }
 
 // screenStampText renders a strict ISO 8601 stamp for the Inspector, which is
@@ -125,27 +168,6 @@ func screenStampText(value string, budget int) string {
 	default:
 		return ""
 	}
-}
-
-func screenAuthorLine(snapshot CommitSnapshot) string {
-	author := "author: " + snapshot.AuthorName
-	if snapshot.AuthorEmail != "" {
-		author += " <" + snapshot.AuthorEmail + ">"
-	}
-	// The "FROM <hash>" tail stays. Task 6.8 owns replacing it with a parent: row
-	// and owns the narrow-width copy priority that makes it the first thing cut.
-	// Removing it here would not buy the date rows anything: the tail sits on the
-	// author row while the dates are rows of their own, so they compete for
-	// header height, which dropping the tail does not reclaim. Taking it out
-	// would only lose parent visibility until 6.8 is scheduled, and
-	// TestCommitInspectorScreenMatrixKeepsFrameAndPartialFooter pins it.
-	if snapshot.IsRoot {
-		return author + "  ROOT COMMIT"
-	}
-	if snapshot.Parent != "" {
-		return author + "  FROM " + snapshot.Parent
-	}
-	return author
 }
 
 func selectedScreenFile(snapshot CommitSnapshot, cursor int) ChangedFile {

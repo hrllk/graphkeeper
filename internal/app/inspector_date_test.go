@@ -18,18 +18,18 @@ func inspectorDateFixture(authorDate, commitDate string) model {
 	}}
 }
 
-// The header is five rows normally and six once the two stamps disagree, which
+// The header is six rows normally and seven once the two stamps disagree, which
 // is what a rebase or a cherry-pick produces. A second identical row would cost
 // a diff row for no information, so it only appears when it says something.
 func TestScreenHeaderRowsGrowOnlyWhenTheStampsDiffer(t *testing.T) {
 	const author = "2026-09-08T23:15:16+09:00"
 	same := screenHeaderLines(inspectorDateFixture(author, author).commitInspectorSnapshot, ChangedFile{}, 60)
-	if len(same) != 5 {
-		t.Fatalf("expected 5 header rows when the stamps match, got %d: %q", len(same), same)
+	if len(same) != 6 {
+		t.Fatalf("expected 6 header rows when the stamps match, got %d: %q", len(same), same)
 	}
 	moved := screenHeaderLines(inspectorDateFixture(author, "2026-09-09T01:02:03+09:00").commitInspectorSnapshot, ChangedFile{}, 60)
-	if len(moved) != 6 {
-		t.Fatalf("expected 6 header rows when the stamps differ, got %d: %q", len(moved), moved)
+	if len(moved) != 7 {
+		t.Fatalf("expected 7 header rows when the stamps differ, got %d: %q", len(moved), moved)
 	}
 	if !strings.Contains(strings.Join(moved, "\n"), "committed:") {
 		t.Fatalf("expected a committed: row when the stamps differ, got %q", moved)
@@ -91,7 +91,7 @@ func TestScreenStampTextStepsDownWithBudget(t *testing.T) {
 func TestCommitInspectorScreenShowsTheDate(t *testing.T) {
 	m := inspectorDateFixture("2026-09-08T23:15:16+09:00", "2026-09-08T23:15:16+09:00")
 	m.width, m.height = 80, 30
-	got := renderCommitInspectorScreen(m, m.width, m.height)
+	got := renderCommitInspectorScreen(m)
 	if !strings.Contains(got, "date: 2026-09-08 23:15:16 +09:00") {
 		t.Fatalf("expected the full stamp in the header, got %q", got)
 	}
@@ -130,7 +130,7 @@ func TestInspectorBodyRowsMatchesTheFrameAtUnsupportedHeights(t *testing.T) {
 		m.commitInspectorSnapshot.AuthorDate = "2026-09-08T23:15:16+09:00"
 		m.commitInspectorSnapshot.CommitDate = "2026-09-09T01:02:03+09:00"
 		m.width, m.height = 120, height
-		drawn := len(inspectorBodyLines(renderCommitInspectorScreen(m, m.width, m.height)))
+		drawn := len(inspectorBodyLines(renderCommitInspectorScreen(m)))
 		if want := m.inspectorBodyRowCount(); drawn != want {
 			t.Fatalf("height %d drew %d body rows, inspectorBodyRowCount says %d", height, drawn, want)
 		}
@@ -163,7 +163,7 @@ func TestShortFramesDropTheDateRowsRatherThanTheDiff(t *testing.T) {
 		if got := m.inspectorBodyRowCount(); got < 1 {
 			t.Fatalf("height %d kept %d body rows; the header should have given way", height, got)
 		}
-		drawn := len(inspectorBodyLines(renderCommitInspectorScreen(m, m.width, m.height)))
+		drawn := len(inspectorBodyLines(renderCommitInspectorScreen(m)))
 		if want := m.inspectorBodyRowCount(); drawn != want {
 			t.Fatalf("height %d drew %d body rows, inspectorBodyRowCount says %d", height, drawn, want)
 		}
@@ -179,11 +179,23 @@ func TestHeaderKeepsDatesOnlyWhenTheFrameCanAffordThem(t *testing.T) {
 		CommitDate: "2026-09-09T01:02:03+09:00",
 	}
 	tall := screenHeaderFor(snapshot, ChangedFile{}, 116, 40)
-	if len(tall) != 6 {
+	if len(tall) != 7 {
 		t.Fatalf("a tall frame should keep both date rows, got %d rows: %q", len(tall), tall)
 	}
+	// The ladder gives up one row at a time and stops as soon as the diff pane
+	// has a line, so at this height the date rows go and parent stays. It used
+	// to be all-dates-or-none, which threw away a row the frame could afford.
+	// Below the floor it drops committed, date and parent and no further:
+	// author, path, message and identity are not negotiable.
 	short := screenHeaderFor(snapshot, ChangedFile{}, 116, 11)
-	if len(short) != 4 {
-		t.Fatalf("a short frame should drop the date rows, got %d rows: %q", len(short), short)
+	if len(short) != 5 {
+		t.Fatalf("a short frame should drop the date rows and keep parent, got %d rows: %q", len(short), short)
+	}
+	if strings.Contains(strings.Join(short, "\n"), "date:") {
+		t.Fatalf("expected the date rows dropped first, got %q", short)
+	}
+	floor := screenHeaderFor(snapshot, ChangedFile{}, 116, 8)
+	if len(floor) != 4 {
+		t.Fatalf("the floor is commit, message, author and path, got %d rows: %q", len(floor), floor)
 	}
 }
