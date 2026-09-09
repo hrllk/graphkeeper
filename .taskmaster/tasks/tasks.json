@@ -799,7 +799,7 @@
         "description": "docs/20260701-0005-feature-graph-section-merge-rebase-gate-note.md 가 규정한 기준과 현재 구현이 어긋난다. 근거 4건.\n\n(1) 가장 정당한 케이스에 가장 부정적인 문구가 붙는다. preview.go:32 — currentOnly>0 && targetOnly>0 은 gate note 가 '진짜 merge 가 필요한 유일한 분기 상태'로 규정한 케이스인데 headline 이 'Fast-forward unavailable.' 이다. 못 하는 것을 말하고 할 것을 말하지 않는다. 같은 조건의 rebase 는 preview.go:42 에서 'Rebase onto target.' 으로 행동을 말한다. 두 경로가 불일치.\n\n(2) gate note 의 결론이 구현되지 않았다. 문서는 merge/rebase 활성 조건을 currentOnly>0 && targetOnly>0 으로 재정의하라고 결론내지만, 실제 gate 는 key_handling_browse.go:261 의 isLocalGraphPointer 뿐이다. buildMergePreview/buildRebasePreview 의 네 갈래가 모두 WithOutcome(..., true) 로 진행 가능을 반환하므로 fast-forward 가능 대상과 이미 포함된 대상도 merge/rebase 를 제안한다. 문서 표에서는 둘 다 '비활성 유지 권장'.\n\n(3) 타입 있는 차단 사유를 버린다. internal/state/state.go:50-60 에 BlockReason 11종이 있는데 internal/app 의 98개 차단 지점 중 48개가 BlockUnknown 이다. BlockDiverged 는 딱 1번 쓰인다. merge/rebase gate(key_handling_browse.go:262)도 BlockUnknown 이라, UI 가 사유별로 다른 다음 행동을 제안할 수 없다.\n\n(4) 안내 문구가 실제 조건과 다르다. key_handling_browse.go:262 는 'Select a local branch.' 라고 하지만 gate note 기준의 실제 요구는 'HEAD 와 분기된 대상' 이다. local 브랜치를 골라도 fast-forward 가능하면 merge 는 의미가 없다.\n\n작업 범위: gate note 의 4행 표를 판정의 단일 출처로 삼고, 네 상태별 headline/detail/proceedable/BlockReason 을 정한다. fast-forward 계열은 문서 권고대로 pull 로 보낸다. 실기 검증 필요 — 픽스처에 hotfix/ff-able(FF 가능)과 origin 보다 뒤진 main 이 이미 있다.",
         "details": "",
         "testStrategy": "",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -837,8 +837,8 @@
             "id": 4,
             "title": "[미결] gate note 가 현행 isLocalGraphPointer 를 잘못 기술함",
             "description": "문서는 'local lane 이 이어진 그래프 경로 위의 커밋'도 local 로 본다고 적었으나, 코드는 row.Graph != \"\" 인 graph 행에서 그 행의 decoration 만 본다. lane 판정(row.Before[laneCursor].Side)은 row.Graph == \"\" 인 연결선 행에서만 돈다. 문서가 후속 수정의 근거이므로 정정 필요.",
-            "details": "",
-            "status": "pending",
+            "details": "2026-09-10 done. 문서 주장을 실측으로 검증했더니 절반만 맞았다. isLocalGraphPointer 는 행을 두 갈래로 나눈다 - row.Graph != \"\" (git 이 raw graph prefix 를 준 행)이면 그 행의 decoration 만 보고 lane 은 아예 안 본다. row.Graph == \"\" 이면 row.Before[laneCursor].Side 를 보고, lane 은 tip 에서 부모로 이어지므로 경로 위 커밋이 local 로 판정된다. 즉 같은 커밋이 raw prefix 유무에 따라 다르게 판정된다 - 문서 오류이자 코드 불일치다. 어느 쪽이 의도인지는 나머지 코드가 말한다: 차단 문구가 'Select a commit a local branch points at.' 로 decoration 을 말하고, graphCheckoutTargets 는 게이트 통과 후 다시 decoration 을 요구하므로 lane 경로로 통과한 커밋은 빈 목록을 받는다. lane 갈래는 잔재로 보인다. 7.4 범위는 문서 정정이므로 게이트 동작 변경은 task 12.4 로 등록하고, 현행 동작을 TestLocalPointerJudgementSplitsOnTheRawGraphPrefix 로 고정했다.",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": "7",
             "parentId": "undefined"
@@ -1796,6 +1796,13 @@
             "status": "pending",
             "dependencies": [],
             "details": "screenStampText 와 screenHashText 는 예산이 부족하면 빈 문자열을 돌려주고, 그러면 그 행이 사라진다. 즉 헤더 행 수가 innerWidth 에 따라 달라진다. 6.8 에서 renderCommitInspectorScreen 의 크기 인자를 없애 렌더러와 클램프가 같은 폭을 보게 했으므로 지금은 안전하지만, 폭을 따로 넘기는 호출자가 다시 생기면 같은 부류의 어긋남이 돌아온다. 행 수를 폭과 무관하게 만들지, 아니면 폭을 인자로 받는 inspectorBodyRowCount(width) 로 갈지 결정이 필요하다."
+          },
+          {
+            "id": 4,
+            "title": "isLocalGraphPointer 가 raw graph prefix 유무로 다른 답을 낸다",
+            "status": "pending",
+            "dependencies": [],
+            "details": "raw prefix 행은 decoration 만, 그 외 행은 lane 경로까지 local 로 본다. 같은 커밋이 렌더 모드에 따라 다르게 판정된다. 나머지 코드는 decoration 규칙 편이다 - 차단 문구가 'Select a commit a local branch points at.' 이고, graphCheckoutTargets 는 게이트 통과 후 decoration 을 다시 요구해 lane 경로로 통과한 커밋에 빈 목록을 준다. 따라서 lane 갈래를 없애는 쪽이 유력하나, merge/rebase 활성 범위가 바뀌므로 별도 결정이 필요하다. 현행은 TestLocalPointerJudgementSplitsOnTheRawGraphPrefix 가 고정. 근거: docs/20260701-0005-...gate-note.md 의 2026-09-10 정정."
           }
         ]
       }

@@ -15,14 +15,41 @@
 
 ### 현재 구현에서 local 로 인정되는 범위
 
-현행 `isLocalGraphPointer()` 는 tip 하나만 보는 함수가 아니다.
-`graph` 가 붙은 라인에서는 다음을 모두 local 로 볼 수 있다.
+> **2026-09-10 정정 (task 7.4).** 이 절은 원래 세 가지를 모두 local 로 적었고,
+> 그중 “local lane 이 이어진 그래프 경로 위의 커밋”은 **행의 종류에 따라 참이기도
+> 거짓이기도 하다.** 문서가 후속 수정의 근거이므로 실제 동작으로 고쳐 적는다.
 
-- `HEAD -> branch` 가 붙은 현재 tip
-- local 브랜치 decoration 이 붙은 과거 커밋
-- local lane 이 이어진 그래프 경로 위의 커밋
+`isLocalGraphPointer()` 는 행을 두 갈래로 나눠 서로 다른 규칙을 쓴다
+(`internal/app/graph_rules.go:24`).
 
-즉, Graph 에서 “local lane” 은 브랜치 끝점뿐 아니라 **그 브랜치가 지나온 경로**까지 포함한다.
+**`row.Graph != ""` — git 이 raw graph prefix 를 준 행**
+
+그 행의 **decoration 만** 본다. lane 은 아예 보지 않는다.
+
+- `HEAD -> branch` 가 붙은 tip → local
+- local 브랜치 decoration 이 붙은 과거 커밋 → local
+- decoration 이 없는, local 브랜치 경로 위의 커밋 → **local 아님**
+
+**`row.Graph == ""` — 앱이 직접 그리는 행**
+
+`row.Before[laneCursor].Side == laneLocal` 을 본다. lane 은 tip 에서 씨앗을 받아
+부모로 이어지므로, 경로 위의 커밋이 **local 로 판정된다**.
+
+즉 같은 커밋이 raw prefix 유무에 따라 다르게 판정된다. 이는 문서가 잘못 적은
+것이기도 하고, 코드 자체의 불일치이기도 하다.
+
+**어느 쪽이 의도인가.** 나머지 코드는 decoration 규칙 쪽에 서 있다.
+
+- 차단 문구가 “Select a commit a local branch points at.” 로 **decoration** 을 말한다
+  (`key_handling_browse.go:300`, `:311`).
+- `graphCheckoutTargets` 는 게이트를 통과한 뒤 다시
+  `graphLocalBranchNames(focus.Decorations, ...)` 를 요구하므로, lane 경로로
+  통과한 커밋은 곧바로 빈 목록을 받는다 (`navigation_graph.go:150`).
+
+따라서 lane 경로 갈래는 raw prefix 가 없을 때만 발화하는 잔재로 보인다.
+동작을 어느 쪽으로 맞출지는 merge/rebase 활성 범위를 바꾸는 일이므로 별도
+과제로 등록했고, 이 문서는 **현행을 정확히 기술하는 데까지만** 책임진다.
+현행 동작은 `TestLocalPointerJudgementSplitsOnTheRawGraphPrefix` 가 고정한다.
 
 ## 문제 정의
 
@@ -108,7 +135,9 @@ Graph 섹션의 `merge` / `rebase` 는 다음 조건을 모두 만족할 때만 
 ## 이미 지나간 커밋의 활성 여부
 
 지나온 커밋도 활성 후보가 될 수 있다.
-현재 구현은 `isLocalGraphPointer()` 가 로컬 브랜치의 현재 tip 만 보는 게 아니라, 그 브랜치가 지나온 lane 위의 커밋도 local 로 간주한다.
+현재 구현은 `isLocalGraphPointer()` 가 로컬 브랜치의 현재 tip 만 보지는 않는다.
+다만 **raw graph prefix 가 없는 행에 한해서만** 지나온 lane 위의 커밋을 local 로
+본다 (위 “현재 구현에서 local 로 인정되는 범위”의 2026-09-10 정정 참조).
 
 즉,
 
@@ -142,7 +171,7 @@ Graph 섹션의 `merge` / `rebase` 는 다음 조건을 모두 만족할 때만 
 
 | 구분 | 현재 구현 | 목표 |
 | --- | --- | --- |
-| Graph local 판정 | local tip + local path 를 local 로 본다 | 유지 |
+| Graph local 판정 | raw prefix 행은 decoration 만, 그 외 행은 lane 경로까지 (2026-09-10 정정) | 한쪽으로 통일 필요 — 별도 과제 |
 | merge/rebase 활성 | local lane 기준으로 보인다 | diverged target 만 활성 |
 | 실행 의미 | preview 단계에서 divergence 계산 | 유지, 더 명확히 분리 |
 
