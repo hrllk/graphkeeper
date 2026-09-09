@@ -13,9 +13,48 @@ import (
 // handed, so a caller that set one and not the other made the scroll clamp and
 // the render disagree about how many rows exist -- and the last diff lines
 // became unreachable. Taking the parameters away makes that unwritable.
+// inspectorFrameSize is the Inspector's frame: the shell's width, and the
+// terminal's height.
+//
+// The width matches the shell because the Inspector used to take the whole
+// terminal while the shell sits inside a 10% margin, so opening a commit
+// widened the frame by about a tenth and closing it snapped back -- measured 72
+// to 80 at an 80-column terminal, 162 to 180 at 180.
+//
+// The height does not, and deliberately. The shell spends 12% of the rows top
+// and bottom, which is four of eleven on a short terminal; the Inspector is a
+// full-screen surface with one job, and taking a third of its rows to line up
+// with a shell that is not on screen costs the reader diff lines for nothing.
+// The defect reported was the width jumping.
+//
+// Both the renderer and the scroll budget call this, for the same reason the
+// size parameters came off renderCommitInspectorScreen: two places deriving the
+// frame is what put the last diff lines out of reach.
+func inspectorFrameSize(m model) (width, height int) {
+	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
+	width, _ = layoutShellBodySize(m, hMargin, topMargin, bottomMargin)
+	height = m.height
+	if height < 1 {
+		height = 1
+	}
+	return width, height
+}
+
+// inspectorMinimumUsefulHeight is the shortest frame that can hold the header,
+// the rule, a pane header and a diff row worth reading.
+const inspectorMinimumUsefulHeight = 12
+
+// inspectorHeightIsTooShort measures the Inspector's own frame, not the
+// terminal. Those were the same number until the frame was brought inside the
+// shell's margins, and the two call sites had each written the comparison out
+// against whichever one was to hand.
+func inspectorHeightIsTooShort(m model) bool {
+	_, height := inspectorFrameSize(m)
+	return height < inspectorMinimumUsefulHeight
+}
+
 func renderCommitInspectorScreen(m model) string {
-	width := m.width
-	height := m.height
+	width, height := inspectorFrameSize(m)
 	if width < 1 {
 		width = 1
 	}
@@ -34,7 +73,7 @@ func renderCommitInspectorScreen(m model) string {
 	lines := make([]string, 0, contentHeight)
 	lines = append(lines, header...)
 	lines = append(lines, strings.Repeat("─", innerWidth))
-	lines = append(lines, screenBody(m, snapshot, selected, innerWidth, inspectorBodyRowsFor(height, len(header)), height < 12)...)
+	lines = append(lines, screenBody(m, snapshot, selected, innerWidth, inspectorBodyRowsFor(height, len(header)), inspectorHeightIsTooShort(m))...)
 	footer := "Esc back   ? help"
 	if m.commitInspectorHelp {
 		footer = "Esc back   ? close"
@@ -249,9 +288,9 @@ func inspectorInnerWidth(width int) int {
 }
 
 func (m model) inspectorBodyRowCount() int {
-	innerWidth := inspectorInnerWidth(m.width)
-	header := screenHeaderFor(m.commitInspectorSnapshot, ChangedFile{}, innerWidth, m.height)
-	return inspectorBodyRowsFor(m.height, len(header))
+	width, height := inspectorFrameSize(m)
+	header := screenHeaderFor(m.commitInspectorSnapshot, ChangedFile{}, inspectorInnerWidth(width), height)
+	return inspectorBodyRowsFor(height, len(header))
 }
 
 // inspectorFileOffset scrolls the changed-files list only as far as needed to keep
@@ -291,7 +330,9 @@ func (m model) inspectorDiffLines(unsupported bool) []string {
 		lines = []string{"No textual changes"}
 	}
 	if unsupported {
-		lines = append([]string{"unsupported height"}, lines...)
+		// "unsupported height" was developer shorthand on a user surface, and
+		// it named a state rather than a way out of it.
+		lines = append([]string{"Too short to show a diff. Make the terminal taller."}, lines...)
 	}
 	if m.commitInspectorStale {
 		lines = append([]string{"Repository changed; close and reopen to refresh."}, lines...)
@@ -309,7 +350,7 @@ func (m model) maxInspectorDiffScroll() int {
 		// through a pane that shows nothing.
 		return 0
 	}
-	return max(len(m.inspectorDiffLines(m.height < 12))-visible, 0)
+	return max(len(m.inspectorDiffLines(inspectorHeightIsTooShort(m)))-visible, 0)
 }
 
 // inspectorTruncationNote says the diff stops here and what to do about it.

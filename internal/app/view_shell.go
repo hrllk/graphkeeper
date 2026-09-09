@@ -46,7 +46,9 @@ func (m model) View() string {
 
 func renderAppView(m model) string {
 	if m.commitInspectorOpen {
-		return renderCommitInspectorScreen(m)
+		// Placed the way the shell is placed, so the frame does not move when a
+		// commit is opened or closed.
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, renderCommitInspectorScreen(m))
 	}
 	hMargin, topMargin, bottomMargin := layoutShellMargins(m)
 	bodyWidth, bodyHeight := layoutShellContentSize(m, hMargin, topMargin, bottomMargin)

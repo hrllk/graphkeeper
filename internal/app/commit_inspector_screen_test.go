@@ -9,6 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+
+	"hrllk/graphkeeper/internal/git"
 )
 
 func TestCommitInspectorScreenMatrixKeepsFrameAndPartialFooter(t *testing.T) {
@@ -25,9 +27,17 @@ func TestCommitInspectorScreenMatrixKeepsFrameAndPartialFooter(t *testing.T) {
 		},
 	}
 	for _, size := range [][2]int{{40, 12}, {60, 20}, {80, 30}} {
-		got := renderCommitInspectorScreen(withFrame(m, size[0], size[1]))
-		if lipgloss.Width(got) != size[0] || lipgloss.Height(got) != size[1] {
-			t.Fatalf("size %dx%d rendered as %dx%d", size[0], size[1], lipgloss.Width(got), lipgloss.Height(got))
+		framed := withFrame(m, size[0], size[1])
+		got := renderCommitInspectorScreen(framed)
+		// The frame is the shell's width and the terminal's height, so opening
+		// a commit does not move the box sideways. See inspectorFrameSize.
+		wantWidth, wantHeight := inspectorFrameSize(framed)
+		if lipgloss.Width(got) != wantWidth || lipgloss.Height(got) != wantHeight {
+			t.Fatalf("terminal %dx%d rendered as %dx%d, want %dx%d",
+				size[0], size[1], lipgloss.Width(got), lipgloss.Height(got), wantWidth, wantHeight)
+		}
+		if wantWidth >= size[0] {
+			t.Fatalf("terminal %d: the frame should sit inside the shell's margin, got %d", size[0], wantWidth)
 		}
 		if !strings.Contains(got, "n next") {
 			t.Fatalf("partial screen %dx%d omitted n next: %q", size[0], size[1], got)
@@ -44,7 +54,9 @@ func TestCommitInspectorScreenMatrixKeepsFrameAndPartialFooter(t *testing.T) {
 func TestCommitInspectorScreenNoColorPreservesContextAndPathIdentity(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	m := model{inspectorState: inspectorState{commitInspectorSnapshot: CommitSnapshot{FullHash: "abc", Subject: "subject", AuthorName: "dev", IsRoot: true, Files: []ChangedFile{{StableID: "f", Status: StatusAdded, Path: "src/한글/very_long_file.go"}}}, commitInspectorDiffWindow: DiffWindow{FileID: "f", Hunks: []DiffHunk{{Header: "@@", Rows: []PairedRow{{Kind: "context", From: CodeLine{Number: 1, Text: "same"}, To: CodeLine{Number: 1, Text: "same"}, FromPresent: true, ToPresent: true}}}}}}}
-	got := renderCommitInspectorScreen(withFrame(m, 40, 12))
+	// 50, not 40: the frame sits inside the shell's 10% margin now, and at a
+	// 40-column terminal the 32-column frame clips the diff text this asserts.
+	got := renderCommitInspectorScreen(withFrame(m, 50, 12))
 	if !strings.Contains(got, "(root commit)") || !strings.Contains(got, "very_long_file.go") || !strings.Contains(got, "same") {
 		t.Fatalf("no-color screen lost identity/context: %q", got)
 	}
@@ -379,8 +391,10 @@ func TestInspectorScreenDoesNotWrapLongDiffCode(t *testing.T) {
 		m.commitInspectorLines = []string{"@@ -1 +1 @@", "-old", long}
 
 		got := renderCommitInspectorScreen(m)
-		if lipgloss.Width(got) != size[0] || lipgloss.Height(got) != size[1] {
-			t.Fatalf("%dx%d rendered as %dx%d", size[0], size[1], lipgloss.Width(got), lipgloss.Height(got))
+		wantWidth, wantHeight := inspectorFrameSize(m)
+		if lipgloss.Width(got) != wantWidth || lipgloss.Height(got) != wantHeight {
+			t.Fatalf("terminal %dx%d rendered as %dx%d, want %dx%d",
+				size[0], size[1], lipgloss.Width(got), lipgloss.Height(got), wantWidth, wantHeight)
 		}
 		// A wrapped line puts the tail at the start of a row of its own.
 		for _, line := range strings.Split(ansi.Strip(got), "\n") {
@@ -436,5 +450,49 @@ func TestTruncationNoteDoesNotLeakTheInternalReason(t *testing.T) {
 	// case must not promise it can.
 	if strings.Contains(inspectorTruncationNote(PartialLineTruncated), "press n") {
 		t.Error("a truncated line is not recoverable with n; the note must not say it is")
+	}
+}
+
+// Opening a commit must not move the frame. The Inspector took the whole
+// terminal while the shell sits inside a 10% margin, so the box grew by about
+// a tenth on open and snapped back on close.
+func TestOpeningTheInspectorDoesNotMoveTheFrame(t *testing.T) {
+	widest := func(block string) int {
+		got := 0
+		for _, line := range strings.Split(ansi.Strip(block), "\n") {
+			if w := lipgloss.Width(strings.TrimRight(line, " ")); w > got {
+				got = w
+			}
+		}
+		return got
+	}
+	for _, width := range []int{60, 80, 100, 140, 180} {
+		m := model{repositoryState: repositoryState{repoStatus: git.Status{
+			Root: "/repo", Branch: "main", Head: "abc1234",
+			GraphCommits: []git.GraphCommit{{Hash: "abc1234", Subject: "s"}},
+		}}}
+		m.width, m.height = width, 30
+		shell := widest(renderAppView(m))
+
+		m.commitInspectorOpen = true
+		m.commitInspectorSnapshot = CommitSnapshot{FullHash: "abc1234", Subject: "s", AuthorName: "dev"}
+		inspector := widest(renderAppView(m))
+
+		if shell != inspector {
+			t.Errorf("terminal %d: the shell is %d wide and the Inspector %d", width, shell, inspector)
+		}
+	}
+}
+
+// The height is deliberately not the shell's. Its 12% top and bottom margins
+// are four of eleven rows on a short terminal, and the Inspector is a
+// full-screen surface that would be paying those rows in diff lines.
+func TestInspectorKeepsTheTerminalHeight(t *testing.T) {
+	for _, height := range []int{11, 20, 40} {
+		m := model{}
+		m.width, m.height = 100, height
+		if _, got := inspectorFrameSize(m); got != height {
+			t.Errorf("terminal height %d gave the Inspector %d rows", height, got)
+		}
 	}
 }
