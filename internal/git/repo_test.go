@@ -79,7 +79,7 @@ func TestGraphLogArgsUsesLocalBranchesOnly(t *testing.T) {
 		"--decorate-refs=refs/heads/*",
 		"--decorate-refs=refs/remotes/*",
 		"--topo-order",
-		"--format=%x00%H%x1f%P%x1f%ar%x1f%an%x1f%D%x1f%s",
+		"--format=%x00%H%x1f%P%x1f%ar%x1f%an%x1f%D%x1f%s%x1f%cI",
 		"--max-count=40",
 		"main",
 		"origin/main",
@@ -331,7 +331,7 @@ func TestSplitRawLinesPreservesGraphWhitespace(t *testing.T) {
 
 func TestParseGraphCommitLinesPreservesGraphPrefix(t *testing.T) {
 	got := parseGraphCommitLines([]string{
-		"  * \x00abc\x1fparent\x1f5 minutes ago\x1fdev\x1fHEAD -> main\x1fsubject",
+		"  * \x00abc\x1fparent\x1f5 minutes ago\x1fdev\x1fHEAD -> main\x1fsubject\x1f2026-09-08T23:15:16+09:00",
 		" |/",
 	})
 	if len(got) != 2 {

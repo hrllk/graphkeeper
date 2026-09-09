@@ -83,7 +83,7 @@ func (r *gitCommitInspectorReader) InspectCommit(ctx context.Context, req commit
 	}
 	authorName, authorEmail := splitInspectorAuthor(inspection.Author)
 	result.State = commitinspector.PaneReady
-	result.Value = commitinspector.CommitSnapshot{FullHash: inspection.Hash, Subject: inspection.Subject, AuthorName: authorName, AuthorEmail: authorEmail, MessageBody: inspection.Message, Parent: inspection.Parent, IsRoot: inspection.IsRoot, Files: files}
+	result.Value = commitinspector.CommitSnapshot{FullHash: inspection.Hash, Subject: inspection.Subject, AuthorName: authorName, AuthorEmail: authorEmail, AuthorDate: inspection.AuthorDate, CommitDate: inspection.CommitDate, MessageBody: inspection.Message, Parent: inspection.Parent, IsRoot: inspection.IsRoot, Files: files}
 	result.Parent = inspection.Parent
 	return result
 }

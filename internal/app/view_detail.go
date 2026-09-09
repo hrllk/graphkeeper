@@ -25,6 +25,9 @@ func (m model) renderContextInfoLines(width int) []string {
 		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash != "" {
 			lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("focus"), shorten(focus.Hash, 8)))
+			if when := compactWhenISO(focus.CommitDate, width-len("date: ")); when != "" {
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("date"), when))
+			}
 			lines = append(lines, focusParentLines(focus, width)...)
 			if branchLines := focusBranchSummaryLines(focus, width, LocalBranchInventory{Names: m.repoStatus.LocalBranches, Known: m.repoStatus.LocalBranchesKnown, Fresh: m.repoStatus.LocalBranchesFresh, Error: m.repoStatus.LocalBranchesError, Epoch: m.repositoryEpoch}); len(branchLines) > 0 {
 				lines = append(lines, fmt.Sprintf("%s:", renderContextKey("branches")))
@@ -165,6 +168,44 @@ func compactWhenTime(t time.Time) string {
 		return "-"
 	}
 	return t.Format("2006-01-02 15:04")
+}
+
+// compactWhenISO renders a strict ISO 8601 stamp (%cI / %aI) into the widest
+// form that fits budget, and returns "" when even the shortest form does not.
+//
+// Returning "" drops the whole row on purpose. The Details content width is
+// cardWidth-4 (view_shell.go:378), which is 13 at an 80-column terminal, so both
+// forms the plan assumed - "2026-09-08 23:15" and "2026-09-08" - get cut to
+// "date: 2026-0". A truncated hash still reads as a hash; a truncated date reads
+// as a different, wrong date. Showing nothing beats showing a lie.
+//
+//	budget >= 16  2026-09-08 23:15
+//	budget >= 10  2026-09-08
+//	budget >=  5  09-08
+//	otherwise     row omitted
+//
+// A parse failure yields "-" rather than "": unlike parseGraphCommits, where a
+// bad field would silently drop a commit, here the cost is one cell, and "-" is
+// the panel's existing convention for a value it has but cannot show.
+func compactWhenISO(value string, budget int) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "-"
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return "-"
+	}
+	switch {
+	case budget >= 16:
+		return parsed.Format("2006-01-02 15:04")
+	case budget >= 10:
+		return parsed.Format("2006-01-02")
+	case budget >= 5:
+		return parsed.Format("01-02")
+	default:
+		return ""
+	}
 }
 
 func renderBranchDivergenceLines(rs git.Status, branch string) []string {

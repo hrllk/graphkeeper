@@ -84,6 +84,10 @@ type GraphCommit struct {
 	Decorations []string
 	Subject     string
 	Tags        []string
+	// CommitDate is the committer date in strict ISO 8601 with the commit's own
+	// UTC offset, straight from %cI. It is never parsed in this layer: a string
+	// cannot fail to parse, so it cannot make parseGraphCommits skip a commit.
+	CommitDate string
 }
 
 type TagEntry struct {
@@ -109,9 +113,13 @@ type StashEntry struct {
 
 type CommitInspection struct {
 	Hash, Subject, Author, Message, Parent string
-	IsRoot                                 bool
-	Parents                                []string
-	Files                                  []CommitDiffFile
+	// AuthorDate and CommitDate are strict ISO 8601 with the commit's own UTC
+	// offset, from %aI and %cI. They differ once a commit has been rebased or
+	// cherry-picked, which is the only reason both are carried.
+	AuthorDate, CommitDate string
+	IsRoot                 bool
+	Parents                []string
+	Files                  []CommitDiffFile
 }
 
 type CommitDiffFile struct {

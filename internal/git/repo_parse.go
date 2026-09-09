@@ -125,8 +125,8 @@ func parseGraphCommitLines(lines []string) []GraphCommit {
 			continue
 		}
 		graph := line[:nul]
-		parts := strings.SplitN(line[nul+1:], "\x1f", 6)
-		if len(parts) < 6 {
+		parts := strings.SplitN(line[nul+1:], "\x1f", 7)
+		if len(parts) < 7 {
 			continue
 		}
 		entry := GraphCommit{Graph: graph, Hash: strings.TrimSpace(parts[0])}
@@ -143,6 +143,7 @@ func parseGraphCommitLines(lines []string) []GraphCommit {
 			entry.Decorations = splitDecorations(decorations)
 		}
 		entry.Subject = strings.TrimSpace(parts[5])
+		entry.CommitDate = strings.TrimSpace(parts[6])
 		if entry.Hash != "" {
 			commits = append(commits, entry)
 		}
@@ -183,7 +184,10 @@ func graphLogArgs(refs []string, limit int) []string {
 		"--decorate-refs=refs/heads/*",
 		"--decorate-refs=refs/remotes/*",
 		"--topo-order",
-		"--format=%x00%H%x1f%P%x1f%ar%x1f%an%x1f%D%x1f%s",
+		// %cI is appended, never inserted: the parser reads parts[2..5] by
+		// position, so a field in the middle would shift subject out from under
+		// it. %cI needs no --date argument and keeps the time %cs drops.
+		"--format=%x00%H%x1f%P%x1f%ar%x1f%an%x1f%D%x1f%s%x1f%cI",
 	}
 	if limit > 0 {
 		args = append(args, fmt.Sprintf("--max-count=%d", limit))

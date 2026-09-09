@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -21,15 +22,11 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 		snapshot.Parent = m.commitInspectorRequestedParent
 	}
 	selected := selectedScreenFile(snapshot, m.commitInspectorCursor)
+	header := screenHeaderLines(snapshot, selected, innerWidth)
 	lines := make([]string, 0, contentHeight)
-	lines = append(lines,
-		fitScreenText("COMMIT "+snapshot.FullHash, innerWidth),
-		fitScreenText("message: "+snapshot.Subject, innerWidth),
-		fitScreenText(screenAuthorLine(snapshot), innerWidth),
-		fitScreenText("path: "+screenSelectedPath(selected, max(innerWidth-6, 1)), innerWidth),
-	)
+	lines = append(lines, header...)
 	lines = append(lines, strings.Repeat("─", innerWidth))
-	lines = append(lines, screenBody(m, snapshot, selected, innerWidth, inspectorBodyRows(height), height < 12)...)
+	lines = append(lines, screenBody(m, snapshot, selected, innerWidth, inspectorBodyRowsFor(height, len(header)), height < 12)...)
 	footer := "Esc back   ? help"
 	if m.commitInspectorHelp {
 		footer = "Esc back   ? close"
@@ -53,11 +50,73 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 	return style.Render(strings.Join(lines, "\n"))
 }
 
+// screenHeaderLines builds the Inspector header. Its length is the header's
+// only definition: inspectorBodyRowsFor derives the chrome budget from it, so
+// adding or removing a row here cannot silently steal rows from the diff pane.
+//
+// The row count is 5, or 6 when the author and committer dates disagree, which
+// only happens once a commit has been rebased or cherry-picked.
+func screenHeaderLines(snapshot CommitSnapshot, selected ChangedFile, innerWidth int) []string {
+	lines := []string{
+		fitScreenText("COMMIT "+snapshot.FullHash, innerWidth),
+		fitScreenText("message: "+snapshot.Subject, innerWidth),
+		fitScreenText(screenAuthorLine(snapshot), innerWidth),
+	}
+	if when := screenStampText(snapshot.AuthorDate, innerWidth-len("date: ")); when != "" {
+		lines = append(lines, fitScreenText("date: "+when, innerWidth))
+		// A separate committed: row only earns its line when it differs. On an
+		// ordinary commit the two stamps are identical and a second copy would
+		// cost a diff row for nothing.
+		if snapshot.CommitDate != "" && snapshot.CommitDate != snapshot.AuthorDate {
+			if committed := screenStampText(snapshot.CommitDate, innerWidth-len("committed: ")); committed != "" {
+				lines = append(lines, fitScreenText("committed: "+committed, innerWidth))
+			}
+		}
+	}
+	return append(lines, fitScreenText("path: "+screenSelectedPath(selected, max(innerWidth-6, 1)), innerWidth))
+}
+
+// screenStampText renders a strict ISO 8601 stamp for the Inspector, which is
+// the surface where a commit is confirmed rather than scanned, so it keeps the
+// recorded offset when there is room for it.
+//
+//	budget >= 25  2026-09-08 23:15:16 +09:00
+//	budget >= 16  2026-09-08 23:15
+//	budget >= 10  2026-09-08
+//	otherwise     row omitted
+func screenStampText(value string, budget int) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return ""
+	}
+	switch {
+	case budget >= 25:
+		return parsed.Format("2006-01-02 15:04:05 -07:00")
+	case budget >= 16:
+		return parsed.Format("2006-01-02 15:04")
+	case budget >= 10:
+		return parsed.Format("2006-01-02")
+	default:
+		return ""
+	}
+}
+
 func screenAuthorLine(snapshot CommitSnapshot) string {
 	author := "author: " + snapshot.AuthorName
 	if snapshot.AuthorEmail != "" {
 		author += " <" + snapshot.AuthorEmail + ">"
 	}
+	// The "FROM <hash>" tail stays. Task 6.8 owns replacing it with a parent: row
+	// and owns the narrow-width copy priority that makes it the first thing cut.
+	// Removing it here would not buy the date rows anything: the tail sits on the
+	// author row while the dates are rows of their own, so they compete for
+	// header height, which dropping the tail does not reclaim. Taking it out
+	// would only lose parent visibility until 6.8 is scheduled, and
+	// TestCommitInspectorScreenMatrixKeepsFrameAndPartialFooter pins it.
 	if snapshot.IsRoot {
 		return author + "  ROOT COMMIT"
 	}
@@ -102,8 +161,23 @@ func screenPath(path string) string {
 // four header rows, the separator and the pane header take six more. Generating
 // more than that used to be silently truncated, which left the last rows of a
 // scrolled diff unreachable.
+// inspectorBodyRowsFor reports how many rows screenBody may produce.
+//
+// The chrome around the body is the header, one separator rule, one padding row
+// and the footer. That used to be the constant 7, which encoded a four-row
+// header; once the header became five or six rows the constant over-reported the
+// budget and renderCommitInspectorScreen's lines[:contentHeight-1] trimmed the
+// tail of the diff pane with no error and no marker. Deriving it from the header
+// the renderer actually built keeps the two from drifting apart again.
+func inspectorBodyRowsFor(height, headerRows int) int {
+	const nonHeaderChrome = 3 // separator + padding + footer
+	return max(max(height-2, 1)-headerRows-nonHeaderChrome, 1)
+}
+
+// inspectorBodyRows keeps the four-row-header arithmetic for callers that only
+// know the height. Prefer inspectorBodyRowsFor wherever the header is in hand.
 func inspectorBodyRows(height int) int {
-	return max(max(height-2, 1)-7, 1)
+	return inspectorBodyRowsFor(height, 4)
 }
 
 // inspectorFileOffset scrolls the changed-files list only as far as needed to keep

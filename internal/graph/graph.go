@@ -24,6 +24,7 @@ type Commit struct {
 	Decorations []string
 	Subject     string
 	Tags        []string
+	CommitDate  string
 }
 
 type ConflictState struct {
@@ -42,6 +43,7 @@ type Node struct {
 	Decorations []string
 	Subject     string
 	Tags        []string
+	CommitDate  string
 }
 
 type LaneSide string
@@ -80,6 +82,7 @@ func Nodes(snapshot Snapshot) []Node {
 			Decorations: append([]string(nil), commit.Decorations...),
 			Subject:     commit.Subject,
 			Tags:        append([]string(nil), commit.Tags...),
+			CommitDate:  commit.CommitDate,
 		})
 	}
 	return items
@@ -173,7 +176,7 @@ func rowsFromGraph(snapshot Snapshot) []Row {
 		}
 		childRefs := append([]string(nil), children[commit.Hash]...)
 		row := Row{
-			Commit:       Node{Hash: commit.Hash, Parents: append([]string(nil), commit.Parents...), RelativeAge: commit.RelativeAge, Author: commit.Author, Decorations: append([]string(nil), commit.Decorations...), Subject: commit.Subject, Tags: append([]string(nil), commit.Tags...)},
+			Commit:       Node{Hash: commit.Hash, Parents: append([]string(nil), commit.Parents...), RelativeAge: commit.RelativeAge, Author: commit.Author, Decorations: append([]string(nil), commit.Decorations...), Subject: commit.Subject, Tags: append([]string(nil), commit.Tags...), CommitDate: commit.CommitDate},
 			Graph:        commit.Graph,
 			Children:     childRefs,
 			DisplayWidth: max(max(len([]rune(commit.Graph)), len(childRefs)), 1),

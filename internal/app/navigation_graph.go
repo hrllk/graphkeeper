@@ -130,6 +130,7 @@ func graphSnapshot(rs git.Status) graph.Snapshot {
 			Decorations: append([]string(nil), commit.Decorations...),
 			Subject:     commit.Subject,
 			Tags:        append([]string(nil), commit.Tags...),
+			CommitDate:  commit.CommitDate,
 		})
 	}
 	return snapshot

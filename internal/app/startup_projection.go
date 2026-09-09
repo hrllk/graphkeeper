@@ -26,7 +26,7 @@ func applyRepositoryProjection(p RepositoryProjection, snapshot graph.Snapshot) 
 		status.GraphCommits = append(status.GraphCommits, git.GraphCommit{
 			Graph: commit.Graph, Hash: commit.Hash, Parents: append([]string(nil), commit.Parents...),
 			RelativeAge: commit.RelativeAge, Author: commit.Author, Decorations: append([]string(nil), commit.Decorations...),
-			Subject: commit.Subject, Tags: append([]string(nil), commit.Tags...),
+			Subject: commit.Subject, Tags: append([]string(nil), commit.Tags...), CommitDate: commit.CommitDate,
 		})
 	}
 	return status

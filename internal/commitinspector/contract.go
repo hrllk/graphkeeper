@@ -95,6 +95,11 @@ type CommitSnapshot struct {
 	Subject     string
 	AuthorName  string
 	AuthorEmail string
+	// AuthorDate and CommitDate are strict ISO 8601 with the commit's own UTC
+	// offset. They are strings because this package holds no time arithmetic and
+	// may not import anything that would let it grow some.
+	AuthorDate  string
+	CommitDate  string
 	MessageBody string
 	Parent      string
 	IsRoot      bool

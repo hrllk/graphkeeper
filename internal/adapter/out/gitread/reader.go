@@ -49,7 +49,7 @@ func MapStatusToSnapshot(status git.Status, epoch uint64) app.ReadSnapshot {
 			Graph: commit.Graph, Hash: commit.Hash, Parents: append([]string(nil), commit.Parents...),
 			RelativeAge: commit.RelativeAge, Author: commit.Author,
 			Decorations: append([]string(nil), commit.Decorations...), Subject: commit.Subject,
-			Tags: append([]string(nil), commit.Tags...),
+			Tags: append([]string(nil), commit.Tags...), CommitDate: commit.CommitDate,
 		})
 	}
 	return app.ReadSnapshot{

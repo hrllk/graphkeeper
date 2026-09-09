@@ -159,12 +159,15 @@ func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection
 	if hash == "" {
 		return CommitInspection{}, fmt.Errorf("commit hash is empty")
 	}
-	meta, err := r.git(ctx, "show", "-s", "--format=%H%x00%P%x00%an%x00%ae%x00%s", hash)
+	// %aI and %cI are appended, and the SplitN count and the length check move
+	// with them. Changing the format alone makes every call return
+	// "invalid commit metadata" and the Inspector stops opening.
+	meta, err := r.git(ctx, "show", "-s", "--format=%H%x00%P%x00%an%x00%ae%x00%s%x00%aI%x00%cI", hash)
 	if err != nil {
 		return CommitInspection{}, err
 	}
-	parts := strings.SplitN(meta, "\x00", 5)
-	if len(parts) != 5 {
+	parts := strings.SplitN(meta, "\x00", 7)
+	if len(parts) != 7 {
 		return CommitInspection{}, fmt.Errorf("invalid commit metadata")
 	}
 	parents := strings.Fields(parts[1])
@@ -193,6 +196,8 @@ func (r *Repo) InspectCommit(ctx context.Context, hash string) (CommitInspection
 	return CommitInspection{
 		Hash: commit, Subject: sanitizeTerminalText(parts[4]), Author: sanitizeTerminalText(author),
 		Message: sanitizeTerminalText(message), Parent: parent, IsRoot: parent == "", Parents: parents, Files: files,
+		AuthorDate: sanitizeTerminalText(strings.TrimSpace(parts[5])),
+		CommitDate: sanitizeTerminalText(strings.TrimSpace(parts[6])),
 	}, nil
 }
 
