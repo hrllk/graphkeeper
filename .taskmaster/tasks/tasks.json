@@ -1301,8 +1301,8 @@
             "taskId": "C3",
             "title": "C3 Measure the 1s refresh tick cost with a 500-tag / 50-stash fixture",
             "description": "perf · 1h / CC 10min\n\n근거: Section 7 WARNING - T6 restores loadLocalTagStatus plus provenance store disk read plus git stash list on every 1s tick (commands.go:88). The legacy cadence shipped at tag d5257bb and was never reported as a problem, but the cost on a many-tag repo has never been measured.",
-            "details": "internal/app/commands.go; internal/app/update_lifecycle.go",
-            "status": "pending",
+            "details": "internal/app/commands.go; internal/app/update_lifecycle.go\n\n2026-09-10 측정 완료. docs/20260910-0003-c3-refresh-tick-cost.md. 커밋 60개 저장소를 tag/stash 규모만 바꿔 세 벌 만들고 Status() 20회 평균 + git 서브프로세스 계측. 결과: 0태그 184.9ms / 100태그10스태시 186.3ms / 500태그50스태시 194.3ms, 서브프로세스는 세 경우 모두 13개로 동일. WARNING 이 걱정한 축은 문제가 아니다 - 500태그+50스태시가 더하는 비용은 약 9ms(5%)이고 호출 수는 규모와 무관하다. 정작 눈에 띄는 건 기준선 185ms(1초 주기 대비 duty cycle 19%)이고 그 대부분은 서브프로세스 13개(호출당 약 14ms)다. 가장 눈에 띄는 중복은 rev-parse 5회. 이 수치는 하한이다 - Status() 는 앱 refresh 경로 전체가 아니고 provenance 디스크 읽기는 미포함. 측정이 C3 범위이므로 결정하지 않았다. 선택지 셋(cadence 늦추기 / 호출 수 줄이기 / 그대로)을 문서에 적었고, 데이터가 지지하는 것은 호출 수 줄이기다 - cadence 를 안 건드리고 규모와 무관하게 이득이 난다. cadence 는 반응성과의 맞바꿈이라 사용자 판단이 필요하다.",
+            "status": "done",
             "priority": "P2",
             "dependencies": [],
             "parentTaskId": "9",
@@ -1770,7 +1770,7 @@
       {
         "id": "12",
         "title": "6.6~6.8 작업 중 드러난 발견",
-        "status": "pending",
+        "status": "in-progress",
         "priority": "medium",
         "description": "어휘·팝업·Inspector 정리 과정에서 증명됐지만 그 task 의 범위가 아니었던 항목들.",
         "dependencies": [],
@@ -1803,6 +1803,13 @@
             "status": "pending",
             "dependencies": [],
             "details": "raw prefix 행은 decoration 만, 그 외 행은 lane 경로까지 local 로 본다. 같은 커밋이 렌더 모드에 따라 다르게 판정된다. 나머지 코드는 decoration 규칙 편이다 - 차단 문구가 'Select a commit a local branch points at.' 이고, graphCheckoutTargets 는 게이트 통과 후 decoration 을 다시 요구해 lane 경로로 통과한 커밋에 빈 목록을 준다. 따라서 lane 갈래를 없애는 쪽이 유력하나, merge/rebase 활성 범위가 바뀌므로 별도 결정이 필요하다. 현행은 TestLocalPointerJudgementSplitsOnTheRawGraphPrefix 가 고정. 근거: docs/20260701-0005-...gate-note.md 의 2026-09-10 정정."
+          },
+          {
+            "id": 5,
+            "title": "refresh 1회의 git 서브프로세스 13개, 그중 rev-parse 5회",
+            "status": "pending",
+            "dependencies": [],
+            "details": "C3(9.36) 측정에서 나왔다. 한 번의 Status() 가 git 서브프로세스 13개를 띄우고 그중 rev-parse 가 5번이다. 호출당 약 14ms 이므로 기준선 185ms 의 대부분이 여기서 온다. tag/stash 규모와 무관한 고정 비용이라 모든 저장소에 동일하게 효과가 있다. rev-parse 5회를 한 번으로 합치는 것이 가장 명확한 후보. cadence(1초) 변경은 반응성과의 맞바꿈이므로 별개 결정. 근거: docs/20260910-0003-c3-refresh-tick-cost.md"
           }
         ]
       }
