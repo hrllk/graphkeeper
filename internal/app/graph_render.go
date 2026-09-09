@@ -92,9 +92,9 @@ func renderGraphHashField(hash, searchQuery string, focused bool, marks graphRow
 	}
 	switch {
 	case marks.RangeAnchor:
-		attrs += "\x1b[4m\x1b[1m"
+		attrs += underlineSignalPrefix + "\x1b[1m"
 	case marks.RangeMember:
-		attrs += "\x1b[4m"
+		attrs += underlineSignalPrefix
 	}
 	if attrs == "" {
 		return field

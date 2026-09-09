@@ -83,6 +83,43 @@ func renderAppView(m model) string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, shell)
 }
 
+// popupWidthForContent sizes a popup from what it holds rather than from how
+// wide the terminal happens to be. popupWidthForBody derives width from the
+// body alone, so a three-line form took 56 columns next to a terminal with room
+// to spare, and the box landed on an arbitrary column offset that cut across
+// the Graph and rail borders behind it.
+//
+// The terminal still sets the ceiling and the floor; content only decides where
+// between them the popup sits.
+func popupWidthForContent(lines []string, bodyWidth, minWidth, maxWidth int) int {
+	longest := 0
+	for _, line := range lines {
+		for _, segment := range strings.Split(line, "\n") {
+			if w := lipgloss.Width(segment); w > longest {
+				longest = w
+			}
+		}
+	}
+	// The popup's own padding (2 each side) plus its border (1 each side).
+	needed := longest + popupChromeWidth
+	if needed < minWidth {
+		needed = minWidth
+	}
+	return popupWidthForBody(bodyWidth, minWidth, min(needed, maxWidth))
+}
+
+const (
+	// popupPaddingWidth is the horizontal padding every popup carries, and so
+	// the column its content starts at.
+	popupPaddingWidth = 2
+	// popupChromeWidth is what the border and that padding cost a popup, so a
+	// content measurement can be turned into a box width.
+	popupChromeWidth = 2*popupPaddingWidth + popupBorderWidth
+	// popupBorderWidth is what the box's own border costs, on top of the width
+	// the caller asks for.
+	popupBorderWidth = 2
+)
+
 func popupWidthForBody(bodyWidth, minWidth, maxWidth int) int {
 	if bodyWidth <= 0 {
 		return minWidth
@@ -94,8 +131,15 @@ func popupWidthForBody(bodyWidth, minWidth, maxWidth int) int {
 	if width < minWidth {
 		width = minWidth
 	}
-	if width > bodyWidth {
-		width = bodyWidth
+	// The caller's width is the box's content plus padding; the border costs two
+	// more columns on top of it. Clamping against bodyWidth alone let every
+	// popup hang two columns past the terminal edge below about 34 columns --
+	// the same defect 10.10 fixed for the shell frame.
+	if limit := bodyWidth - popupBorderWidth; width > limit {
+		width = limit
+	}
+	if width < 1 {
+		width = 1
 	}
 	return width
 }

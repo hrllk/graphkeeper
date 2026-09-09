@@ -505,8 +505,9 @@ var (
 func noColorEnabled() bool { return os.Getenv("NO_COLOR") != "" }
 
 const (
-	cursorSignalPrefix = "\x1b[7m"
-	cursorSignalReset  = "\x1b[0m"
+	cursorSignalPrefix    = "\x1b[7m"
+	underlineSignalPrefix = "\x1b[4m"
+	cursorSignalReset     = "\x1b[0m"
 )
 
 // cursorSignal marks the row the cursor is on in a way that survives NO_COLOR.
@@ -522,4 +523,12 @@ const (
 // once styles are stripped.
 func cursorSignal(text string) string {
 	return cursorSignalPrefix + text + cursorSignalReset
+}
+
+// underlineSignal marks an extent -- a road member in the graph, the reach of
+// an editable field in a form -- for the same reason and by the same route as
+// cursorSignal. The graph wrote this escape inline; naming it here keeps the
+// two surfaces on one definition.
+func underlineSignal(text string) string {
+	return underlineSignalPrefix + text + cursorSignalReset
 }

@@ -145,25 +145,43 @@ func visibleHiddenHotkeySections(m model) []hiddenHotkeySection {
 	return visible
 }
 
+// This popup's body is a list, so everything in it shares the list's left
+// baseline -- header, focus line and footer included. Centring belongs to
+// popups whose body is a single message.
+//
+// The centred lines were also not centred. renderCenteredPopupLine was handed
+// the popup width, but the box spends four of those columns on padding, so the
+// line was built four columns too wide and its trailing space was clipped:
+// "esc: close" sat 22 columns from the left edge and 18 from the right.
 func hiddenHotkeyPopupBody(m model, width int, content []string, showFocus bool, offset, viewport int) string {
 	lines := []string{
-		renderCenteredPopupLine(popupHeader.Render("Hidden hotkeys by section"), width),
+		popupHeader.Render("Hidden hotkeys by section"),
 	}
 	if showFocus {
-		lines = append(lines, renderCenteredPopupLine(popupHelp.Render("focus: "+sectionName(m.activeSection)), width), "")
+		lines = append(lines, popupHelp.Render("focus: "+sectionName(m.activeSection)), "")
 	}
 	if viewport > 0 && offset < len(content) {
 		end := min(offset+viewport, len(content))
 		lines = append(lines, content[offset:end]...)
 	}
-	lines = append(lines, "", renderCenteredPopupLine(popupHelp.Render(hiddenHotkeyPopupFooter), width))
+	lines = append(lines, "", popupHelp.Render(hiddenHotkeyPopupFooter))
 	return strings.Join(lines, "\n")
 }
 
 func hiddenHotkeyPopupLayout(m model, bodyWidth, bodyHeight int) (string, int) {
+	// The content has to be built before it can be measured, and it is fitted
+	// to the width it is built at. So: build once at the ceiling the terminal
+	// allows, narrow to what the content actually needs, then rebuild. Narrowing
+	// never lengthens a line, so the second pass settles.
+	//
+	// The measure covers every line, not the scrolled window, so the box does
+	// not resize under the reader while they scroll. Same reasoning as the graph
+	// column budget (docs/decisions.md 2026-09-10).
 	popupWidth := hiddenHotkeyPopupWidth(bodyWidth)
-	popupBox := hiddenHotkeyPopupStyle(popupWidth)
 	content := hiddenHotkeyContentLines(m, popupWidth)
+	popupWidth = popupWidthForContent(content, bodyWidth, hiddenHotkeyPopupMinWidth, hiddenHotkeyPopupMaxWidth)
+	content = hiddenHotkeyContentLines(m, popupWidth)
+	popupBox := hiddenHotkeyPopupStyle(popupWidth)
 	showFocusOptions := []bool{true, false}
 	for _, showFocus := range showFocusOptions {
 		for viewport := len(content); viewport >= 0; viewport-- {
@@ -304,11 +322,4 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 			},
 		},
 	}
-}
-
-func renderCenteredPopupLine(text string, width int) string {
-	if width <= 0 {
-		return text
-	}
-	return lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(text)
 }

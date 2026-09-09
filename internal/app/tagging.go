@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -133,21 +132,37 @@ func (m model) handleTagCreatedMsg(msg tagCreatedMsg) (model, tea.Cmd) {
 	})
 }
 
+// tagFormLabelWidth is the longest label in this form ("target").
+const tagFormLabelWidth = 6
+
 func renderTagPopup(m model, bodyWidth, bodyHeight int) string {
-	width := popupWidthForBody(bodyWidth, 36, 56)
+	// A form is a list of fields, so this popup is left-aligned throughout --
+	// label column, values, hint and footer on one baseline. Centring belongs
+	// to popups whose body is a single message.
+	target := shorten(m.tagPopupTarget, 8)
+	width := popupWidthForContent(
+		[]string{
+			formLabel("target", tagFormLabelWidth) + target,
+			formLabel("name", tagFormLabelWidth) + strings.Repeat(" ", formFieldMinWidth),
+			m.tagPopupError,
+			"enter: create",
+		},
+		bodyWidth, 36, 56,
+	)
 	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(width).
-		Align(lipgloss.Center)
+		Align(lipgloss.Left)
+	fieldWidth := formFieldWidth(width-4, tagFormLabelWidth)
 	content := []string{
-		fmt.Sprintf("target: %s", shorten(m.tagPopupTarget, 8)),
-		fmt.Sprintf("name: %s", m.tagPopupDraft),
+		formLabel("target", tagFormLabelWidth) + formValue(target),
+		formLabel("name", tagFormLabelWidth) + formInput(m.tagPopupDraft, fieldWidth),
 	}
 	sections := []string{strings.Join(content, "\n")}
 	if m.tagPopupError != "" {
 		sections = append(sections, warn.Render(m.tagPopupError))
 	}
-	sections = append(sections, "enter: create", renderPopupFooter(width-4))
+	sections = append(sections, popupHelp.Render("enter: create"), popupHelp.Render("esc: close"))
 	return renderFloatingTitlePopup(popupBox, "Create tag", joinLayoutSections(sections...), width)
 }
 

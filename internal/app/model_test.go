@@ -2095,24 +2095,33 @@ func TestHiddenHotkeysPopupCentersHeaderAndFooter(t *testing.T) {
 		return ""
 	}
 
+	// This popup's body is a list, so the header and footer sit on the list's
+	// left baseline. They used to be centred, and centred wrongly: the centring
+	// width did not account for the box's four columns of padding, so the line
+	// was built too wide and its trailing space was clipped.
+	indent := func(line string) int {
+		body := strings.TrimSuffix(strings.TrimPrefix(line, "│"), "│")
+		return len(body) - len(strings.TrimLeft(body, " "))
+	}
+
 	headerLine := findLine("Hidden hotkeys by section")
 	if headerLine == "" {
-		t.Fatal("expected centered header line to be present")
+		t.Fatal("expected the header line to be present")
 	}
-	headerBody := strings.TrimPrefix(headerLine, "│")
-	headerBody = strings.TrimSuffix(headerBody, "│")
-	if leading := len(headerBody) - len(strings.TrimLeft(headerBody, " ")); leading <= 2 {
-		t.Fatalf("expected header to be centered, got %q", headerLine)
+	listLine := findLine("• ")
+	if listLine == "" {
+		t.Fatal("expected a hotkey list line to be present")
+	}
+	if got := indent(headerLine); got != popupPaddingWidth {
+		t.Fatalf("expected the header on the popup's left baseline at %d, got %d in %q", popupPaddingWidth, got, headerLine)
 	}
 
 	footerLine := findLine("esc: close")
 	if footerLine == "" {
-		t.Fatal("expected centered footer line to be present")
+		t.Fatal("expected the footer line to be present")
 	}
-	footerBody := strings.TrimPrefix(footerLine, "│")
-	footerBody = strings.TrimSuffix(footerBody, "│")
-	if leading := len(footerBody) - len(strings.TrimLeft(footerBody, " ")); leading <= 2 {
-		t.Fatalf("expected footer to be centered, got %q", footerLine)
+	if got := indent(footerLine); got != popupPaddingWidth {
+		t.Fatalf("expected the footer on the same baseline at %d, got %d in %q", popupPaddingWidth, got, footerLine)
 	}
 }
 
@@ -3454,8 +3463,10 @@ func TestRenderTagPopupUsesSingleTitleStrip(t *testing.T) {
 	if strings.Contains(got, "Tag commit") {
 		t.Fatalf("expected tag popup to avoid nested body title, got %q", got)
 	}
-	if !strings.Contains(got, "target: abc1234") || !strings.Contains(got, "name: v1.2.3") {
-		t.Fatalf("expected tag popup fields, got %q", got)
+	// Labels pad to one column so values share a baseline, and the editable
+	// field is marked so it cannot be read as more read-only context.
+	if !strings.Contains(got, "target: abc1234") || !strings.Contains(got, "name:   v1.2.3") {
+		t.Fatalf("expected tag popup fields on one baseline, got %q", got)
 	}
 	if !strings.Contains(got, "enter: create") || !strings.Contains(got, "esc: close") {
 		t.Fatalf("expected tag popup help, got %q", got)

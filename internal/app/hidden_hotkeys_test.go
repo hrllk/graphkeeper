@@ -141,7 +141,9 @@ func TestHiddenHotkeyPopupUsesHotkeyWidthPolicy(t *testing.T) {
 	}{
 		{bodyWidth: 90, want: hiddenHotkeyPopupMaxWidth},
 		{bodyWidth: 50, want: 38},
-		{bodyWidth: 20, want: 20},
+		// The border costs two columns on top of the width asked for, so a
+		// 20-column terminal can hold an 18-wide box and not a 20-wide one.
+		{bodyWidth: 20, want: 18},
 	} {
 		if got := hiddenHotkeyPopupWidth(tt.bodyWidth); got != tt.want {
 			t.Fatalf("hiddenHotkeyPopupWidth(%d) = %d, want %d", tt.bodyWidth, got, tt.want)
