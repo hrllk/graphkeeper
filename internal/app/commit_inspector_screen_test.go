@@ -554,3 +554,54 @@ func TestExpandTabsAlignsToTheTabStop(t *testing.T) {
 		}
 	}
 }
+
+// The Inspector's key contract, measured rather than assumed.
+//
+// A spec once said "q close  Esc back  ? help" while the binary implemented
+// Esc alone, and task 9.17 was filed to settle the two. Settled by measurement:
+// q does nothing here, Esc steps back out of help and then closes, ? toggles
+// help, and the footer and README both say exactly that. The spec that
+// disagreed no longer exists.
+//
+// The assertion that the Inspector must not advertise "q close" lived in the
+// popup renderer's test and went with it in task 12.1. It belongs on the
+// renderer that ships.
+func TestInspectorKeyContract(t *testing.T) {
+	open := func(help bool) model {
+		m := model{}
+		m.width, m.height = 80, 24
+		m.commitInspectorOpen = true
+		m.commitInspectorHelp = help
+		m.commitInspectorSnapshot = CommitSnapshot{FullHash: "abc", Subject: "s", AuthorName: "dev"}
+		return m
+	}
+	press := func(m model, key tea.KeyMsg) model {
+		next, _ := m.Update(key)
+		return next.(model)
+	}
+	esc := tea.KeyMsg{Type: tea.KeyEsc}
+	q := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
+	question := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}}
+
+	if got := press(open(false), esc); got.commitInspectorOpen {
+		t.Error("esc should close the Inspector")
+	}
+	if got := press(open(true), esc); !got.commitInspectorOpen || got.commitInspectorHelp {
+		t.Error("esc should step out of help before closing the Inspector")
+	}
+	if got := press(open(false), q); !got.commitInspectorOpen {
+		t.Error("q does nothing in the Inspector; only esc closes it")
+	}
+	if got := press(open(false), question); !got.commitInspectorHelp {
+		t.Error("? should open help")
+	}
+
+	// And the frame must not claim otherwise.
+	frame := ansi.Strip(renderCommitInspectorScreen(open(false)))
+	if strings.Contains(frame, "q close") || strings.Contains(frame, "q: close") {
+		t.Errorf("the Inspector advertises a q that does nothing: %q", frame)
+	}
+	if !strings.Contains(frame, "Esc back") {
+		t.Errorf("the Inspector should say what esc does: %q", frame)
+	}
+}
