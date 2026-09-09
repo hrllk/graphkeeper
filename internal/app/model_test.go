@@ -2065,18 +2065,31 @@ func TestHiddenHotkeysPopupShowsMovedAndConditionalActions(t *testing.T) {
 		},
 		status: state.New().WithBrowse(),
 	}, 90, 0))
+	// The "Visible:"/"Conditional:" split is gone. It named how the code
+	// categorises keys, not anything a reader can act on, and the app already
+	// gives the reason when an unmet key is pressed.
 	for _, want := range []string{
 		"Hidden hotkeys by section",
 		"focus: Graph",
 		"Graph",
-		"Visible:",
 		"m: merge",
-		"Conditional:",
 		"s: reset",
 		hiddenHotkeyPopupFooter,
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected hidden hotkeys popup to contain %q, got %q", want, got)
+		}
+	}
+	for _, unwanted := range []string{"Visible:", "Conditional:", "Moved out:", "Common:"} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("expected the internal category label %q to be gone, got %q", unwanted, got)
+		}
+	}
+	// p and a do nothing under Graph focus: handleBrowseGraphKey has no case for
+	// either and does not fall through to the handler that owns them.
+	for _, dead := range []string{"p: pull", "a: abort"} {
+		if strings.Contains(got, dead) {
+			t.Fatalf("expected the Graph list to omit %q, which no handler answers there: %q", dead, got)
 		}
 	}
 }

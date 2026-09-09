@@ -30,11 +30,7 @@ func sectionHotkeyItems(t *testing.T, section graphSection) []hiddenHotkeyItem {
 	t.Helper()
 	for _, s := range hiddenHotkeySections(model{navigationState: navigationState{activeSection: section}}) {
 		if s.active {
-			items := make([]hiddenHotkeyItem, 0)
-			for _, g := range s.groups {
-				items = append(items, g.items...)
-			}
-			return items
+			return s.items
 		}
 	}
 	t.Fatalf("no active section for %v", section)

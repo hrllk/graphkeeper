@@ -169,11 +169,9 @@ func TestRoadKeyIsDocumentedInTheOverlayAndNotTheFooter(t *testing.T) {
 		if section.title != "Graph" {
 			continue
 		}
-		for _, group := range section.groups {
-			for _, item := range group.items {
-				if item.key == "w" {
-					found = true
-				}
+		for _, item := range section.items {
+			if item.key == "w" {
+				found = true
 			}
 		}
 	}

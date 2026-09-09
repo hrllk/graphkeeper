@@ -497,3 +497,25 @@ message·identity 를 버려 diff 행을 사는 것은, Inspector 가 어느 커
 2. **`"M"` assertion 이 줄곧 무의미했다.** 수정 파일 마커를 검사한다고 적혀
    있었지만 프레임 안의 유일한 M 은 **"FROM" 의 M** 이었다. 꼬리가 사라지자
    드러났다. 이 픽스처의 파일 상태는 지금도 `?` 로 렌더된다 — 별도 과제.
+
+## 2026-09-10 — Hidden Hotkeys 는 섹션당 평평한 목록이다 (task 6.8, D-014)
+
+**라벨 넷이 전부 내부 어휘였다.** `Visible:`/`Conditional:`, 그리고 Global 의
+`Common:`/`Moved out:`. "무엇에 대한 conditional 인가"에 화면이 답하지 않았고,
+"moved out" 은 키가 푸터에서 옮겨졌다는 앱의 **연혁**이지 독자의 관심사가 아니다.
+
+**앱이 이미 더 잘 답한다.** 조건이 안 맞는 키를 누르면 이유가 나온다
+(`o` → "No stash available. Add a stash at HEAD first."). 그 순간의 답이
+카테고리보다 쓸모 있다. 따라서 분류는 그룹당 한 행을 쓰는 장식이었고,
+DESIGN.md 의 "Decoration level: Minimal" 에 어긋난다. 없앴다.
+
+**불릿은 남긴다.** D-008 이 방금 세운 앱 공용 목록 마커이고, 여기서 아낀 행은
+그룹 제목에서 나왔지 불릿에서 나온 게 아니다.
+
+**조사가 진짜 결함을 찾았다.** Graph 목록이 `p: pull` 과 `a: abort` 를 광고하는데
+**Graph 포커스에서 둘 다 아무 핸들러에도 닿지 않는다.** `handleBrowseKey` 는
+Graph 를 `handleBrowseGraphKey` 로 보내고 거기엔 두 키의 case 가 없으며,
+그 키들을 소유한 `handleBrowseSectionKey` 로의 fall-through 가 없다. 목록에서
+뺐다. 나머지 섹션은 핸들러와 대조해 전부 일치했다.
+
+팝업은 52 → 40컬럼이 됐다.

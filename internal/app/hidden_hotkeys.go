@@ -12,15 +12,22 @@ type hiddenHotkeyItem struct {
 	desc string
 }
 
-type hiddenHotkeyGroup struct {
-	title string
-	items []hiddenHotkeyItem
-}
-
+// A section is a flat list of keys. It used to be split into "Visible" and
+// "Conditional" groups, and "Common" and "Moved out" for the global section --
+// four labels describing how the code categorises keys, none of them something
+// a reader can act on. "Conditional on what?" had no answer on screen.
+//
+// The app already answers it at the moment it matters: pressing a key whose
+// condition is unmet produces the reason ("No stash available. Add a stash at
+// HEAD first."), which is more use than a category. So the split was decoration
+// costing a row per group, against DESIGN.md's minimal decoration.
+//
+// The bullet stays. It is the list marker the whole app uses (docs/decisions.md
+// 2026-09-10, D-008), and the rows saved here come from the group titles.
 type hiddenHotkeySection struct {
 	title  string
 	active bool
-	groups []hiddenHotkeyGroup
+	items  []hiddenHotkeyItem
 }
 
 const hiddenHotkeyPopupFooter = "esc: close"
@@ -124,9 +131,7 @@ func hiddenHotkeyContentLines(m model, width int) []string {
 	sections := visibleHiddenHotkeySections(m)
 	for i, section := range sections {
 		lines = append(lines, renderHiddenHotkeySectionTitle(section.title, section.active))
-		for _, group := range section.groups {
-			lines = append(lines, renderHiddenHotkeyGroupLines(group.title, group.items, width)...)
-		}
+		lines = append(lines, renderHiddenHotkeyItemLines(section.items, width)...)
 		if i < len(sections)-1 {
 			lines = append(lines, "")
 		}
@@ -208,14 +213,13 @@ func renderHiddenHotkeySectionTitle(title string, active bool) string {
 	return muted.Render("  " + title)
 }
 
-func renderHiddenHotkeyGroupLines(title string, items []hiddenHotkeyItem, width int) []string {
-	lines := []string{"  " + title + ":"}
+func renderHiddenHotkeyItemLines(items []hiddenHotkeyItem, width int) []string {
 	if len(items) == 0 {
-		lines = append(lines, "    "+muted.Render("(none)"))
-		return lines
+		return []string{"  " + muted.Render("(none)")}
 	}
+	lines := make([]string, 0, len(items))
 	for _, item := range items {
-		lines = append(lines, fitVisibleWidth("    • "+renderHotkey(item.key)+": "+item.desc, width))
+		lines = append(lines, fitVisibleWidth("  • "+renderHotkey(item.key)+": "+item.desc, width))
 	}
 	return lines
 }
@@ -224,101 +228,66 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 	return []hiddenHotkeySection{
 		{
 			title: "Global",
-			groups: []hiddenHotkeyGroup{
-				{
-					title: "Common",
-					items: globalHotkeyItems(),
-				},
-				{
-					title: "Moved out",
-					items: []hiddenHotkeyItem{
-						{key: "gg", desc: "top"},
-						{key: "G", desc: "bottom"},
-						{key: "ctrl+u/d", desc: "scroll"},
-					},
-				},
-			},
+			items: append(globalHotkeyItems(),
+				hiddenHotkeyItem{key: "gg", desc: "top"},
+				hiddenHotkeyItem{key: "G", desc: "bottom"},
+				hiddenHotkeyItem{key: "ctrl+u/d", desc: "scroll"},
+			),
 		},
 		{
 			title:  "Graph",
 			active: m.activeSection == sectionGraph,
-			groups: []hiddenHotkeyGroup{
-				{
-					title: "Visible",
-					items: []hiddenHotkeyItem{
-						{key: "enter", desc: "open commit inspector"},
-						{key: "m", desc: "merge"},
-						{key: "r", desc: "rebase"},
-						{key: "space", desc: "checkout"},
-						{key: "H", desc: "jump to HEAD"},
-						{key: "w", desc: "road: pick from, then to"},
-					},
-				},
-				{
-					title: "Conditional",
-					items: []hiddenHotkeyItem{
-						{key: "s", desc: "reset"},
-						{key: "d", desc: "delete branch"},
-						{key: "p", desc: "pull"},
-						{key: "P", desc: "push"},
-						{key: "t", desc: "tag commit"},
-						{key: "o", desc: "pop stash"},
-						{key: "a", desc: "abort in-progress operation"},
-						{key: "n", desc: "new branch or repeat search"},
-						{key: "N", desc: "repeat search backward"},
-					},
-				},
+			// p and a used to be listed here. Neither reaches a handler under
+			// Graph focus: handleBrowseKey routes Graph to handleBrowseGraphKey,
+			// which has no case for either, and there is no fall-through to the
+			// section handler that owns them. The popup was naming keys that do
+			// nothing where it said they work.
+			items: []hiddenHotkeyItem{
+				{key: "enter", desc: "open commit inspector"},
+				{key: "m", desc: "merge"},
+				{key: "r", desc: "rebase"},
+				{key: "space", desc: "checkout"},
+				{key: "H", desc: "jump to HEAD"},
+				{key: "w", desc: "road: pick from, then to"},
+				{key: "s", desc: "reset"},
+				{key: "d", desc: "delete branch"},
+				{key: "P", desc: "push"},
+				{key: "t", desc: "tag commit"},
+				{key: "o", desc: "pop stash"},
+				{key: "n", desc: "new branch or repeat search"},
+				{key: "N", desc: "repeat search backward"},
 			},
 		},
 		{
 			title:  "Local",
 			active: m.activeSection == sectionCurrent,
-			groups: []hiddenHotkeyGroup{
-				{
-					title: "Visible",
-					items: []hiddenHotkeyItem{
-						{key: "s", desc: "stash changes"},
-						{key: "c", desc: "clean working tree"},
-						{key: "space", desc: "checkout"},
-						{key: "d", desc: "delete branch"},
-						{key: "n", desc: "new branch"},
-					},
-				},
-				{
-					title: "Conditional",
-					items: []hiddenHotkeyItem{
-						{key: "a", desc: "abort merge"},
-						{key: "P", desc: "push"},
-					},
-				},
+			items: []hiddenHotkeyItem{
+				{key: "s", desc: "stash changes"},
+				{key: "c", desc: "clean working tree"},
+				{key: "space", desc: "checkout"},
+				{key: "d", desc: "delete branch"},
+				{key: "n", desc: "new branch"},
+				{key: "a", desc: "abort merge"},
+				{key: "p", desc: "pull"},
+				{key: "P", desc: "push"},
 			},
 		},
 		{
 			title:  "Remote",
 			active: m.activeSection == sectionRemote,
-			groups: []hiddenHotkeyGroup{
-				{
-					title: "Visible",
-					items: []hiddenHotkeyItem{
-						{key: "space", desc: "checkout"},
-						{key: "d", desc: "delete remote branch"},
-					},
-				},
+			items: []hiddenHotkeyItem{
+				{key: "space", desc: "checkout"},
+				{key: "d", desc: "delete remote branch"},
 			},
 		},
 		{
 			title:  "Tags",
 			active: m.activeSection == sectionTags,
-			groups: []hiddenHotkeyGroup{
-				{
-					title: "Visible",
-					items: []hiddenHotkeyItem{
-						{key: "enter", desc: "jump to graph"},
-						{key: "P", desc: "push tag"},
-						{key: "d", desc: "delete tag"},
-						{key: "D", desc: "delete tag on remote"},
-					},
-				},
+			items: []hiddenHotkeyItem{
+				{key: "enter", desc: "jump to graph"},
+				{key: "P", desc: "push tag"},
+				{key: "d", desc: "delete tag"},
+				{key: "D", desc: "delete tag on remote"},
 			},
 		},
 	}
