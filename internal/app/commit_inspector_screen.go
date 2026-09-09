@@ -279,11 +279,13 @@ func (m model) inspectorDiffLines(unsupported bool) []string {
 	}
 	lines := renderInspectorDiffWindow(m.commitInspectorDiffWindow)
 	if m.commitInspectorDiffWindow.HasMore {
-		hint := "partial"
-		if m.commitInspectorDiffWindow.PartialReason != "" {
-			hint += " (" + string(m.commitInspectorDiffWindow.PartialReason) + ")"
-		}
-		lines = append([]string{hint + "; press n next"}, lines...)
+		// At the end, where the content actually stops. This used to be a
+		// header line, so it scrolled away before the reader reached the cut --
+		// the one place the truncation is visible had nothing to say about it.
+		// The footer already carries "n next" from the first frame, so the
+		// header line was also telling the reader what the footer had told
+		// them.
+		lines = append(lines, inspectorTruncationNote(m.commitInspectorDiffWindow.PartialReason))
 	}
 	if len(m.commitInspectorDiffWindow.Hunks) == 0 && !m.commitInspectorDiffWindow.HasMore {
 		lines = []string{"No textual changes"}
@@ -308,6 +310,21 @@ func (m model) maxInspectorDiffScroll() int {
 		return 0
 	}
 	return max(len(m.inspectorDiffLines(m.height < 12))-visible, 0)
+}
+
+// inspectorTruncationNote says the diff stops here and what to do about it.
+//
+// The reason used to be printed raw, so the reader saw "partial (line_limit)"
+// -- an internal enum spelled in snake_case, the same defect 6.8 took out of
+// the hotkey overlay. Four of the five reasons mean one thing to a reader:
+// there is more, press n. The fifth does not, and that is the distinction
+// worth spending words on: when a single line was too long, pressing n will
+// not bring back what is missing from inside it.
+func inspectorTruncationNote(reason PartialReason) string {
+	if reason == PartialLineTruncated {
+		return ellipsis + " a line here was too long to show in full"
+	}
+	return ellipsis + " more of this diff follows; press n"
 }
 
 // inspectorHelpLines is the Inspector's key contract. It lists only keys that

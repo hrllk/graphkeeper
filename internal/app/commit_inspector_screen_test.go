@@ -391,3 +391,50 @@ func TestInspectorScreenDoesNotWrapLongDiffCode(t *testing.T) {
 		}
 	}
 }
+
+// A truncated diff has to say so where it stops. The note used to be a header
+// line, so it scrolled out of view long before the reader reached the cut.
+func TestPartialDiffSaysSoAtTheEndNotTheTop(t *testing.T) {
+	m := scrollFixture(120, 1)
+	m.width, m.height = 100, 30
+	m.commitInspectorDiffWindow.HasMore = true
+	m.commitInspectorDiffWindow.PartialReason = PartialLineLimit
+
+	top := ansi.Strip(renderCommitInspectorScreen(m))
+	if strings.Contains(top, "more of this diff follows") {
+		t.Error("the note belongs at the cut, not on the first screen of a long diff")
+	}
+
+	m.commitInspectorScroll = m.maxInspectorDiffScroll()
+	end := ansi.Strip(renderCommitInspectorScreen(m))
+	if !strings.Contains(end, "more of this diff follows; press n") {
+		t.Errorf("expected the note where the diff stops, got:\n%s", end)
+	}
+
+	// The reader is told about "n" from the first frame regardless: that is the
+	// footer's job, which is why the header line was a duplicate.
+	if !strings.Contains(top, "n next") {
+		t.Error("expected the footer to advertise n while more remains")
+	}
+}
+
+// An internal enum is not user copy, and one of the five reasons means
+// something different to the reader than the other four.
+func TestTruncationNoteDoesNotLeakTheInternalReason(t *testing.T) {
+	for _, reason := range []PartialReason{
+		PartialByteLimit, PartialLineLimit, PartialProcessLimit, PartialIndivisiblePair, PartialLineTruncated, "",
+	} {
+		note := inspectorTruncationNote(reason)
+		if reason != "" && strings.Contains(note, string(reason)) {
+			t.Errorf("%q leaked into the note: %q", reason, note)
+		}
+		if !strings.HasPrefix(note, ellipsis) {
+			t.Errorf("%q: expected the shared overflow marker, got %q", reason, note)
+		}
+	}
+	// Pressing n cannot recover what is missing from inside a line, so that
+	// case must not promise it can.
+	if strings.Contains(inspectorTruncationNote(PartialLineTruncated), "press n") {
+		t.Error("a truncated line is not recoverable with n; the note must not say it is")
+	}
+}
