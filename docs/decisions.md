@@ -716,3 +716,24 @@ graph state hint, cherry-pick 요약이 여기 해당했다.
 40컬럼에서는 바깥쪽 clip 이 안쪽 마커까지 잘라낸다(`l->featur`). 그 폭은
 DESIGN.md 가 레이아웃으로 감당한다고 주장하지 않는 구간이고 10.10 의 클램프가
 프레임 파손만 막는다. 기록만 남긴다.
+
+## 2026-09-10 — 삭제한 렌더러 아래에 한 층이 더 있었다 (task 12.1 마무리)
+
+12.1 에서 `renderCommitInspectorPopup` 을 지우고 테스트 하나를 옮겼다. 그 아래
+`renderInspectorBody` → `commitInspectorUnifiedLines` →
+`parseInspectorDiffRows`/`inspectorHunkHeaders` 가 통째로 고아가 됐고,
+살아남은 테스트 하나가 그걸 붙들고 있었다.
+
+**그 경로가 읽는 `commitInspectorLines` 는 프로덕션에서 nil 로만 설정된다.**
+채우는 곳이 없다. 즉 항상 nil 을 파싱하는 diff 렌더링 경로가 통째로 남아 있었다 —
+다음 사람이 "유니파이드 렌더러가 왜 안 나오지" 로 몇 시간 쓸 수 있는 함정이다.
+
+**세 번의 교훈이 같다.** 삭제한 테스트의 *테스트*를 옮기는 것과 그 *보장*을
+옮기는 것은 다르다. 12.1 이후 따로따로 되살린 것이 셋이다.
+
+1. 긴 diff 줄 no-wrap (12.1 에서 옮김)
+2. 프레임이 `q close` 를 광고하지 않을 것 (9.17 에서 되살림)
+3. ANSI 스타일 선택 행에서 pane 구분선 정렬 (여기)
+
+그리고 헤더가 무엇을 보여주는지 말하는지 — commit/message/author/parent/path 와
+두 pane 라벨 — 도 이제 배포되는 화면에 대해 한 테스트가 붙든다.

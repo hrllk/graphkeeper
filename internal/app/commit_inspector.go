@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -124,52 +123,6 @@ func (m model) selectInspectorFile() (tea.Model, tea.Cmd) {
 	return m.startInspectorDiff()
 }
 
-func (m model) renderInspectorBody(width, height int) []string {
-	if height < 1 {
-		return nil
-	}
-	fileWidth := max(width*30/100, 18)
-	if fileWidth > width-8 {
-		fileWidth = max(width/2, 1)
-	}
-	diffWidth := max(width-fileWidth-3, 1)
-	leftTitle := "Changed files"
-	rightTitle := "Diff"
-	rows := []string{padInspectorCell(truncateInspector(leftTitle, fileWidth), fileWidth) + " │ " + truncateInspector(rightTitle, diffWidth)}
-	fileRows := m.inspectorTreeRows(fileWidth)
-	fileStart := 0
-	for i, row := range fileRows {
-		if row.fileIndex == m.commitInspectorCursor {
-			fileStart = max(i-height/2, 0)
-			break
-		}
-	}
-	diffLines := m.commitInspectorUnifiedLines()
-	for i := 0; i < height-1; i++ {
-		left := ""
-		if idx := fileStart + i; idx >= 0 && idx < len(fileRows) {
-			left = fileRows[idx].text
-			if fileRows[idx].fileIndex == m.commitInspectorCursor {
-				left = highlight.Render("> " + left)
-			}
-		}
-		right := ""
-		if m.commitInspectorDiffLoading && i == 0 {
-			right = "Loading…"
-		}
-		if m.commitInspectorDiffError != "" && i == 0 {
-			right = "Diff error: " + m.commitInspectorDiffError
-		}
-		if right == "" {
-			if diffIndex := m.commitInspectorScroll + i; diffIndex >= 0 && diffIndex < len(diffLines) {
-				right = diffLines[diffIndex]
-			}
-		}
-		rows = append(rows, padInspectorCell(truncateInspector(left, fileWidth), fileWidth)+" │ "+truncateInspector(right, diffWidth))
-	}
-	return rows
-}
-
 // padInspectorCell pads by terminal cells, not bytes. File rows may contain
 // ANSI status colors and the selected-row reverse style; fmt width verbs count
 // those escape bytes and would move the pane divider to the right.
@@ -184,23 +137,6 @@ func padInspectorCell(s string, width int) string {
 type inspectorTreeRow struct {
 	text      string
 	fileIndex int
-}
-
-func (m model) inspectorTreeRows(width int) []inspectorTreeRow {
-	type entry struct {
-		path  string
-		index int
-	}
-	entries := make([]entry, 0, len(m.commitInspector.Files))
-	for i, file := range m.commitInspector.Files {
-		entries = append(entries, entry{strings.ReplaceAll(file.Path, "\\", "/"), i})
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].path < entries[j].path })
-	rows := make([]inspectorTreeRow, 0, len(entries))
-	for _, item := range entries {
-		rows = append(rows, inspectorTreeRow{text: inspectorFileLabel(m.commitInspector.Files[item.index], width), fileIndex: item.index})
-	}
-	return rows
 }
 
 func inspectorFileLabel(file ChangedFile, width int) string {
@@ -265,105 +201,6 @@ func renderInspectorDiffWindow(window DiffWindow) []string {
 		return []string{"No textual changes"}
 	}
 	return lines
-}
-
-func (m model) commitInspectorUnifiedLines() []string {
-	if len(m.commitInspectorDiffWindow.Hunks) > 0 {
-		return renderInspectorDiffWindow(m.commitInspectorDiffWindow)
-	}
-	if m.commitInspectorCursor < 0 || m.commitInspectorCursor >= len(m.commitInspector.Files) {
-		return []string{"Select a file"}
-	}
-	file := m.commitInspector.Files[m.commitInspectorCursor]
-	if file.Status == StatusBinary || file.Status == StatusSubmodule || file.Status == StatusModeOnly {
-		return []string{"No textual diff"}
-	}
-	rows := parseInspectorDiffRows(m.commitInspectorLines)
-	hunks := inspectorHunkHeaders(m.commitInspectorLines)
-	if len(rows) == 0 && len(hunks) == 0 {
-		return []string{"No textual changes"}
-	}
-	lines := make([]string, 0, len(rows)+len(hunks))
-	for _, hunk := range hunks {
-		hunk = expandTabs(hunk)
-		if noColorEnabled() {
-			lines = append(lines, hunk)
-		} else {
-			lines = append(lines, inspectorHunkStyle.Render(hunk))
-		}
-	}
-	for _, row := range rows {
-		if row.Kind == "modified" && row.FromPresent && row.ToPresent {
-			lines = append(lines,
-				formatInspectorDiffLine("-", row.OldLine, 0, row.From, "removed"),
-				formatInspectorDiffLine("+", 0, row.NewLine, row.To, "added"),
-			)
-			continue
-		}
-		marker, oldNumber, newNumber, text := " ", row.OldLine, row.NewLine, row.To
-		kind := row.Kind
-		if row.Kind == "removed" {
-			marker, oldNumber, newNumber, text = "-", row.OldLine, 0, row.From
-		} else if row.Kind == "added" {
-			marker, oldNumber, newNumber = "+", 0, row.NewLine
-		}
-		lines = append(lines, formatInspectorDiffLine(marker, oldNumber, newNumber, text, kind))
-	}
-	return lines
-}
-
-func parseInspectorDiffRows(lines []string) []inspectorDiffRow {
-	rows := make([]inspectorDiffRow, 0)
-	oldLine, newLine := 0, 0
-	for _, line := range lines {
-		if strings.HasPrefix(line, "@@") {
-			var oldStart, newStart int
-			if _, err := fmt.Sscanf(line, "@@ -%d", &oldStart); err == nil {
-				oldLine = oldStart
-			}
-			if marker := strings.Index(line, "+"); marker >= 0 {
-				_, _ = fmt.Sscanf(line[marker:], "+%d", &newStart)
-				newLine = newStart
-			}
-			continue
-		}
-		if len(line) < 1 {
-			continue
-		}
-		switch line[0] {
-		case ' ':
-			rows = append(rows, inspectorDiffRow{Kind: "context", OldLine: oldLine, NewLine: newLine, From: line[1:], To: line[1:], FromPresent: true, ToPresent: true})
-			oldLine++
-			newLine++
-		case '-':
-			rows = append(rows, inspectorDiffRow{Kind: "removed", OldLine: oldLine, From: line[1:], FromPresent: true})
-			oldLine++
-		case '+':
-			if strings.HasPrefix(line, "+++") {
-				continue
-			}
-			rows = append(rows, inspectorDiffRow{Kind: "added", NewLine: newLine, To: line[1:], ToPresent: true})
-			newLine++
-		}
-	}
-	return rows
-}
-
-type inspectorDiffRow struct {
-	Kind                   string
-	OldLine, NewLine       int
-	From, To               string
-	FromPresent, ToPresent bool
-}
-
-func inspectorHunkHeaders(lines []string) []string {
-	result := make([]string, 0, 2)
-	for _, line := range lines {
-		if strings.HasPrefix(line, "@@") {
-			result = append(result, line)
-		}
-	}
-	return result
 }
 
 // inspectorTabWidth is what a tab becomes in the diff pane. Four, not eight:

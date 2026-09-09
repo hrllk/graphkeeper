@@ -605,3 +605,113 @@ func TestInspectorKeyContract(t *testing.T) {
 		t.Errorf("the Inspector should say what esc does: %q", frame)
 	}
 }
+
+// Everything the deleted popup renderer's test guaranteed, on the renderer that
+// ships.
+//
+// Task 12.1 removed that renderer and ported one of its two tests. Two things
+// it also guaranteed came back later and separately: that the frame does not
+// advertise a "q close" it does not implement, and this -- that the header says
+// which commit, which message, which author, which parent and which path, and
+// that both panes are labelled. Porting a deleted test's *tests* is not the
+// same as porting its *guarantees*, which is the lesson worth keeping.
+func TestInspectorFrameSaysWhatItIsShowing(t *testing.T) {
+	m := model{}
+	m.width, m.height = 100, 26
+	m.commitInspectorOpen = true
+	m.commitInspectorSnapshot = CommitSnapshot{
+		FullHash: "abc123", Parent: "parent1", Subject: "change", AuthorName: "dev",
+		Files: []ChangedFile{{StableID: "a", Status: StatusModified, Path: "internal/app/main.go"}},
+	}
+	// The screen renders the structured window, not the raw unified lines.
+	m.commitInspectorDiffWindow = DiffWindow{FileID: "a", Hunks: []DiffHunk{{
+		Header: "@@ -1 +1 @@",
+		Rows: []PairedRow{{
+			Kind: "modified",
+			From: CodeLine{Number: 1, Text: "old"}, To: CodeLine{Number: 1, Text: "new"},
+			FromPresent: true, ToPresent: true,
+		}},
+	}}}
+
+	got := ansi.Strip(renderCommitInspectorScreen(m))
+	for _, want := range []string{
+		"commit: abc123",
+		"message: change",
+		"author: dev",
+		"parent: parent1",
+		"path: internal/app/main.go",
+		"Changed files",
+		"Diff",
+		"@@ -1 +1 @@",
+		"old",
+		"new",
+		"Esc back",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the frame does not say %q:\n%s", want, got)
+		}
+	}
+}
+
+// The selected changed file is drawn with a style, and a styled cell measures
+// differently in bytes than on screen. If the pane divider is placed by byte
+// offset it walks left on that one row.
+//
+// This came from the popup renderer's test suite. The renderer went in task
+// 12.1 but the guarantee is about the two-pane layout, which the shipping
+// screen has too.
+func TestPaneDividerStaysAlignedUnderTheSelectedRow(t *testing.T) {
+	// Without a forced profile lipgloss emits nothing and the styled row this
+	// test is about does not exist.
+	forceTrueColorProfile(t)
+	m := model{}
+	m.width, m.height = 90, 20
+	m.commitInspectorOpen = true
+	m.commitInspectorSnapshot = CommitSnapshot{
+		FullHash: "abc", Subject: "s", AuthorName: "dev",
+		Files: []ChangedFile{
+			{StableID: "a", Status: StatusModified, Path: "first.go"},
+			{StableID: "b", Status: StatusAdded, Path: "second.go"},
+		},
+	}
+	m.commitInspectorDiffWindow = DiffWindow{FileID: "a", Hunks: []DiffHunk{{
+		Header: "@@ -1 +1 @@",
+		Rows: []PairedRow{{
+			Kind: "modified",
+			From: CodeLine{Number: 1, Text: "old"}, To: CodeLine{Number: 1, Text: "new"},
+			FromPresent: true, ToPresent: true,
+		}},
+	}}}
+
+	rendered := renderCommitInspectorScreen(m)
+	want := -1
+	for i, line := range strings.Split(rendered, "\n") {
+		stripped := ansi.Strip(line)
+		if !strings.HasPrefix(stripped, "│") || !strings.HasSuffix(stripped, "│") {
+			continue
+		}
+		// Inside the frame only: the closing border is a "│" too, and counting
+		// it makes every header row look like a row with a divider.
+		inner := strings.TrimSuffix(strings.TrimPrefix(stripped, "│"), "│")
+		at := strings.Index(inner, "│")
+		if at < 0 {
+			continue
+		}
+		column := lipgloss.Width(inner[:at])
+		if want < 0 {
+			want = column
+			continue
+		}
+		if column != want {
+			t.Fatalf("row %d puts the divider at column %d, the rest at %d: %q", i, column, want, stripped)
+		}
+	}
+	if want < 0 {
+		t.Fatal("no pane divider found")
+	}
+	// The selected row is the one that is styled, so the check above is only
+	// meaningful if a style actually reached it.
+	if !strings.Contains(rendered, "\x1b[") {
+		t.Fatal("nothing was styled; the alignment check proved nothing")
+	}
+}
