@@ -496,3 +496,61 @@ func TestInspectorKeepsTheTerminalHeight(t *testing.T) {
 		}
 	}
 }
+
+// lipgloss.Width("\t") is 0 while the terminal draws a tab as up to eight
+// columns, so every width calculation measured an indented line of code as
+// shorter than it renders. The fit check passed it through, the terminal
+// wrapped it, and the wrapped remainder broke the two-pane divider on that row.
+// Almost every line of Go in a diff is indented.
+//
+// Found by reading a rendered frame. TestInspectorScreenDoesNotWrapLongDiffCode
+// missed it because its long line had no tabs.
+func TestTabbedDiffLinesDoNotBreakThePane(t *testing.T) {
+	m := model{}
+	m.width, m.height = 80, 24
+	m.commitInspectorOpen = true
+	m.commitInspectorSnapshot = CommitSnapshot{
+		FullHash: "abc123", Subject: "s", AuthorName: "dev",
+		Files: []ChangedFile{{StableID: "a", Status: StatusModified, Path: "main.go"}},
+	}
+	m.commitInspectorDiffWindow = DiffWindow{FileID: "a", Hunks: []DiffHunk{{
+		Header: "@@ -1 +1 @@",
+		Rows: []PairedRow{{
+			Kind:        "context",
+			From:        CodeLine{Number: 1, Text: "\t\t\tvar lines []string"},
+			To:          CodeLine{Number: 1, Text: "\t\t\tvar lines []string"},
+			FromPresent: true, ToPresent: true,
+		}},
+	}}}
+
+	rendered := ansi.Strip(renderCommitInspectorScreen(m))
+	for i, line := range strings.Split(rendered, "\n") {
+		if strings.ContainsAny(line, "╭╰") {
+			continue
+		}
+		// Every body row is bounded by the frame and carries the pane divider.
+		if !strings.HasPrefix(line, "│") || !strings.HasSuffix(line, "│") {
+			t.Fatalf("line %d escaped the frame: %q", i, line)
+		}
+	}
+	if strings.Contains(rendered, "\t") {
+		t.Error("a tab reached the screen; its width cannot be measured")
+	}
+}
+
+// The expansion has to land on a tab stop, or the columns it is there to align
+// do not line up.
+func TestExpandTabsAlignsToTheTabStop(t *testing.T) {
+	for input, want := range map[string]string{
+		"\tx":     "    x",
+		"a\tb":    "a   b",
+		"abc\td":  "abc d",
+		"abcd\te": "abcd    e",
+		"no tabs": "no tabs",
+		"":        "",
+	} {
+		if got := expandTabs(input); got != want {
+			t.Errorf("expandTabs(%q) = %q, want %q", input, got, want)
+		}
+	}
+}

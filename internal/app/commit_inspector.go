@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	ansiutil "github.com/charmbracelet/x/ansi"
+	"github.com/mattn/go-runewidth"
 
 	ci "hrllk/graphkeeper/internal/commitinspector"
 )
@@ -362,7 +363,42 @@ func inspectorHunkHeaders(lines []string) []string {
 	return result
 }
 
+// inspectorTabWidth is what a tab becomes in the diff pane. Four, not eight:
+// the pane is half a terminal and indented code is most of what it shows.
+const inspectorTabWidth = 4
+
+// expandTabs turns tabs into spaces so the measured width is the rendered
+// width.
+//
+// lipgloss.Width("\t") is 0, and the terminal draws it as up to eight columns.
+// Every width calculation in the app therefore measured an indented line of
+// code as shorter than it is, the fit check passed it through untouched, and
+// the terminal wrapped it -- breaking the two-pane divider on that row. Almost
+// every line of Go in a diff is indented, so almost every line was affected.
+//
+// Expanding to a fixed column is the honest fix: the string the app measures is
+// then the string the terminal draws.
+func expandTabs(text string) string {
+	if !strings.ContainsRune(text, '\t') {
+		return text
+	}
+	var b strings.Builder
+	column := 0
+	for _, r := range text {
+		if r == '\t' {
+			pad := inspectorTabWidth - column%inspectorTabWidth
+			b.WriteString(strings.Repeat(" ", pad))
+			column += pad
+			continue
+		}
+		b.WriteRune(r)
+		column += runewidth.RuneWidth(r)
+	}
+	return b.String()
+}
+
 func formatInspectorDiffLine(marker string, oldNumber, newNumber int, text, kind string) string {
+	text = expandTabs(text)
 	oldText, newText := "—", "—"
 	if oldNumber > 0 {
 		oldText = fmt.Sprintf("%d", oldNumber)
