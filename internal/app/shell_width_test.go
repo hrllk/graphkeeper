@@ -21,6 +21,15 @@ var widthMatrix = []int{20, 30, 40, 60, 80, 140}
 // forbids. widthMatrix starts at 20 and never reached it.
 var degenerateWidths = []int{5, 6, 7, 8, 9, 10, 12, 15}
 
+// narrowWidths is the band between the degenerate widths and widthMatrix's floor.
+// Nothing asserted over it, so the frame overflowed there long after 6.2 closed:
+// measured 10/27, 12/27, 14/29, 16/17, 18/19 while 20 and up were exact. Two
+// causes overlapped - the title strip not truncating to the box below width 15,
+// and a one-column overrun at 16 to 19 - but the shared root is that a bordered
+// box cannot shrink past its own border, so the width arithmetic being correct
+// is not enough on its own.
+var narrowWidths = []int{11, 13, 14, 16, 17, 18, 19}
+
 // widthFixture is the shared model for the width assertions. Two commits, one
 // local branch, snapshot marked loaded so the graph renders rows rather than the
 // empty state.
@@ -55,7 +64,12 @@ func widthFixture(w int) model {
 // inside any graph cell so wrapping cannot break the shared-height contract."
 // This test is that decision, enforced.
 func TestViewNeverExceedsTerminalWidth(t *testing.T) {
-	for _, width := range widthMatrix {
+	// Every width, not just the plausible ones. The frame being inside the
+	// screen is an invariant, and an invariant asserted only above 20 is how the
+	// 10 to 19 band stayed broken.
+	all := append(append(append([]int{}, widthMatrix...), degenerateWidths...), narrowWidths...)
+	all = append(all, 1, 2, 3, 4, 200)
+	for _, width := range all {
 		for i, line := range strings.Split(widthFixture(width).View(), "\n") {
 			if got := lipgloss.Width(line); got > width {
 				t.Fatalf("width %d: line %d is %d cells wide, %d over: %q",

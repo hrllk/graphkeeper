@@ -69,6 +69,17 @@ func renderAppView(m model) string {
 	centeredBody := applyOuterMargins(shellBody, bodyWidth, bodyHeight+layoutShellFooterHeight, hMargin, topMargin, max(bottomMargin-1, 0))
 
 	shell := centeredBody + "\n"
+	// lipgloss.Place positions content inside the box it is given but does not
+	// trim content wider than it. Below roughly 20 columns the boxes cannot
+	// shrink any further - a bordered box costs two columns before any content,
+	// and the rail asks for one - so the composed shell comes out wider than the
+	// terminal and corrupts the display. The width arithmetic itself is correct
+	// at every width; it is the boxes that refuse to honour it.
+	//
+	// Clamping here makes 6.2's approved rule ("the frame is always inside the
+	// screen") hold at every width rather than only at 20 and up, which is where
+	// its matrix started and why this band went unchecked.
+	shell = strings.Join(fitBlockWidth(strings.Split(shell, "\n"), m.width), "\n")
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, shell)
 }
 
