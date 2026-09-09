@@ -941,7 +941,7 @@
             "taskId": "T6",
             "title": "T6 REGRESSION: load local stash and tag state on the neutral startup path",
             "description": "startup-load · 1d / CC 1h\n\n근거: Test review REGRESSION — worked at tag d5257bb, broken on main; 53 unreleased commits\n\n**확장 (eng-review 결정 7 + CEO 결정 2).** 시작과 매 틱 양쪽에서 배치하고, stashLoadedMsg 에 epoch 를 배선한다. messages.go:21-24 만 epoch 가 없어 매초 로딩이 stale 경합을 실사용 빈도로 만든다.\n\n[E4 흡수] Wire epoch into stashLoadedMsg and the tag load, inside T6\n  Section 3, confidence 9/10 - messages.go:21-24 shows stashLoadedMsg carries only entries and err while every other repository message carries epoch/epochSet, and handleStashUpdate (update_stash.go:11-24) applies whatever arrives. update.go:136-139 states the contract. T6 plus the every-tick decision",
-            "details": "internal/app/update_lifecycle.go; internal/app/commands.go",
+            "details": "internal/app/update_lifecycle.go; internal/app/commands.go\n\n2026-09-10 진단 완료, 구현 대기. docs/20260910-0006-t6-startup-stash-tag-regression.md. 위치를 특정했다 - loadedSnapshotMsg 핸들러(update_lifecycle.go:41-60)가 return m, nil 로 끝나 명령을 하나도 내지 않는다. 그리고 프로덕션은 이 neutral 경로를 탄다 - refreshedMsg 분기 첫 줄이 'if m.repositoryRead != nil { return m, nil }' 이고 프로덕션은 repositoryRead 를 주입하므로 legacy 분기의 loadStashState 는 주입 없는 구성에서만 돈다. stashLoadedMsg 에 epoch 없음도 확인했다(messages.go:20-23; 형제 메시지는 전부 갖고 있다). 성능 우려는 C3(9.36)이 이미 해소했다 - tag500/stash50 이 더하는 비용은 약 9ms(5%). 착수 지시 두 줄: (1) neutral 경로가 stash·tag 를 batch 한다 (2) stashLoadedMsg 에 epoch 를 배선한다.",
             "status": "pending",
             "priority": "P1",
             "dependencies": [],
