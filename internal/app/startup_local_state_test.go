@@ -101,3 +101,36 @@ func drainBatch(t *testing.T, cmd tea.Cmd) []tea.Msg {
 	}
 	return out
 }
+
+// End to end through Update: the commands the neutral path issues have to land
+// in the model, because that is what the stash popup and the Tags panel read.
+// The regression was invisible at the command level -- the legacy path emitted
+// the same command -- and visible only in that production never ran it.
+func TestLocalStateReachesTheModelThroughUpdate(t *testing.T) {
+	fixture := newCommandRepo(t)
+	runGit(t, fixture.root, "tag", "v1.0.0")
+	writeRepoFile(t, fixture.root, "file.txt", "dirty\n")
+	runGit(t, fixture.root, "stash", "push", "-m", "wip")
+
+	m := model{}
+	m.repo = fixture.repo
+	m.repositoryEpoch = 1
+
+	for _, msg := range drainBatch(t, loadLocalStateCmd(m)) {
+		next, _ := m.Update(msg)
+		m = next.(model)
+	}
+
+	if len(m.stashEntries) == 0 {
+		t.Error("the stash list is empty; the popup would say the repository has no stashed work")
+	}
+	if !m.stashLoadAttempted {
+		t.Error("the stash load was never recorded as attempted")
+	}
+	if len(m.tagEntries) == 0 {
+		t.Error("no tags reached the model; the Tags panel would say none exist")
+	}
+	if !m.repoStatus.TagEntriesLoaded {
+		t.Error("the status does not know its tags were loaded")
+	}
+}
