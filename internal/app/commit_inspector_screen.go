@@ -22,7 +22,7 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 		snapshot.Parent = m.commitInspectorRequestedParent
 	}
 	selected := selectedScreenFile(snapshot, m.commitInspectorCursor)
-	header := screenHeaderLines(snapshot, selected, innerWidth)
+	header := screenHeaderFor(snapshot, selected, innerWidth, height)
 	lines := make([]string, 0, contentHeight)
 	lines = append(lines, header...)
 	lines = append(lines, strings.Repeat("─", innerWidth))
@@ -56,11 +56,30 @@ func renderCommitInspectorScreen(m model, width, height int) string {
 //
 // The row count is 5, or 6 when the author and committer dates disagree, which
 // only happens once a commit has been rebased or cherry-picked.
+func screenHeaderFor(snapshot CommitSnapshot, selected ChangedFile, innerWidth, height int) []string {
+	full := screenHeaderLines(snapshot, selected, innerWidth)
+	if inspectorBodyRowsFor(height, len(full)) >= 1 {
+		return full
+	}
+	// The frame cannot afford the date rows, so they go first. decisions.md
+	// (2026-08-03) puts commit identity, the selected path and a minimum diff
+	// ahead of everything else on a short screen, and a header that eats the
+	// whole frame leaves screenBody with nothing to draw at all.
+	return screenHeaderLinesWithDates(snapshot, selected, innerWidth, false)
+}
+
 func screenHeaderLines(snapshot CommitSnapshot, selected ChangedFile, innerWidth int) []string {
+	return screenHeaderLinesWithDates(snapshot, selected, innerWidth, true)
+}
+
+func screenHeaderLinesWithDates(snapshot CommitSnapshot, selected ChangedFile, innerWidth int, withDates bool) []string {
 	lines := []string{
 		fitScreenText("COMMIT "+snapshot.FullHash, innerWidth),
 		fitScreenText("message: "+snapshot.Subject, innerWidth),
 		fitScreenText(screenAuthorLine(snapshot), innerWidth),
+	}
+	if !withDates {
+		return append(lines, fitScreenText("path: "+screenSelectedPath(selected, max(innerWidth-6, 1)), innerWidth))
 	}
 	if when := screenStampText(snapshot.AuthorDate, innerWidth-len("date: ")); when != "" {
 		lines = append(lines, fitScreenText("date: "+when, innerWidth))
@@ -80,7 +99,7 @@ func screenHeaderLines(snapshot CommitSnapshot, selected ChangedFile, innerWidth
 // the surface where a commit is confirmed rather than scanned, so it keeps the
 // recorded offset when there is room for it.
 //
-//	budget >= 25  2026-09-08 23:15:16 +09:00
+//	budget >= 26  2026-09-08 23:15:16 +09:00
 //	budget >= 16  2026-09-08 23:15
 //	budget >= 10  2026-09-08
 //	otherwise     row omitted
@@ -197,7 +216,8 @@ func inspectorBodyRowsFor(height, headerRows int) int {
 // not be reached. Counting the real header is slightly wasteful and the only
 // version that cannot drift.
 func (m model) inspectorBodyRowCount() int {
-	header := screenHeaderLines(m.commitInspectorSnapshot, ChangedFile{}, max(m.width-4, 1))
+	innerWidth := max(m.width-4, 1)
+	header := screenHeaderFor(m.commitInspectorSnapshot, ChangedFile{}, innerWidth, m.height)
 	return inspectorBodyRowsFor(m.height, len(header))
 }
 

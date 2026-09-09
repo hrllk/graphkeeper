@@ -116,10 +116,16 @@ func TestInspectorBodyRowsReportsZeroWhenTheFrameKeepsNothing(t *testing.T) {
 	}
 }
 
-// The invariant has to hold below height 12 too, where the frame keeps no diff
-// rows at all. The earlier test started at 12 and missed this band.
+// The invariant has to hold below height 12 too. The earlier test started at 12
+// and missed this band entirely, which is where the reported budget and the
+// drawn rows came apart.
+//
+// Heights 1 through 9 keep nothing even after the header drops its date rows
+// (the four-row header alone costs the whole frame), so the clamp must be zero
+// there. From height 10 the frame keeps rows again and the clamp is meaningful;
+// TestShortFramesDropTheDateRowsRatherThanTheDiff covers that band.
 func TestInspectorBodyRowsMatchesTheFrameAtUnsupportedHeights(t *testing.T) {
-	for _, height := range []int{1, 4, 8, 10, 11} {
+	for _, height := range []int{1, 4, 8, 9} {
 		m := scrollFixture(500, 3)
 		m.commitInspectorSnapshot.AuthorDate = "2026-09-08T23:15:16+09:00"
 		m.commitInspectorSnapshot.CommitDate = "2026-09-09T01:02:03+09:00"
@@ -131,5 +137,53 @@ func TestInspectorBodyRowsMatchesTheFrameAtUnsupportedHeights(t *testing.T) {
 		if m.maxInspectorDiffScroll() != 0 {
 			t.Fatalf("height %d has nothing to scroll but the clamp is %d", height, m.maxInspectorDiffScroll())
 		}
+		if m.inspectorScrollPage() != 0 {
+			t.Fatalf("height %d shows nothing but Ctrl+U/D pages by %d", height, m.inspectorScrollPage())
+		}
+	}
+}
+
+// The date rows are the first thing dropped when the frame cannot afford them.
+// decisions.md (2026-08-03) puts commit identity, the selected path and a
+// minimum diff ahead of everything else on a short screen. Before this, a
+// six-row header at height 11 left screenBody a budget of zero and it returned
+// nil, so the Inspector showed no file list, no cursor and no diff at all -
+// worse than the two body rows the same height used to give.
+func TestShortFramesDropTheDateRowsRatherThanTheDiff(t *testing.T) {
+	const (
+		authored  = "2026-09-08T23:15:16+09:00"
+		committed = "2026-09-09T01:02:03+09:00"
+	)
+	for _, height := range []int{11, 12, 13} {
+		m := scrollFixture(500, 3)
+		m.commitInspectorSnapshot.AuthorDate = authored
+		m.commitInspectorSnapshot.CommitDate = committed
+		m.width, m.height = 120, height
+
+		if got := m.inspectorBodyRowCount(); got < 1 {
+			t.Fatalf("height %d kept %d body rows; the header should have given way", height, got)
+		}
+		drawn := len(inspectorBodyLines(renderCommitInspectorScreen(m, m.width, m.height)))
+		if want := m.inspectorBodyRowCount(); drawn != want {
+			t.Fatalf("height %d drew %d body rows, inspectorBodyRowCount says %d", height, drawn, want)
+		}
+	}
+}
+
+// A tall frame keeps the dates; a short one does not. The same snapshot has to
+// produce both, or the fallback is either never used or always used.
+func TestHeaderKeepsDatesOnlyWhenTheFrameCanAffordThem(t *testing.T) {
+	snapshot := CommitSnapshot{
+		FullHash: "abc", Subject: "s", AuthorName: "dev", Parent: "p",
+		AuthorDate: "2026-09-08T23:15:16+09:00",
+		CommitDate: "2026-09-09T01:02:03+09:00",
+	}
+	tall := screenHeaderFor(snapshot, ChangedFile{}, 116, 40)
+	if len(tall) != 6 {
+		t.Fatalf("a tall frame should keep both date rows, got %d rows: %q", len(tall), tall)
+	}
+	short := screenHeaderFor(snapshot, ChangedFile{}, 116, 11)
+	if len(short) != 4 {
+		t.Fatalf("a short frame should drop the date rows, got %d rows: %q", len(short), short)
 	}
 }
