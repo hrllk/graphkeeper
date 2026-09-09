@@ -361,7 +361,10 @@ func renderTitleStrip(style lipgloss.Style, title string, width int) string {
 	if maxTitleWidth < 1 {
 		maxTitleWidth = 1
 	}
-	title = fitVisibleWidth(title, maxTitleWidth)
+	// A panel title is a name. Cutting "Graph Details" to "Graph Detai" with
+	// nothing to show for it reads as a different panel, the same reason branch
+	// names are marked. See docs/decisions.md 2026-09-10 (D-007).
+	title = truncateText(title, maxTitleWidth)
 	titleWidth := lipgloss.Width(title)
 	if titleWidth+2 > innerWidth {
 		return fitVisibleWidth(title, stripWidth)

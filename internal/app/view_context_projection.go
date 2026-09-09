@@ -39,7 +39,7 @@ func renderContextViewport(lines []string, height, offset, width int) []string {
 		return lines
 	}
 	if height == 1 {
-		return []string{fitVisibleWidth(muted.Render(fmt.Sprintf("… +%d hidden", len(lines)-1)), width)}
+		return []string{truncateText(muted.Render(fmt.Sprintf("… +%d hidden", len(lines)-1)), width)}
 	}
 	visible := height - 1
 	maxOffset := len(lines) - visible
@@ -51,7 +51,7 @@ func renderContextViewport(lines []string, height, offset, width int) []string {
 	}
 	view := append([]string(nil), lines[offset:offset+visible]...)
 	hidden := len(lines) - visible
-	indicator := fitVisibleWidth(muted.Render(fmt.Sprintf("… +%d hidden", hidden)), width)
+	indicator := truncateText(muted.Render(fmt.Sprintf("… +%d hidden", hidden)), width)
 	if offset > 0 {
 		if visible == 1 {
 			return view

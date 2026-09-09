@@ -170,3 +170,31 @@ func TestNarrowFramesMarkTheirProseCuts(t *testing.T) {
 		}
 	}
 }
+
+// A panel title is a name, and the "+N hidden" indicator is a sentence. Both
+// were hard-cut at 60 columns -- "Graph Detai" and "… +2 hidd" -- which reads
+// as a different panel and as a broken indicator.
+func TestPanelTitlesAndIndicatorsMarkTheirCuts(t *testing.T) {
+	status := git.Status{
+		Root: "/repo", Branch: "main", Head: "a39d548",
+		GraphCommits: []git.GraphCommit{{Hash: "a39d548", Subject: "a commit"}},
+	}
+	for _, width := range []int{50, 60, 70} {
+		m := model{repositoryState: repositoryState{repoStatus: status}}
+		m.width, m.height = width, 20
+		for _, line := range strings.Split(ansi.Strip(renderAppView(m)), "\n") {
+			for _, name := range []string{"Graph Detai", "+2 hidd", "[2] Loca", "[4] Tag"} {
+				if !strings.Contains(line, name) {
+					continue
+				}
+				// Either the whole thing fits, or the cut is marked.
+				body := strings.TrimRight(strings.Trim(line, "│╭╮╰╯─ "), " ")
+				if strings.Contains(body, name) && !strings.Contains(body, ellipsis) &&
+					!strings.Contains(body, "Graph Details") && !strings.Contains(body, "hidden") &&
+					!strings.Contains(body, "[2] Local") && !strings.Contains(body, "[4] Tags") {
+					t.Errorf("width %d: %q was cut without a marker", width, body)
+				}
+			}
+		}
+	}
+}
