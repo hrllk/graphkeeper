@@ -631,7 +631,7 @@
         "description": "GitHub Release와 Linux 배포 검증을 정비한다.",
         "details": "Release 자동화, Linux 실제 실행 검증, scripts/eval·doctor·hooks 지침 정합성을 처리한다.",
         "testStrategy": "",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -649,8 +649,8 @@
             "id": 3,
             "title": "GitHub Release와 Linux 실행 검증",
             "description": "GitHub Release 자동화와 Linux 실제 실행 검증 추가. Linux cross-build만 가능한 현재 상태를 해소",
-            "details": "",
-            "status": "pending",
+            "details": "2026-09-10 done. 저장소에 CI 가 아예 없었다(.github/workflows 부재). scripts/verify-linux-binary 가 다섯 가지를 헤드리스로 확인한다 - --version 이 빌드에 박힌 버전을 말하는가, --help 가 깨끗이 끝나는가, 모르는 플래그를 exit 2 로 거절하는가, 저장소 밖에서 설명하고 끝나는가, 터미널 없이 깨끗이 실패하는가. 종료 코드만이 아니라 출력의 panic/goroutine 덤프도 본다(crash 와 정중한 거절이 같은 코드를 공유할 수 있다). CI YAML 이 아니라 스크립트인 것은 저장소 관습이자 로컬 실행 가능성 때문이고, scripts/verify-linux-in-container 가 macOS 에서 컨테이너로 같은 검증을 돌린다. debian stable-slim amd64/arm64 양쪽 실제 실행 통과 확인. ci.yml 은 push/PR 에서 scripts/check + Linux 실행 검증(로컬과 같은 스크립트라 갈라지지 않는다). release.yml 은 v* 태그를 사람이 밀 때만 돈다. 태그가 VERSION 으로 끝나지 않으면 거부한다 - build 가 VERSION 을 바이너리에 박고 릴리스 이름은 태그가 정하므로 어긋나면 사용자가 받은 바이너리가 자기 릴리스를 틀리게 말한다. 지금까지 모든 태그가 v0.1.0-alpha.6 / VERSION alpha.6 관계이고, 이 검사는 그 관계만 강제할 뿐 어느 쪽으로 통일할지는 정하지 않는다(사용자 결정으로 남김). 태그는 밀지 않았다 - 릴리스는 바깥으로 나가는 행위. 커밋 41f3826.",
+            "status": "done",
             "dependencies": [
               4
             ],
