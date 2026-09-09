@@ -134,47 +134,6 @@ func padInspectorCell(s string, width int) string {
 	return s + strings.Repeat(" ", missing)
 }
 
-type inspectorTreeRow struct {
-	text      string
-	fileIndex int
-}
-
-func inspectorFileLabel(file ChangedFile, width int) string {
-	path := compactInspectorPath(file.Path)
-	if file.OldPath != "" && file.OldPath != file.Path {
-		path = compactInspectorPath(file.OldPath) + " → " + compactInspectorPath(file.Path)
-	}
-	status := screenStatus(file.Status)
-	prefix := "  " + inspectorStatusStyle(status).Render(status) + " "
-	available := max(width-lipgloss.Width(prefix), 1)
-	path = fitInspectorPath(path, available)
-	return prefix + path
-}
-
-func compactInspectorPath(path string) string {
-	path = strings.ReplaceAll(path, "\\", "/")
-	parts := strings.Split(path, "/")
-	if len(parts) <= 1 {
-		return "./" + path
-	}
-	return "../../" + parts[len(parts)-1]
-}
-
-func fitInspectorPath(path string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	if lipgloss.Width(path) <= width {
-		return path
-	}
-	parts := strings.Split(path, "/")
-	name := parts[len(parts)-1]
-	if lipgloss.Width(name)+2 <= width {
-		return truncateInspector("…/"+name, width)
-	}
-	return truncateInspector(name, width)
-}
-
 func renderInspectorDiffWindow(window DiffWindow) []string {
 	lines := make([]string, 0)
 	for _, hunk := range window.Hunks {
@@ -271,28 +230,6 @@ func inspectorStatus(status string) string {
 	}
 }
 
-func inspectorStatusStyle(status string) lipgloss.Style {
-	if noColorEnabled() {
-		return lipgloss.NewStyle()
-	}
-	switch status {
-	case "A":
-		return ansiBoldStyle(ansiGreen)
-	case "M":
-		return ansiBoldStyle(ansiBrightBlue)
-	case "D":
-		return ansiStyle(ansiBrightBlack)
-	case "R":
-		return ansiBoldStyle(ansiCyan)
-	case "C":
-		return ansiStyle(ansiBlue)
-	case "B", "S", "ModeOnly":
-		return ansiBoldStyle(ansiYellow)
-	default:
-		return lipgloss.NewStyle()
-	}
-}
-
 func truncateInspector(s string, width int) string {
 	if width <= 0 {
 		return ""
@@ -306,7 +243,6 @@ var (
 	inspectorAddedStyle    = ansiBoldStyle(ansiGreen)
 	inspectorModifiedStyle = ansiBoldStyle(ansiBrightBlue)
 	inspectorRemovedStyle  = ansiStyle(ansiBrightBlack)
-	inspectorHunkStyle     = ansiBoldStyle(ansiCyan)
 )
 
 func noColorEnabled() bool { return os.Getenv("NO_COLOR") != "" }
