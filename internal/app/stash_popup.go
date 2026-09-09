@@ -234,6 +234,9 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	return titleLine + "\n" + bodyBlock
 }
 
+// stashFormLabelWidth is the only label in this form ("message").
+const stashFormLabelWidth = 7
+
 func renderStashMessagePopup(m model, bodyWidth int) string {
 	descStyle := popupBody
 	helpStyle := popupHelp
@@ -242,19 +245,19 @@ func renderStashMessagePopup(m model, bodyWidth int) string {
 	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidth).
-		Align(lipgloss.Center)
-	draft := m.stashMessageDraft
-	if draft == "" {
-		draft = " "
-	}
+		Align(lipgloss.Left)
+	// Same form treatment as Create tag and Create branch: left baseline, and
+	// the editable field marked rather than padded to " " so it has something
+	// to occupy when empty.
+	fieldWidth := formFieldWidth(popupWidth-2*popupPaddingWidth, stashFormLabelWidth)
 	sections := []string{strings.Join([]string{
 		descStyle.Render("Enter a message for this stash."),
-		descStyle.Render("message: " + draft),
+		formLabel("message", stashFormLabelWidth) + formInput(m.stashMessageDraft, fieldWidth),
 	}, "\n")}
 	if m.stashMessageError != "" {
 		sections = append(sections, errStyle.Render(m.stashMessageError))
 	}
-	sections = append(sections, helpStyle.Render("enter: stash"), renderPopupFooter(popupWidth-4))
+	sections = append(sections, helpStyle.Render("enter: stash"), helpStyle.Render("esc: close"))
 	return renderFloatingTitlePopup(popupBox, "Stash changes", joinLayoutSections(sections...), popupWidth)
 }
 

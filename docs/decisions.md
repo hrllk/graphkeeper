@@ -448,3 +448,11 @@ body 가 메시지 하나면 전체가 가운데 정렬.** 폼은 필드의 목�
    `formFieldMinWidth` 도 같은 종류였다 — 빈 필드를 보이게 하는 최소값이
    박스보다 우선해 lipgloss 가 상자를 한 칸 더 키웠다. 최소값은 가용폭을
    넘을 수 없다.
+
+### 세 폼 팝업 전부에 적용
+
+Create tag 하나만 고치면 이 저장소가 반복해온 패턴 — 한 결정, 두 표면, 한쪽만
+수정 — 을 또 만든다. Create branch 와 Stash message 도 같은 결함을
+갖고 있었고(`name:`/`base:` 가 똑같이 그려졌고, 빈 초안을 `" "` 로 패딩했다 —
+보이지 않는 필드가 강요하는 우회다), 같은 처리를 받았다.
+`TestEveryFormPopupMarksItsEditableField` 가 셋을 한꺼번에 붙든다.

@@ -1780,9 +1780,12 @@ func TestRenderBranchOpenShowsCenteredPopupOverlay(t *testing.T) {
 		status: loadingToast("Enter a branch name.")}
 
 	got := renderAppView(m)
-	if strings.Contains(got, "Mode: Loading") || strings.Contains(got, "Loading | Enter a branch name.") {
+	if strings.Contains(got, "Mode: Loading") || strings.Contains(got, "Loading · Enter a branch name.") {
 		t.Fatalf("expected branch input to stay out of the Global panel, got %q", got)
 	}
+	// The editable field carries attribute escapes between the label and the
+	// value, so the field content is checked on the stripped form.
+	got = ansi.Strip(got)
 	for _, want := range []string{"Create branch", "Enter a branch name.", "name: feature/new-flow", "base: abc1234", "Branch name already exists.", "esc: close"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected branch popup to contain %q, got %q", want, got)
@@ -3440,7 +3443,7 @@ func TestRenderStashMessagePopupShowsInputAndHelp(t *testing.T) {
 	m := model{
 		overlayState: overlayState{stashMessageDraft: "wip: local cleanup"},
 	}
-	got := renderStashMessagePopup(m, 72)
+	got := ansi.Strip(renderStashMessagePopup(m, 72))
 	if !strings.Contains(got, "Enter a message for this stash.") {
 		t.Fatalf("expected stash message prompt, got %q", got)
 	}

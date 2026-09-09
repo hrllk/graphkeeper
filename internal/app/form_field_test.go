@@ -96,6 +96,55 @@ func TestPopupsStayRectangularAcrossWidths(t *testing.T) {
 	}
 }
 
+// The app has three form popups. Fixing the affordance on one and not the
+// others is a pattern this repo has hit repeatedly (the Inspector's two render
+// paths, the graph and the rail cursor, the renderer and the scroll callers),
+// so all three are held to the contract here.
+func TestEveryFormPopupMarksItsEditableField(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{overlayState: overlayState{
+		tagPopupTarget:    "abc1234",
+		tagPopupDraft:     "v1.2.3",
+		branchDraft:       "feature/x",
+		branchBase:        "abc1234",
+		stashMessageDraft: "wip",
+	}}
+	for name, out := range map[string]string{
+		"create tag":    renderTagPopup(m, 72, 24),
+		"create branch": renderBranchInputPopup(m, 72),
+		"stash message": renderStashMessagePopup(m, 72),
+	} {
+		if !strings.Contains(out, underlineSignalPrefix) {
+			t.Errorf("%s: the editable field is not marked, so it reads as read-only context", name)
+		}
+		if !strings.Contains(out, cursorSignalPrefix) {
+			t.Errorf("%s: no caret in the editable field", name)
+		}
+	}
+}
+
+// An empty field still has to be visible. Padding the draft to " " -- what each
+// of these popups used to do -- is the workaround an invisible field forces.
+func TestFormFieldIsVisibleWhenEmpty(t *testing.T) {
+	empty := formInput("", 12)
+	if lipgloss.Width(ansi.Strip(empty)) != 12 {
+		t.Fatalf("expected an empty field to hold its full extent, got %d", lipgloss.Width(ansi.Strip(empty)))
+	}
+	if !strings.Contains(empty, underlineSignalPrefix) {
+		t.Fatal("expected an empty field to still be underlined")
+	}
+}
+
+// The minimum keeps an empty field visible; it must not outrank the box.
+func TestFormFieldMinimumYieldsToTheBox(t *testing.T) {
+	if got := formFieldWidth(10, 6); got > 10-formLabelColumn(6) && got > 1 {
+		t.Fatalf("expected the field to fit the room left after the label, got %d in 10", got)
+	}
+	if got := formFieldWidth(2, 6); got < 1 {
+		t.Fatalf("expected at least one column, got %d", got)
+	}
+}
+
 func lineContaining(t *testing.T, block, want string) string {
 	t.Helper()
 	for _, line := range strings.Split(block, "\n") {

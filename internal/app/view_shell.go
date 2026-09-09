@@ -354,37 +354,42 @@ func renderTargetPickPopup(m model, bodyWidth int) string {
 	)
 }
 
+// branchFormLabelWidth is the longest label in this form ("name"/"base").
+const branchFormLabelWidth = 4
+
 func renderBranchInputPopup(m model, bodyWidth int) string {
 	descStyle := popupBody
 	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidthForBody(bodyWidth, 36, 56)).
-		Align(lipgloss.Center)
-	draft := m.branchDraft
-	if draft == "" {
-		draft = " "
-	}
+		Align(lipgloss.Left)
 	base := m.branchBase
 	if base == "" {
 		base = "-"
 	}
+	// A form is a list of fields: left baseline, one label column, and the
+	// editable field marked so it is not read as more context. The draft used
+	// to be padded to " " when empty, which is what an invisible field forces
+	// you to do.
+	width := popupWidthForBody(bodyWidth, 36, 56)
+	fieldWidth := formFieldWidth(width-2*popupPaddingWidth, branchFormLabelWidth)
 	lines := []string{
 		descStyle.Render("Enter a branch name."),
 		"",
-		descStyle.Render("name: " + draft),
-		descStyle.Render("base: " + truncateText(base, 24)),
+		formLabel("name", branchFormLabelWidth) + formInput(m.branchDraft, fieldWidth),
+		formLabel("base", branchFormLabelWidth) + formValue(truncateText(base, fieldWidth)),
 	}
 	if m.branchError != "" {
 		lines = append(lines, "")
 		lines = append(lines, errorStyle.Render(m.branchError))
 	}
 	lines = append(lines, "")
-	lines = append(lines, renderPopupFooter(popupWidthForBody(bodyWidth, 36, 56)-4))
+	lines = append(lines, popupHelp.Render("esc: close"))
 	return renderFloatingTitlePopup(
 		popupBox,
 		"Create branch",
 		strings.Join(lines, "\n"),
-		popupWidthForBody(bodyWidth, 36, 56),
+		width,
 	)
 }
 
