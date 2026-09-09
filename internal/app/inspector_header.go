@@ -61,6 +61,28 @@ func inspectorCommitText(hash string, budget int) string {
 	return key + value
 }
 
+// inspectorSubjectMaxWidth caps the commit subject however wide the terminal
+// is. A subject is one line of prose, and a line of prose that runs the full
+// width of a 200-column terminal is not read, it is skimmed past. The rest of
+// the subject is in the message body, which is what the reader opens next.
+const inspectorSubjectMaxWidth = 100
+
+// inspectorMessageText renders the subject row under that cap.
+//
+// The cap lived only in the popup renderer, which had no production caller and
+// was deleted in task 12.1 -- so for a moment it was gone from the app
+// entirely. Task 9.14 named it as the one thing that renderer implemented and
+// the live one did not, which is exactly why "port what only it implements"
+// comes before "then delete".
+func inspectorMessageText(subject string, budget int) string {
+	const key = "message: "
+	room := budget - lipgloss.Width(key)
+	if room < 1 {
+		room = 1
+	}
+	return key + truncateText(subject, min(inspectorSubjectMaxWidth, room))
+}
+
 // inspectorAuthorText keeps the name and adds the email only when the row can
 // hold it whole. A clipped domain ("<heykia3@protonmail.c…>") is a wrong
 // address, not a shortened one.

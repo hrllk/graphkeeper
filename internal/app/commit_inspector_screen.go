@@ -120,7 +120,7 @@ func screenHeaderTexts(rows []screenHeaderRow, dropBelow int) []string {
 func screenHeaderRows(snapshot CommitSnapshot, selected ChangedFile, innerWidth int) []screenHeaderRow {
 	rows := []screenHeaderRow{
 		{headerRowCommit, fitScreenText(inspectorCommitText(snapshot.FullHash, innerWidth), innerWidth)},
-		{headerRowMessage, fitScreenText("message: "+snapshot.Subject, innerWidth)},
+		{headerRowMessage, fitScreenText(inspectorMessageText(snapshot.Subject, innerWidth), innerWidth)},
 		{headerRowAuthor, fitScreenText(inspectorAuthorText(snapshot.AuthorName, snapshot.AuthorEmail, innerWidth), innerWidth)},
 		{headerRowParent, fitScreenText(inspectorParentText(snapshot.Parent, snapshot.IsRoot, innerWidth), innerWidth)},
 	}

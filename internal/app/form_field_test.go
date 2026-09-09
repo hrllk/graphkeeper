@@ -155,3 +155,26 @@ func lineContaining(t *testing.T, block, want string) string {
 	t.Fatalf("expected a line containing %q in:\n%s", want, block)
 	return ""
 }
+
+// A subject is one line of prose, and the Inspector caps it however wide the
+// terminal is. The cap existed only in the popup renderer, which had no
+// production caller; deleting that renderer took the cap with it until this
+// put it back on the live path.
+func TestInspectorSubjectIsCappedHoweverWideTheFrame(t *testing.T) {
+	subject := strings.Repeat("x", 400)
+	for _, innerWidth := range []int{60, 120, 200, 400} {
+		got := inspectorMessageText(subject, innerWidth)
+		if width := lipgloss.Width(got); width > inspectorSubjectMaxWidth+len("message: ") {
+			t.Errorf("innerWidth %d: subject row is %d cells, cap is %d plus the label",
+				innerWidth, width, inspectorSubjectMaxWidth)
+		}
+	}
+	// The cap never widens a narrow frame.
+	if got := lipgloss.Width(inspectorMessageText(subject, 40)); got > 40 {
+		t.Errorf("a 40-column frame produced a %d-cell subject row", got)
+	}
+	// A short subject is left whole, with no marker.
+	if got := inspectorMessageText("fix the thing", 120); got != "message: fix the thing" {
+		t.Errorf("expected a short subject untouched, got %q", got)
+	}
+}
