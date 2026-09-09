@@ -243,7 +243,9 @@ func renderInspectorDiffWindow(window DiffWindow) []string {
 	lines := make([]string, 0)
 	for _, hunk := range window.Hunks {
 		if hunk.Header != "" {
-			lines = append(lines, hunk.Header)
+			// The header carries git's function context after the @@, which is
+			// source and can be tabbed like any other line.
+			lines = append(lines, expandTabs(hunk.Header))
 		}
 		for _, row := range hunk.Rows {
 			if row.Kind == "context" && row.FromPresent && row.ToPresent {
@@ -283,6 +285,7 @@ func (m model) commitInspectorUnifiedLines() []string {
 	}
 	lines := make([]string, 0, len(rows)+len(hunks))
 	for _, hunk := range hunks {
+		hunk = expandTabs(hunk)
 		if noColorEnabled() {
 			lines = append(lines, hunk)
 		} else {
