@@ -361,19 +361,30 @@ const branchFormLabelWidth = 4
 
 func renderBranchInputPopup(m model, bodyWidth int) string {
 	descStyle := popupBody
-	popupBox := popupBorder.
-		Padding(1, 2).
-		Width(popupWidthForBody(bodyWidth, 36, 56)).
-		Align(lipgloss.Left)
 	base := m.branchBase
 	if base == "" {
 		base = "-"
 	}
+	// Sized by content, like the other form popups: a four-line form took 56
+	// columns wherever 56 fit. See docs/decisions.md 2026-09-10 (D-010).
+	width := popupWidthForContent(
+		[]string{
+			"Enter a branch name.",
+			formLabel("name", branchFormLabelWidth) + strings.Repeat(" ", formFieldMinWidth),
+			formLabel("base", branchFormLabelWidth) + base,
+			m.branchError,
+			"enter: create · esc: close",
+		},
+		bodyWidth, 36, 56,
+	)
+	popupBox := popupBorder.
+		Padding(1, 2).
+		Width(width).
+		Align(lipgloss.Left)
 	// A form is a list of fields: left baseline, one label column, and the
 	// editable field marked so it is not read as more context. The draft used
 	// to be padded to " " when empty, which is what an invisible field forces
 	// you to do.
-	width := popupWidthForBody(bodyWidth, 36, 56)
 	fieldWidth := formFieldWidth(width-2*popupPaddingWidth, branchFormLabelWidth)
 	lines := []string{
 		descStyle.Render("Enter a branch name."),
@@ -386,7 +397,7 @@ func renderBranchInputPopup(m model, bodyWidth int) string {
 		lines = append(lines, errorStyle.Render(m.branchError))
 	}
 	lines = append(lines, "")
-	lines = append(lines, popupHelp.Render("esc: close"))
+	lines = append(lines, popupHelp.Render("enter: create · esc: close"))
 	return renderFloatingTitlePopup(
 		popupBox,
 		"Create branch",

@@ -178,3 +178,42 @@ func TestInspectorSubjectIsCappedHoweverWideTheFrame(t *testing.T) {
 		t.Errorf("expected a short subject untouched, got %q", got)
 	}
 }
+
+// All four form popups are sized by what they hold and join their keys on one
+// line. Two of them kept the terminal-derived width and a section per hint
+// after 6.7, which showed up as a 56-column box around 33 columns of content
+// with as many blank rows as content rows.
+func TestFormPopupsAreCompactAndConsistent(t *testing.T) {
+	forceTrueColorProfile(t)
+	m := model{overlayState: overlayState{
+		tagPopupTarget:    "a39d548c",
+		tagPopupDraft:     "v1.2.0",
+		branchDraft:       "feature/x",
+		branchBase:        "a39d548",
+		stashMessageDraft: "wip",
+	}}
+	for name, out := range map[string]string{
+		"create tag":    ansi.Strip(renderTagPopup(m, 200, 24)),
+		"create branch": ansi.Strip(renderBranchInputPopup(m, 200)),
+		"stash message": ansi.Strip(renderStashMessagePopup(m, 200)),
+	} {
+		lines := strings.Split(out, "\n")
+		width := lipgloss.Width(lines[0])
+		if width > 48 {
+			t.Errorf("%s: %d columns for a short form at a 200-column terminal", name, width)
+		}
+		blank := 0
+		for _, line := range lines[1 : len(lines)-1] {
+			if strings.TrimSpace(strings.Trim(line, "│")) == "" {
+				blank++
+			}
+		}
+		if content := len(lines) - 2 - blank; blank > content {
+			t.Errorf("%s: %d blank rows against %d of content", name, blank, content)
+		}
+		// One line of keys, joined the way every other footer joins them.
+		if strings.Count(out, "esc: close") != 1 {
+			t.Errorf("%s: expected esc named exactly once, got:\n%s", name, out)
+		}
+	}
+}

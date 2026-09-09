@@ -675,3 +675,15 @@ graph state hint, cherry-pick 요약이 여기 해당했다.
 
 원래 디자인 감사가 진짜 문제를 찾은 방식이 이것이었다는 점을 기록해 둔다 —
 테스트가 아니라 실제 렌더를 본 것.
+
+### D-010 을 폼 팝업 넷 모두에 (같은 날, 렌더를 보고 이어서)
+
+6.7 은 감사가 지목한 둘(Create tag, Hidden Hotkeys)에만 콘텐츠 기준 폭을 적용했다.
+렌더를 보니 Create branch 와 Stash message 가 콘텐츠 33칸에 56컬럼을 쓰고 있었고,
+빈 줄이 콘텐츠 줄만큼 있었다. 넷 모두 같은 처리를 받는다.
+
+**힌트는 한 줄이다.** `enter: create` 와 `esc: close` 를 각각 section 으로 두면
+두 행에 그 사이 빈 줄까지 세 행을 쓴다. D-008 의 "`·` 는 줄 안에서 잇는다"를
+적용해 `enter: create · esc: close` 한 줄로 만들었다 — merge 팝업의
+`m: merge · r: rebase · esc: cancel` 과 같은 형태다. Create tag 는 14행에서
+6행이 됐다.

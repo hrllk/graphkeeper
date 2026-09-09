@@ -162,7 +162,10 @@ func renderTagPopup(m model, bodyWidth, bodyHeight int) string {
 	if m.tagPopupError != "" {
 		sections = append(sections, warn.Render(m.tagPopupError))
 	}
-	sections = append(sections, popupHelp.Render("enter: create"), popupHelp.Render("esc: close"))
+	// One line, joined the way every other footer joins its keys. Two sections
+	// cost two rows and the blank between them, in a box that was already half
+	// empty.
+	sections = append(sections, popupHelp.Render("enter: create · esc: close"))
 	return renderFloatingTitlePopup(popupBox, "Create tag", joinLayoutSections(sections...), width)
 }
 

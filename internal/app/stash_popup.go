@@ -241,7 +241,15 @@ func renderStashMessagePopup(m model, bodyWidth int) string {
 	descStyle := popupBody
 	helpStyle := popupHelp
 	errStyle := errorStyle
-	popupWidth := popupWidthForBody(bodyWidth, 40, 60)
+	popupWidth := popupWidthForContent(
+		[]string{
+			"Enter a message for this stash.",
+			formLabel("message", stashFormLabelWidth) + strings.Repeat(" ", formFieldMinWidth),
+			m.stashMessageError,
+			"enter: stash · esc: close",
+		},
+		bodyWidth, 40, 60,
+	)
 	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidth).
@@ -257,7 +265,7 @@ func renderStashMessagePopup(m model, bodyWidth int) string {
 	if m.stashMessageError != "" {
 		sections = append(sections, errStyle.Render(m.stashMessageError))
 	}
-	sections = append(sections, helpStyle.Render("enter: stash"), helpStyle.Render("esc: close"))
+	sections = append(sections, helpStyle.Render("enter: stash · esc: close"))
 	return renderFloatingTitlePopup(popupBox, "Stash changes", joinLayoutSections(sections...), popupWidth)
 }
 
