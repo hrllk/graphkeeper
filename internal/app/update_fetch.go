@@ -71,6 +71,10 @@ func handleFetchUpdate(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			"mode":   string(msg.status.Mode),
 		})
 		return m, nil
+	case graphRangeMsg:
+		// The epoch guard and the anchor check live in applyGraphRangeMsg, so a
+		// result that raced a refresh or a moved anchor is dropped there.
+		return applyGraphRangeMsg(m, msg), nil
 	case graphActionCheckMsg:
 		if msg.err != nil {
 			m.status = state.New().WithBlocked(state.BlockUnknown, "Graph action check failed.", msg.err.Error())

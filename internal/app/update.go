@@ -138,6 +138,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// A user operation starts a new repository epoch. Scheduled refreshes
 		// use this value to reject reads started before the operation.
 		nextModel.repositoryEpoch++
+		// The road selection was made against the previous epoch, so its member
+		// hashes point at rows the graph is about to rebuild. Keeping the
+		// highlight would leave it pointing at rows whose meaning has changed,
+		// so it is dropped outright rather than kept and hoped over.
+		if nextModel.graphRange.staleFor(nextModel.repositoryEpoch) {
+			nextModel.graphRange = nil
+		}
 		return nextModel, cmd
 	default:
 		return m, nil

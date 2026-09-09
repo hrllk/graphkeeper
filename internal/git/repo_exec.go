@@ -834,6 +834,42 @@ func (r *Repo) OriginTagSet(ctx context.Context) (map[string]bool, error) {
 	return tags, nil
 }
 
+// AncestryPath returns the commit hashes on the ancestry path from `from` to
+// `to`, as `git rev-list --ancestry-path from..to` reports them.
+//
+// Range semantics follow git's `from..to` exactly:
+//   - `from` is EXCLUDED from the result.
+//   - `to` is INCLUDED in the result.
+//   - Order is newest-first, so result[0] == to whenever the result is non-empty.
+//
+// A nil result with a nil error means there is no ancestry path in this
+// direction. That is an answer, not a failure: it happens when the two commits
+// have diverged, when `from` is a descendant of `to`, and when from == to.
+// Callers MUST tell those apart by comparing the refs first and by asking again
+// in the other direction; this function does not. Callers MUST test emptiness
+// with len(), never with != nil.
+//
+// No result cap. The graph itself already runs an unbounded log (commitLimit is
+// 0), and a cap here would make a reported path length a lie.
+//
+// Returns an error when either ref is empty, or when git fails. The empty-ref
+// guard is load-bearing: git reads `..to` as `HEAD..to`, so without it a blank
+// anchor answers a different question and reports no error at all.
+func (r *Repo) AncestryPath(ctx context.Context, from, to string) ([]string, error) {
+	if from == "" || to == "" {
+		return nil, fmt.Errorf("ancestry path requires two refs")
+	}
+	out, err := r.git(ctx, "rev-list", "--ancestry-path", from+".."+to)
+	if err != nil {
+		return nil, err
+	}
+	hashes := strings.Fields(out)
+	if len(hashes) == 0 {
+		return nil, nil
+	}
+	return hashes, nil
+}
+
 func (r *Repo) Divergence(ctx context.Context, left, right string) (leftOnly int, rightOnly int, err error) {
 	if left == "" || right == "" {
 		return 0, 0, fmt.Errorf("divergence requires two refs")

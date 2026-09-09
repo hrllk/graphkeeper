@@ -233,6 +233,7 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 						{key: "r", desc: "rebase"},
 						{key: "space", desc: "checkout"},
 						{key: "H", desc: "jump to HEAD"},
+						{key: "w", desc: "road: pick from, then to"},
 					},
 				},
 				{

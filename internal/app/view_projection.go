@@ -28,9 +28,15 @@ type GraphProjection struct {
 	Active               bool
 	LocalBranchInventory LocalBranchInventory
 	Handshake            map[string]bool
-	StashCounts          map[string]int
-	SearchQuery          string
-	StateHint            string
+	// RangeMembers is a read-only view of the model's map: the renderers may
+	// read it and must never write to it. The model replaces the map wholesale
+	// when the selection changes rather than mutating in place, so a partly
+	// updated map is never observed mid-render.
+	RangeMembers map[string]bool
+	RangeAnchor  string
+	StashCounts  map[string]int
+	SearchQuery  string
+	StateHint    string
 }
 
 type LocalBranchInventory struct {
@@ -81,7 +87,7 @@ func (m model) screenProjection(width, height int) ScreenProjection {
 	return ScreenProjection{
 		Width:       width,
 		Height:      height,
-		Graph:       GraphProjection{Rows: graph, PageSize: pageSize, Scroll: m.graphScroll, Cursor: m.sectionCursor[sectionGraph], LaneCursor: m.graphLaneCursor, Active: m.activeSection == sectionGraph, LocalBranchInventory: LocalBranchInventory{Names: append([]string(nil), m.repoStatus.LocalBranches...), Known: m.repoStatus.LocalBranchesKnown, Fresh: m.repoStatus.LocalBranchesFresh, Error: m.repoStatus.LocalBranchesError, Epoch: m.repositoryEpoch}, Handshake: m.handshakeCommits, StashCounts: stashCounts, SearchQuery: m.graphSearchQuery, StateHint: hint},
+		Graph:       GraphProjection{Rows: graph, PageSize: pageSize, Scroll: m.graphScroll, Cursor: m.sectionCursor[sectionGraph], LaneCursor: m.graphLaneCursor, Active: m.activeSection == sectionGraph, LocalBranchInventory: LocalBranchInventory{Names: append([]string(nil), m.repoStatus.LocalBranches...), Known: m.repoStatus.LocalBranchesKnown, Fresh: m.repoStatus.LocalBranchesFresh, Error: m.repoStatus.LocalBranchesError, Epoch: m.repositoryEpoch}, Handshake: m.handshakeCommits, RangeMembers: m.graphRange.rangeMembers(), RangeAnchor: m.graphRange.rangeAnchor(), StashCounts: stashCounts, SearchQuery: m.graphSearchQuery, StateHint: hint},
 		Sections:    sections,
 		Status:      m.status,
 		Active:      m.activeSection,

@@ -112,8 +112,11 @@ type overlayState struct {
 }
 
 type navigationState struct {
-	activeSection   graphSection
-	sectionCursor   map[graphSection]int
+	activeSection graphSection
+	sectionCursor map[graphSection]int
+	// graphRange is the road selection. nil means no anchor; see graph_range.go
+	// for why "off" is the nil pointer rather than a state constant.
+	graphRange      *graphRange
 	graphLaneCursor int
 	graphScroll     int
 	contextScroll   int

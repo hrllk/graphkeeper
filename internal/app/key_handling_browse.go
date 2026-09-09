@@ -273,6 +273,28 @@ func (m model) handleBrowseGraphKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "x":
 		m.status = state.New().WithBlocked(state.BlockUnknown, "Cherry-pick is disabled.", "This mode is temporarily unavailable.")
 		return m, nil
+	case "w":
+		// road: pick FROM, then pick TO. Pressing w with no anchor sets one and
+		// leaves a visible hint; pressing it again resolves the path. Registered
+		// in the graph group of the ? overlay in the same change, because task 8
+		// is already carrying ten working keys that appear nowhere.
+		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
+		if focus.Hash == "" || focus.Hash == "VIRTUAL_CONFLICT_HASH" {
+			// The synthetic conflict row is not a commit; graph_search.go:23
+			// excludes it from its index for the same reason. Handing it to
+			// rev-list would spend a subprocess on a ref that cannot resolve.
+			return m, nil
+		}
+		if m.graphRange == nil {
+			m.graphRange = resolveGraphRange(focus.Hash, "", m.repositoryEpoch, nil, nil, nil)
+			return m, nil
+		}
+		anchor := m.graphRange.Anchor
+		if focus.Hash == anchor {
+			m.graphRange = resolveGraphRange(anchor, focus.Hash, m.repositoryEpoch, nil, nil, nil)
+			return m, nil
+		}
+		return m, queryGraphRange(m.repo, anchor, focus.Hash, m.repositoryEpoch)
 	case "m":
 		if !isLocalGraphPointer(m.repoStatus, m.sectionCursor[sectionGraph], m.graphLaneCursor) {
 			m.status = state.New().WithBlocked(state.BlockNotLocalPointer, "Merge unavailable.", "Select a commit a local branch points at.")
