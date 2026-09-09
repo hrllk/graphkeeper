@@ -1,0 +1,131 @@
+name: Release
+
+# Publishing is a deliberate act: nothing here runs until a human pushes a
+# v-prefixed tag.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify the tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # A binary that reports a different version than the release it ships in
+      # is worse than no version at all, and scripts/build stamps VERSION into
+      # the binary while the release is named by the tag.
+      #
+      # The tag must end with VERSION. Every tag so far is "v0.1.0-alpha.6"
+      # against a VERSION of "alpha.6" -- the CHANGELOG headings and DESIGN.md
+      # use the short form and the tags carry a semver prefix. This check
+      # enforces the relationship those two conventions already have without
+      # picking one of them.
+      - name: tag agrees with VERSION
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          tag="${GITHUB_REF_NAME}"
+          if [[ "${tag}" != *"${version}" ]]; then
+            echo "tag ${tag} does not end with VERSION (${version})." >&2
+            echo "Update VERSION, or tag the version the binary will report." >&2
+            exit 1
+          fi
+          echo "tag ${tag} agrees with VERSION ${version}"
+
+      - run: ./scripts/check
+
+      - name: build and run the linux binary
+        run: |
+          ./scripts/build "${RUNNER_TEMP}/graphkeeper"
+          ./scripts/verify-linux-binary "${RUNNER_TEMP}/graphkeeper"
+
+  build:
+    name: build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          name="graphkeeper_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+          mkdir -p "dist/${name}"
+          ./scripts/build "dist/${name}/graphkeeper"
+          cp README.md CHANGELOG.md LICENSE "dist/${name}/"
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          ( cd dist && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256" )
+
+      # The native runner can only execute one of these four. It is the one
+      # most users download, and running it is the point of this job existing
+      # alongside a plain cross-build.
+      - name: run it, when this runner can
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: ./scripts/verify-linux-binary "dist/graphkeeper_${GITHUB_REF_NAME}_linux_amd64/graphkeeper"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graphkeeper_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+
+  release:
+    name: publish the release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # A prerelease unless the tag is a plain version. alpha and rc tags
+      # should not become the "latest release" people land on.
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            prerelease="--prerelease"
+          fi
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "See CHANGELOG.md for what changed in this release." \
+            --verify-tag \
+            ${prerelease} \
+            artifacts/*

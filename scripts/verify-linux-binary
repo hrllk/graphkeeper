@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Prove the built binary actually runs, rather than only that it compiled.
+#
+# graphkeeper was only ever cross-built for Linux, so nothing checked that the
+# artifact starts on the platform most users download. Everything here is
+# headless on purpose: this runs in CI, where there is no terminal.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BINARY="${1:-${ROOT}/graphkeeper}"
+VERSION="$(tr -d '[:space:]' < "${ROOT}/VERSION")"
+
+if [[ ! -x "${BINARY}" ]]; then
+  echo "binary not found or not executable: ${BINARY}" >&2
+  exit 1
+fi
+
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# A panic anywhere in these runs is a failure even when the exit code looks
+# fine, because a crash and a clean refusal can share an exit code.
+assert_no_crash() {
+  local label="$1" output="$2"
+  case "${output}" in
+    *"panic:"*|*"goroutine "*|*"runtime error"*)
+      fail "${label} crashed: ${output}" ;;
+  esac
+}
+
+echo "1. --version reports the version this build was stamped with"
+out="$("${BINARY}" --version 2>&1)" || fail "--version exited ${?}: ${out}"
+assert_no_crash "--version" "${out}"
+[[ "${out}" == "graphkeeper ${VERSION}" ]] || fail "--version printed ${out}, want 'graphkeeper ${VERSION}'"
+
+echo "2. --help exits clean and describes the flags"
+out="$("${BINARY}" --help 2>&1)" || fail "--help exited ${?}: ${out}"
+assert_no_crash "--help" "${out}"
+[[ "${out}" == *"--version"* ]] || fail "--help does not mention --version: ${out}"
+
+echo "3. an unknown flag is refused, not crashed on"
+set +e
+out="$("${BINARY}" --no-such-flag 2>&1)"; code=$?
+set -e
+assert_no_crash "unknown flag" "${out}"
+[[ ${code} -eq 2 ]] || fail "unknown flag exited ${code}, want 2"
+
+echo "4. outside a repository it explains itself instead of crashing"
+outside="$(mktemp -d)"
+trap 'rm -rf "${outside}"' EXIT
+set +e
+out="$(cd "${outside}" && "${BINARY}" 2>&1)"; code=$?
+set -e
+assert_no_crash "outside a repository" "${out}"
+[[ ${code} -ne 0 ]] || fail "expected a non-zero exit outside a repository"
+[[ -n "${out}" ]] || fail "expected a message explaining the refusal"
+
+echo "5. inside a repository with no terminal it fails cleanly"
+work="$(mktemp -d)"
+trap 'rm -rf "${outside}" "${work}"' EXIT
+git -C "${work}" init --quiet
+git -C "${work}" -c user.email=ci@example.com -c user.name=CI commit --quiet --allow-empty -m "smoke"
+set +e
+out="$(cd "${work}" && "${BINARY}" < /dev/null 2>&1)"; code=$?
+set -e
+assert_no_crash "headless run" "${out}"
+[[ ${code} -ne 0 ]] || fail "expected a non-zero exit without a terminal"
+
+echo "linux binary verified: ${BINARY} (${VERSION})"

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Run scripts/verify-linux-binary on real Linux, from a machine that is not.
+#
+# The point of 5.3 was that graphkeeper could only be cross-built for Linux and
+# never actually run there. CI covers that now, but a change to the binary's
+# startup path should be checkable before it is pushed, so this does the same
+# thing locally through a container.
+#
+# Usage: scripts/verify-linux-in-container [amd64|arm64] ...
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+IMAGE="${GRAPHKEEPER_VERIFY_IMAGE:-debian:stable-slim}"
+OUT_DIR="${ROOT}/.cache/linux-verify"
+
+if ! command -v docker > /dev/null; then
+  echo "docker is required; CI covers this on a native Linux runner" >&2
+  exit 1
+fi
+
+ARCHES=("$@")
+if [[ ${#ARCHES[@]} -eq 0 ]]; then
+  ARCHES=(amd64 arm64)
+fi
+
+mkdir -p "${OUT_DIR}"
+for arch in "${ARCHES[@]}"; do
+  echo "== linux/${arch}"
+  GOOS=linux GOARCH="${arch}" "${ROOT}/scripts/build" "${OUT_DIR}/graphkeeper-${arch}" > /dev/null
+  # The repo is mounted read-only and copied inside, so a container run cannot
+  # write into the working tree.
+  docker run --rm --platform "linux/${arch}" -v "${ROOT}:/src:ro" "${IMAGE}" bash -c '
+    set -e
+    apt-get update -qq > /dev/null 2>&1
+    apt-get install -y -qq git > /dev/null 2>&1
+    cp -r /src /work && cd /work
+    ./scripts/verify-linux-binary "/work/.cache/linux-verify/graphkeeper-'"${arch}"'"
+  '
+done

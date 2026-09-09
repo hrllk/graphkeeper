@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check on linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # scripts/check is lint + test, the same gate used locally. Running the
+      # repo's own script rather than a CI-only copy keeps the two from drifting.
+      - run: ./scripts/check
+
+      # The project could only cross-build for Linux, so nothing checked that
+      # the artifact starts on the platform most users download.
+      - name: build and run the linux binary
+        run: |
+          ./scripts/build "${RUNNER_TEMP}/graphkeeper"
+          ./scripts/verify-linux-binary "${RUNNER_TEMP}/graphkeeper"
