@@ -83,7 +83,7 @@ func TestRenderGraphLineWithSearchHighlightsVisibleFields(t *testing.T) {
 		},
 	}
 
-	got := renderGraphLineWithSearch(row, true, true, 0, []string{"feature/login"}, 20, 80, graphRowMarks{}, "feat")
+	got := renderGraphLineWithSearch(row, true, true, 0, []string{"feature/login"}, graphCols(20), 80, graphRowMarks{}, "feat")
 	if !strings.Contains(got, searchFocusMark.Render("feat")) {
 		t.Fatalf("expected search highlight in rendered graph line, got %q", ansi.Strip(got))
 	}

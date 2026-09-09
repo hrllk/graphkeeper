@@ -724,8 +724,8 @@
             "id": 4,
             "title": "Graph row 컬럼 예산과 폭 성장 재설계",
             "description": "빈 컬럼이 22칸을 점유하는 동안 커밋 제목이 11자로 잘리는 정보 배분을 바로잡는다.",
-            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-004: state 컬럼은 모든 캡처의 모든 행에서 비어 있다. graph 컬럼은 약 12칸을 잡지만 선형 히스토리에서 '*' 하나, 머지 구간(| \\, * |)에서도 3칸만 쓴다. branches는 o/l->main 때문에 약 15칸을 잡고 나머지 200여 커밋에는 '-'만 찍는다. 180컬럼에서도 제목은 약 44자에서 잘리고 그 왼쪽에 28칸 공백이 남는다. D-003: Graph 패널 내부 폭이 80에서 56, 100에서도 56, 120에서 66, 180에서 98이다. 즉 80-100 구간에서 전혀 성장하지 않고 100컬럼에서는 여백에 20칸을 쓰면서 제목을 11자로 자른다. DESIGN.md의 'Terminal-driven, centered'는 유지하되 계단식이 아닌 연속 성장으로 바꾼다. D-015: 저장소에 stash도 tag도 없는데 'S stash · T tag' 범례가 항상 표시된다. state 컬럼 폭 0과 함께 숨긴다. D-017: 머지 connector '|\\'가 hash/branches/title이 모두 빈 전체 행을 소비한다. 24행 화면에서 머지 하나당 viewport의 4%다. graph 컬럼을 보이는 window의 실제 lane 수에 맞춰 산정하고, stash/tag가 없으면 state를 0폭으로 접고, 회수한 폭을 title에 준다. Reddit 피드백의 '20자 강제 truncation' 지적이 이 subtask의 완료 기준이다. 완료 기준: 100컬럼에서 title 가용폭이 80컬럼 대비 증가하고, stash/tag 없는 저장소에서 state 컬럼과 범례가 사라지며 focused/full test, vet, build, gofmt/diff-check CLEAN.",
-            "status": "pending",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-004: state 컬럼은 모든 캡처의 모든 행에서 비어 있다. graph 컬럼은 약 12칸을 잡지만 선형 히스토리에서 '*' 하나, 머지 구간(| \\, * |)에서도 3칸만 쓴다. branches는 o/l->main 때문에 약 15칸을 잡고 나머지 200여 커밋에는 '-'만 찍는다. 180컬럼에서도 제목은 약 44자에서 잘리고 그 왼쪽에 28칸 공백이 남는다. D-003: Graph 패널 내부 폭이 80에서 56, 100에서도 56, 120에서 66, 180에서 98이다. 즉 80-100 구간에서 전혀 성장하지 않고 100컬럼에서는 여백에 20칸을 쓰면서 제목을 11자로 자른다. DESIGN.md의 'Terminal-driven, centered'는 유지하되 계단식이 아닌 연속 성장으로 바꾼다. D-015: 저장소에 stash도 tag도 없는데 'S stash · T tag' 범례가 항상 표시된다. state 컬럼 폭 0과 함께 숨긴다. D-017: 머지 connector '|\\'가 hash/branches/title이 모두 빈 전체 행을 소비한다. 24행 화면에서 머지 하나당 viewport의 4%다. graph 컬럼을 보이는 window의 실제 lane 수에 맞춰 산정하고, stash/tag가 없으면 state를 0폭으로 접고, 회수한 폭을 title에 준다. Reddit 피드백의 '20자 강제 truncation' 지적이 이 subtask의 완료 기준이다. 완료 기준: 100컬럼에서 title 가용폭이 80컬럼 대비 증가하고, stash/tag 없는 저장소에서 state 컬럼과 범례가 사라지며 focused/full test, vet, build, gofmt/diff-check CLEAN. [완료 2026-09-10] 계획: docs/20260910-0001-task64-graph-column-budget-plan.md (autoplan 4단 자동결정). 실측이 감사 수치를 두 곳에서 뒤집었다 — (1) D-003 '80~100 구간 미성장'은 이미 해결됨(39/50/62 연속 성장), (2) D-004 의 'branches 가 15칸을 잡고 대부분 - 만 찍는다'는 행별로는 참이나 최대값은 정확히 예산 14라 줄이면 실제 내용이 잘린다. 그래서 범위를 state·topology 두 컬럼으로 한정했다. 설계: 보이는 창이 아니라 graph 전체 기준으로 측정한다. 창 기준이 몇 칸 더 회수하지만 스크롤할 때마다 레이아웃이 리플로우돼 사용자가 위치를 잃고, 이 저장소 기준 차이는 topo 4 대 1 로 3칸이다. 결과: 고정폭 41 -> 24(1레인·무태그 기준), 80컬럼 title 가용폭 -2 -> +12. measureGraphColumns 는 렌더 루프 밖에서 1회 호출되어 범례·헤더·모든 행이 같은 값을 쓴다. 부수: state 컬럼이 0폭이 되면 'S stash · T tag' 범례도 함께 숨긴다 — 없는 컬럼을 설명하는 범례는 사용자에게 화면에 없는 것을 찾게 한다(D-015 를 blast radius 로 흡수).",
+            "status": "done",
             "dependencies": [
               "6.2"
             ],
@@ -1504,8 +1504,8 @@
             "taskId": "6.4",
             "title": "6.4 컬럼 예산 재배분",
             "description": "state 컬럼이 22칸을 비워둔 채 제목을 11자로 자른다는 지적. 6.2 가 폭 계산을 먼저 정리해야 그 위에서 재배분이 의미가 있다. 주의: 원 리뷰가 인용한 'Reddit 20자 강제 truncation' 은 출처를 확인하지 못했다.",
-            "details": "",
-            "status": "pending",
+            "details": " [2026-09-10] 원본 6.4 완료로 함께 닫는다.",
+            "status": "done",
             "priority": "P2",
             "dependencies": [],
             "parentTaskId": "10",

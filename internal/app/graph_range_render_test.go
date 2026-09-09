@@ -32,15 +32,15 @@ func TestRoadMarksReachBothRenderPaths(t *testing.T) {
 		{"raw path", rawRoadRow("abcdef1")},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			plain := renderGraphLineWithSearch(tt.row, false, true, 0, nil, 16, 80, graphRowMarks{}, "")
+			plain := renderGraphLineWithSearch(tt.row, false, true, 0, nil, graphCols(16), 80, graphRowMarks{}, "")
 			if strings.Contains(plain, "\x1b[4m") {
 				t.Fatalf("an unmarked row must carry no underline: %q", plain)
 			}
-			withMember := renderGraphLineWithSearch(tt.row, false, true, 0, nil, 16, 80, member, "")
+			withMember := renderGraphLineWithSearch(tt.row, false, true, 0, nil, graphCols(16), 80, member, "")
 			if !strings.Contains(withMember, "\x1b[4m") {
 				t.Fatalf("a path member must be underlined: %q", withMember)
 			}
-			withAnchor := renderGraphLineWithSearch(tt.row, false, true, 0, nil, 16, 80, anchor, "")
+			withAnchor := renderGraphLineWithSearch(tt.row, false, true, 0, nil, graphCols(16), 80, anchor, "")
 			if !strings.Contains(withAnchor, "\x1b[4m\x1b[1m") {
 				t.Fatalf("an anchor must be underlined and bold: %q", withAnchor)
 			}
@@ -55,11 +55,11 @@ func TestRoadMarksSurviveNoColor(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	row := rawRoadRow("abcdef1")
 
-	member := renderGraphLineWithSearch(row, false, true, 0, nil, 16, 80, graphRowMarks{RangeMember: true}, "")
+	member := renderGraphLineWithSearch(row, false, true, 0, nil, graphCols(16), 80, graphRowMarks{RangeMember: true}, "")
 	if !strings.Contains(member, "\x1b[4m") {
 		t.Fatalf("path member lost its mark under NO_COLOR: %q", member)
 	}
-	anchor := renderGraphLineWithSearch(row, false, true, 0, nil, 16, 80, graphRowMarks{RangeAnchor: true}, "")
+	anchor := renderGraphLineWithSearch(row, false, true, 0, nil, graphCols(16), 80, graphRowMarks{RangeAnchor: true}, "")
 	if !strings.Contains(anchor, "\x1b[4m\x1b[1m") {
 		t.Fatalf("anchor lost its mark under NO_COLOR: %q", anchor)
 	}
@@ -69,7 +69,7 @@ func TestRoadMarksSurviveNoColor(t *testing.T) {
 // reverse and underline together rather than one winning outright.
 func TestCursorAndAnchorCompose(t *testing.T) {
 	row := rawRoadRow("abcdef1")
-	got := renderGraphLineWithSearch(row, true, true, 0, nil, 16, 80, graphRowMarks{RangeAnchor: true}, "")
+	got := renderGraphLineWithSearch(row, true, true, 0, nil, graphCols(16), 80, graphRowMarks{RangeAnchor: true}, "")
 	if !strings.Contains(got, "\x1b[7m") {
 		t.Fatalf("the cursor mark is missing: %q", got)
 	}
@@ -82,7 +82,7 @@ func TestCursorAndAnchorCompose(t *testing.T) {
 // fighting the search highlight for the same characters.
 func TestSearchOwnsTheCellOverRoadMarks(t *testing.T) {
 	row := rawRoadRow("abcdef1")
-	got := renderGraphLineWithSearch(row, true, true, 0, nil, 16, 80, graphRowMarks{RangeAnchor: true}, "abc")
+	got := renderGraphLineWithSearch(row, true, true, 0, nil, graphCols(16), 80, graphRowMarks{RangeAnchor: true}, "abc")
 	if strings.Contains(got, "\x1b[4m\x1b[1m") {
 		t.Fatalf("search focus must outrank the anchor mark: %q", got)
 	}
@@ -93,7 +93,7 @@ func TestSearchOwnsTheCellOverRoadMarks(t *testing.T) {
 func TestRoadMarksAddNoGutter(t *testing.T) {
 	row := rawRoadRow("abcdef1")
 	for _, marks := range []graphRowMarks{{RangeAnchor: true}, {RangeMember: true}} {
-		got := renderGraphLineWithSearch(row, true, true, 0, nil, 16, 80, marks, "")
+		got := renderGraphLineWithSearch(row, true, true, 0, nil, graphCols(16), 80, marks, "")
 		stripped := stripAnsiForTest(got)
 		if strings.HasPrefix(stripped, "> ") || strings.HasPrefix(stripped, "▏") {
 			t.Fatalf("road marks must not add a gutter: %q", stripped)

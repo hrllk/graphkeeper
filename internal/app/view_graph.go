@@ -36,18 +36,27 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 	if end > len(rows) {
 		end = len(rows)
 	}
+	// Measured once, over the whole graph, and handed to the legend, the header
+	// and every row so all three agree. See measureGraphColumns for why the whole
+	// graph rather than the visible window.
+	cols := measureGraphColumns(rows, width, p.StashCounts)
 	pageLabel := fmt.Sprintf("graph page %d-%d/%d", start+1, end, len(rows))
-	legend := "S stash · T tag"
+	// The legend explains the state column, so it goes when the column does.
+	// Advertising S and T while the column that carries them has zero width
+	// tells the user to look for something that is not on screen.
+	legend := ""
+	if cols.Status > 0 {
+		legend = "S stash · T tag"
+	}
 	pageLine := pageLabel
 	if available := width - lipgloss.Width(pageLabel) - lipgloss.Width(legend); available >= 2 {
 		pageLine += strings.Repeat(" ", available) + legend
 	}
 	lines = append(lines, fitVisibleWidth(muted.Render(pageLine), width))
 	graphActive := p.Active
-	graphColWidth := graphTopologyWidth(width)
 	rawGraph := len(rows) > 0 && rows[0].Graph != ""
 	if len(lines) < height {
-		lines = append(lines, fitVisibleWidth(sectionTitle.Render(renderGraphHeader(width, graphColWidth)), width))
+		lines = append(lines, fitVisibleWidth(sectionTitle.Render(renderGraphHeader(width, cols)), width))
 	}
 	for i := start; i < end; i++ {
 		if len(lines) >= height {
@@ -60,11 +69,11 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 			RangeMember: hash != "" && p.RangeMembers[hash],
 			RangeAnchor: hash != "" && hash == p.RangeAnchor,
 		}
-		lineStr := renderGraphLineWithSearch(rows[i], graphActive && i == p.Cursor, graphActive, p.LaneCursor, p.LocalBranchInventory, graphColWidth, width, marks, p.SearchQuery)
+		lineStr := renderGraphLineWithSearch(rows[i], graphActive && i == p.Cursor, graphActive, p.LaneCursor, p.LocalBranchInventory, cols, width, marks, p.SearchQuery)
 		lines = append(lines, lineStr)
 		if !rawGraph && i+1 < len(rows) {
 			isConnectorHandshake := rows[i].Commit.Hash != "" && p.Handshake[rows[i].Commit.Hash] && rows[i+1].Commit.Hash != "" && p.Handshake[rows[i+1].Commit.Hash]
-			for _, line := range renderGraphConnectorLinesWithWidth(rows[i], rows[i+1], isConnectorHandshake, graphColWidth) {
+			for _, line := range renderGraphConnectorLinesWithWidth(rows[i], rows[i+1], isConnectorHandshake, cols.Topology) {
 				if len(lines) >= height {
 					break
 				}
@@ -84,12 +93,16 @@ func fitRepositoryStateHint(hint string, width int) string {
 	return fitVisibleWidth(warn.Render(hint), width)
 }
 
-func renderGraphHeader(width, graphColWidth int) string {
-	available := width - graphRowFixedWidth(graphColWidth)
+func renderGraphHeader(width int, cols graphColumnWidths) string {
+	available := width - graphRowFixedWidth(cols)
 	if available <= 0 {
 		return ""
 	}
-	prefix := fmt.Sprintf("%-*s %-14s %-*s %-*s ", graphCommitWidth, "commit", "branches", graphStatusWidth, "state", graphColWidth, "graph")
+	prefix := fmt.Sprintf("%-*s %-14s ", graphCommitWidth, "commit", "branches")
+	if cols.Status > 0 {
+		prefix += fmt.Sprintf("%-*s ", cols.Status, "state")
+	}
+	prefix += fmt.Sprintf("%-*s ", cols.Topology, "graph")
 	if available < graphAuthorWidthTarget+graphTitlePreferredWidth {
 		return prefix + fmt.Sprintf("%-*s", available, "title")
 	}

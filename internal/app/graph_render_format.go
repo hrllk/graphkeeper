@@ -20,11 +20,66 @@ const (
 	graphTopologyMinimumWidth = 12
 )
 
-func graphRowFixedWidth(graphColWidth int) int {
-	return graphCommitWidth + 1 + graphBranchFieldWidth + 1 + graphStatusWidth + 1 + graphColWidth + 1
+// graphColumnWidths is the row layout, measured once per render from the whole
+// graph rather than assumed. Every row and the header take the same value, so
+// the columns line up; recomputing per row would both cost O(rows^2) and break
+// the alignment it is meant to keep.
+//
+// Measured over the whole graph, not the visible window. A window-adaptive
+// budget recovers a few more columns on a linear stretch, but the layout then
+// reflows as you scroll, and a screen that rearranges itself under the cursor
+// costs more than the columns it saves.
+type graphColumnWidths struct {
+	Topology int
+	Status   int // 0 when nothing in the graph carries a stash or a tag
 }
 
-func graphTopologyWidth(width int) int {
+// graphCols builds a layout from a topology width alone, keeping the status
+// column at its full budget. Callers that have measured the graph should use
+// measureGraphColumns instead; this exists for the render tests, which pin a
+// topology width and expect the state column present.
+func graphCols(topology int) graphColumnWidths {
+	return graphColumnWidths{Topology: topology, Status: graphStatusWidth}
+}
+
+func graphRowFixedWidth(cols graphColumnWidths) int {
+	fixed := graphCommitWidth + 1 + graphBranchFieldWidth + 1 + cols.Topology + 1
+	if cols.Status > 0 {
+		fixed += cols.Status + 1
+	}
+	return fixed
+}
+
+// measureGraphColumns sizes the two columns that were previously fixed at their
+// worst case. In this repository at 266 commits the topology cell never exceeds
+// 4 of its 12 budgeted columns and no row carries a tag, so the two together
+// were spending 14 columns on nothing while the title ran negative below 100.
+//
+// branches is deliberately left alone: its widest decoration measures exactly
+// its 14-column budget, so shrinking it would truncate real content rather than
+// reclaim padding.
+func measureGraphColumns(rows []graphRow, width int, stashCounts map[string]int) graphColumnWidths {
+	cols := graphColumnWidths{Topology: 1}
+	for _, row := range rows {
+		if cell := lipgloss.Width(row.Graph); cell > cols.Topology {
+			cols.Topology = cell
+		}
+		if row.Commit.Hash == "" {
+			continue
+		}
+		if len(row.Commit.Tags) > 0 || stashCounts[row.Commit.Hash] > 0 {
+			cols.Status = graphStatusWidth
+		}
+	}
+	if ceiling := graphTopologyCeiling(width); cols.Topology > ceiling {
+		cols.Topology = ceiling
+	}
+	return cols
+}
+
+// graphTopologyCeiling keeps the old proportional formula as an upper bound, so
+// a graph with many lanes cannot take the whole row.
+func graphTopologyCeiling(width int) int {
 	current := max(graphTopologyMinimumWidth+6, int(float64(width)*0.30))
 	return max(graphTopologyMinimumWidth, int(float64(current)*0.70))
 }

@@ -39,8 +39,8 @@ type graphRowMarks struct {
 	RangeAnchor bool
 }
 
-func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, marks graphRowMarks) string {
-	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, marks, "")
+func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, cols graphColumnWidths, rowWidth int, marks graphRowMarks) string {
+	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, cols, rowWidth, marks, "")
 }
 
 // renderGraphHashField owns the commit-hash cell for both the compact and the
@@ -108,9 +108,9 @@ func renderGraphHashField(hash, searchQuery string, focused bool, marks graphRow
 	return attrs + field + cursorSignalReset
 }
 
-func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, marks graphRowMarks, searchQuery string) string {
+func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, cols graphColumnWidths, rowWidth int, marks graphRowMarks, searchQuery string) string {
 	if row.Graph != "" {
-		return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, marks, searchQuery)
+		return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, cols, rowWidth, marks, searchQuery)
 	}
 	var hash, refs string
 	var refInfo decorationInfo
@@ -129,8 +129,8 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 			refs = branchMark.Render(refs)
 		}
 	}
-	graphCell := graphLineCell(row, graphActive, selected, laneCursor, graphColWidth, marks.StashCount)
-	graphCell = padRight(graphCell, graphColWidth)
+	graphCell := graphLineCell(row, graphActive, selected, laneCursor, cols.Topology, marks.StashCount)
+	graphCell = padRight(graphCell, cols.Topology)
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
 		graphCell = strings.ReplaceAll(graphCell, "*", conflictMark.Render("*"))
 		graphCell = strings.ReplaceAll(graphCell, "|", conflictColor.Render("|"))
@@ -139,27 +139,31 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 	} else if marks.Handshake {
 		graphCell = applyHandshakePoint(graphCell, marks.StashCount, len(row.Commit.Tags))
 	}
-	status := strings.Repeat(" ", graphStatusWidth)
-	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
-		status = renderGraphStatus(marks.StashCount, len(row.Commit.Tags))
+	status := ""
+	if cols.Status > 0 {
+		status = strings.Repeat(" ", cols.Status)
+		if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
+			status = renderGraphStatus(marks.StashCount, len(row.Commit.Tags))
+		}
+		status += " "
 	}
 	var title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
 		title = conflictColor.Render(row.Commit.Subject)
 	} else {
-		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, graphColWidth, selected && graphActive)
+		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, cols, selected && graphActive)
 	}
-	line := hash + " " + refs + " " + status + " " + graphCell + " " + title
+	line := hash + " " + refs + " " + status + graphCell + " " + title
 	return fitVisibleWidth(line, rowWidth)
 }
 
-func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, marks graphRowMarks, searchQuery string) string {
+func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, cols graphColumnWidths, rowWidth int, marks graphRowMarks, searchQuery string) string {
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
-		graphCell := padRight(row.Graph, graphColWidth)
+		graphCell := padRight(row.Graph, cols.Topology)
 		if marks.Handshake {
 			graphCell = applyHandshakePoint(graphCell, marks.StashCount, 0)
 		}
-		line := fmt.Sprintf("%-*s %-*s %-*s %-*s %s", graphCommitWidth, "", graphBranchFieldWidth, "", graphStatusWidth, "", graphColWidth, graphCell, "")
+		line := fmt.Sprintf("%-*s %-*s %-*s %-*s %s", graphCommitWidth, "", graphBranchFieldWidth, "", graphStatusWidth, "", cols.Topology, graphCell, "")
 		return fitVisibleWidth(line, rowWidth)
 	}
 	var hash, refs string
@@ -207,7 +211,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		lane := graph.PointerLane(row)
 		graphCell = highlightRawGraphPrefix(row.Graph, lane, pointerFocused, refInfo.HasLocalHead, marks.StashCount, len(row.Commit.Tags))
 	}
-	graphCell = padRight(graphCell, graphColWidth)
+	graphCell = padRight(graphCell, cols.Topology)
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" && marks.Handshake {
 		graphCell = applyHandshakePoint(graphCell, marks.StashCount, len(row.Commit.Tags))
 	}
@@ -215,13 +219,17 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
 		title = conflictColor.Render(row.Commit.Subject)
 	} else {
-		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, graphColWidth, selected && graphActive)
+		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, cols, selected && graphActive)
 	}
-	status := "   "
-	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
-		status = renderGraphStatus(marks.StashCount, len(row.Commit.Tags))
+	status := ""
+	if cols.Status > 0 {
+		status = strings.Repeat(" ", cols.Status)
+		if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
+			status = renderGraphStatus(marks.StashCount, len(row.Commit.Tags))
+		}
+		status += " "
 	}
-	line := hash + " " + refs + " " + status + " " + graphCell + " " + title
+	line := hash + " " + refs + " " + status + graphCell + " " + title
 	return fitVisibleWidth(line, rowWidth)
 }
 
@@ -238,13 +246,13 @@ func applyHandshakePoint(graphCell string, stashCount, tagCount int) string {
 	return strings.Replace(graphCell, point, handshakeMark.Render(point), 1)
 }
 
-func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth, graphColWidth int, focused bool) string {
+func renderGraphTitleWithAuthor(author, subject, searchQuery string, rowWidth int, cols graphColumnWidths, focused bool) string {
 	author = compactAuthorText(author)
 	subject = strings.TrimSpace(subject)
 	if subject == "" {
 		subject = "-"
 	}
-	available := rowWidth - graphRowFixedWidth(graphColWidth)
+	available := rowWidth - graphRowFixedWidth(cols)
 	if available <= 0 {
 		return ""
 	}
