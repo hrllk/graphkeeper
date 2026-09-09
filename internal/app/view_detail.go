@@ -309,7 +309,7 @@ func (m model) renderDetailContent(width, height int) string {
 	} else if m.status.Mode == state.ModeLoading || m.status.Mode == state.ModeBlocked {
 		lines = append(lines, "")
 	} else {
-		lines = append(lines, renderStatusCompact(m.status))
+		lines = append(lines, renderStatusCompact(m.status, m.statusMessageText()))
 	}
 	if m.status.WorktreeState != "" {
 		worktree := string(m.status.WorktreeState)

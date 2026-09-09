@@ -318,7 +318,7 @@ func renderLoadingPopup(m model, bodyWidth int) string {
 		popupBox,
 		"Working...",
 		strings.Join([]string{
-			descStyle.Render(m.status.Message),
+			descStyle.Render(m.statusMessageText()),
 			descStyle.Render(m.status.Detail),
 		}, "\n"),
 		popupWidthForBody(bodyWidth, 28, 44),

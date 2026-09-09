@@ -4069,7 +4069,7 @@ func TestResetTriggeredResetModePicker(t *testing.T) {
 	if got.status.Mode != state.ModeLoading {
 		t.Fatalf("expected loading mode while preparing reset preview, got %s", got.status.Mode)
 	}
-	preview := cmd()
+	preview := resolveAppCmd(t, cmd)
 	previewMsg, ok := preview.(previewMsg)
 	if !ok {
 		t.Fatalf("expected previewMsg, got %T", preview)
@@ -4148,7 +4148,7 @@ func TestResetModePickerRendersCompactResetOnly(t *testing.T) {
 			ResetMode: state.ResetModeMixed,
 		},
 	}
-	if got := renderStatusCompact(m.status); got != ok.Render("Reset") {
+	if got := renderStatusCompact(m.status, m.statusMessageText()); got != ok.Render("Reset") {
 		t.Fatalf("expected compact reset status to hide extra text, got %q", got)
 	}
 }

@@ -143,6 +143,13 @@ type model struct {
 
 	// Repository-derived caches and snapshots.
 
+	// Progress animation. The frame is display state only; progressEpoch is
+	// what lets a late tick tell whether it still belongs to the operation
+	// that armed it.
+	progressAnimating bool
+	progressFrame     int
+	progressEpoch     uint64
+
 	// Viewport and transient errors.
 	commitLimit        int
 	startupReadPending bool

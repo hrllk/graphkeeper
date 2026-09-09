@@ -7,7 +7,19 @@ import (
 )
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	before := m.status.Mode
+	next, cmd := m.update(msg)
+	updated, ok := next.(model)
+	if !ok {
+		return next, cmd
+	}
+	return armProgressAnimation(updated, before, cmd)
+}
+
+func (m model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case progressTickMsg:
+		return handleProgressTick(m, msg)
 	case tea.WindowSizeMsg:
 		return handleWindowSize(m, msg)
 	case loadedMsg, refreshedMsg, loadedSnapshotMsg, refreshedSnapshotMsg, tickMsg:

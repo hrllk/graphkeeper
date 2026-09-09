@@ -305,9 +305,10 @@ func TestCompositionPullPortExecutionUsesInjectedPorts(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("merge confirmation did not start workflow")
 	}
-	workflowMsg, ok := cmd().(pullWorkflowMsg)
+	resolved := resolveAppCmd(t, cmd)
+	workflowMsg, ok := resolved.(pullWorkflowMsg)
 	if !ok {
-		t.Fatalf("workflow command returned %T", cmd())
+		t.Fatalf("workflow command returned %T", resolved)
 	}
 	final, finalCmd := updated.(model).Update(workflowMsg)
 	if finalCmd != nil {
@@ -372,9 +373,10 @@ func TestCompositionPullPortChangedBaselineThroughWorkflowUpdate(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("changed-baseline workflow command was nil")
 	}
-	workflowMsg, ok := cmd().(pullWorkflowMsg)
+	resolved := resolveAppCmd(t, cmd)
+	workflowMsg, ok := resolved.(pullWorkflowMsg)
 	if !ok {
-		t.Fatalf("workflow command returned %T", cmd())
+		t.Fatalf("workflow command returned %T", resolved)
 	}
 	if len(read.requests) != 1 {
 		t.Fatalf("changed-baseline workflow performed %d reads, want 1: %#v", len(read.requests), read.requests)

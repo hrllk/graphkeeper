@@ -299,7 +299,7 @@ func TestTask215TopLevelPullCommandPayloadIdentity(t *testing.T) {
 			if cmd == nil {
 				t.Fatal("affirmative pull key returned no command")
 			}
-			if _, ok := cmd().(pullWorkflowMsg); !ok {
+			if _, ok := resolveAppCmd(t, cmd).(pullWorkflowMsg); !ok {
 				t.Fatalf("pull command returned unexpected message")
 			}
 			got := gotModel.(model)

@@ -144,7 +144,7 @@ func cmdResult(t *testing.T, cmd tea.Cmd) tea.Msg {
 	if cmd == nil {
 		t.Fatal("expected command")
 	}
-	return cmd()
+	return resolveAppCmd(t, cmd)
 }
 
 func TestLoadAndRefreshRepoState(t *testing.T) {

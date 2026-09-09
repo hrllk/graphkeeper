@@ -570,7 +570,7 @@ func TestStashShortcutOpensMessagePopupForDirtyLocalSection(t *testing.T) {
 	if got.status.Mode != state.ModeLoading || got.status.Message != "Stashing changes..." {
 		t.Fatalf("expected stash loading state, got %+v", got.status)
 	}
-	msg := cmd()
+	msg := resolveAppCmd(t, cmd)
 	executed, ok := msg.(executedMsg)
 	if !ok {
 		t.Fatalf("expected executedMsg, got %T", msg)
@@ -686,7 +686,7 @@ func TestStashShortcutRefreshesStashState(t *testing.T) {
 		t.Fatalf("expected stash loading state, got %+v", got.status)
 	}
 
-	msg := cmd()
+	msg := resolveAppCmd(t, cmd)
 	executed, ok := msg.(executedMsg)
 	if !ok {
 		t.Fatalf("expected executedMsg, got %T", msg)
@@ -748,7 +748,7 @@ func TestCleanShortcutRemovesTrackedAndUntrackedFiles(t *testing.T) {
 		t.Fatalf("expected clean loading state, got %+v", got.status)
 	}
 
-	msg := cmd()
+	msg := resolveAppCmd(t, cmd)
 	executed, ok := msg.(executedMsg)
 	if !ok {
 		t.Fatalf("expected executedMsg, got %T", msg)
@@ -844,7 +844,7 @@ func TestBranchOpenSuccessShowsCreatedToast(t *testing.T) {
 	if got.branchOpen {
 		t.Fatal("expected branch modal to close on success path")
 	}
-	msg := cmd()
+	msg := resolveAppCmd(t, cmd)
 	created, ok := msg.(createdBranchMsg)
 	if !ok {
 		t.Fatalf("expected createdBranchMsg, got %T", msg)
@@ -1748,7 +1748,7 @@ func TestTagSectionPushHotkeyPushesSelectedTag(t *testing.T) {
 		t.Fatalf("expected tag push loading state, got %+v", got.status)
 	}
 
-	msg := cmd()
+	msg := resolveAppCmd(t, cmd)
 	executed, ok := msg.(executedMsg)
 	if !ok {
 		t.Fatalf("expected executedMsg, got %T", msg)
@@ -1975,7 +1975,7 @@ func TestDeleteBranchShortcutDeletesSelectedCurrentSectionBranch(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected delete acceptance to execute")
 	}
-	msg := cmd()
+	msg := resolveAppCmd(t, cmd)
 	executed, ok := msg.(executedMsg)
 	if !ok {
 		t.Fatalf("expected executedMsg, got %T", msg)

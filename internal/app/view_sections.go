@@ -96,8 +96,8 @@ func renderSectionProjection(p SectionProjection, section graphSection, tagSyncA
 	return strings.Join(lines, "\n")
 }
 
-func renderStatusCompact(s state.Status) string {
-	msg := truncateText(s.Message, 30)
+func renderStatusCompact(s state.Status, message string) string {
+	msg := truncateText(message, 30)
 	switch s.Mode {
 	case state.ModeBrowse:
 		return ok.Render("Browse") + " · " + msg
