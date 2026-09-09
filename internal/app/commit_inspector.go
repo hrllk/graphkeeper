@@ -10,6 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	ansiutil "github.com/charmbracelet/x/ansi"
+
+	ci "hrllk/graphkeeper/internal/commitinspector"
 )
 
 // inspectorScrollPage is one viewport worth of diff rows, so Ctrl+U and Ctrl+D
@@ -45,7 +47,7 @@ func (m model) startInspectorDiff() (model, tea.Cmd) {
 	m.commitInspectorDiffError = ""
 	m.commitInspectorRequest++
 	file := m.commitInspectorSnapshot.Files[m.commitInspectorCursor]
-	window := DiffWindowRequest{StartLine: 0, MaxLines: 2000, MaxBytes: 1 << 20}
+	window := ci.DefaultDiffWindow()
 	m.commitInspectorWindowRequest = window
 	return m, loadCommitInspectorDiffCommand(m.commitInspectorContext, m, DiffRequest{Commit: m.commitInspectorSnapshot.FullHash, Parent: m.commitInspectorSnapshot.Parent, FileID: file.StableID, RequestID: m.commitInspectorRequest, RepositoryEpoch: m.commitInspectorEpoch, Window: window})
 }

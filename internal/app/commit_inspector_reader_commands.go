@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	ci "hrllk/graphkeeper/internal/commitinspector"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -101,10 +102,10 @@ func startInspectorContinuation(m model) (model, tea.Cmd) {
 	window := m.commitInspectorWindowRequest
 	window.StartLine = m.commitInspectorDiffWindow.NextStartLine
 	if window.MaxLines == 0 {
-		window.MaxLines = 2000
+		window.MaxLines = defaultInspectorMaxLines
 	}
 	if window.MaxBytes == 0 {
-		window.MaxBytes = 1 << 20
+		window.MaxBytes = defaultInspectorMaxBytes
 	}
 	m.commitInspectorWindowRequest = window
 	m.commitInspectorDiffLoading = true
@@ -117,7 +118,7 @@ func (m model) startInspectorDiffFromReader() (model, tea.Cmd) {
 		return m, nil
 	}
 	file := m.commitInspectorSnapshot.Files[m.commitInspectorCursor]
-	window := DiffWindowRequest{StartLine: 0, MaxLines: 2000, MaxBytes: 1 << 20}
+	window := ci.DefaultDiffWindow()
 	m.commitInspectorWindowRequest = window
 	m.commitInspectorDiffLoading = true
 	return m, loadCommitInspectorDiffCommand(m.commitInspectorContext, m, DiffRequest{Commit: m.commitInspectorSnapshot.FullHash, Parent: m.commitInspectorSnapshot.Parent, FileID: file.StableID, RequestID: m.commitInspectorRequest, RepositoryEpoch: m.commitInspectorEpoch, Window: window})

@@ -45,12 +45,49 @@ type InspectorError struct {
 	Retryable bool
 }
 
+// The diff window's limits. They were declared here and then declared again,
+// identically, in internal/app and in the adapter -- and bypassed by literals
+// in three more places, so the contract package's copy was unused while three
+// other copies decided the behaviour.
+//
+// A limit that is written down four times is four limits.
 const (
-	defaultInspectorMaxLines = 2000
-	defaultInspectorMaxBytes = 1 << 20
-	maxInspectorMaxLines     = 10000
-	maxInspectorMaxBytes     = 16 << 20
+	DefaultDiffWindowLines = 2000
+	DefaultDiffWindowBytes = 1 << 20
+	MaxDiffWindowLines     = 10000
+	MaxDiffWindowBytes     = 16 << 20
+
+	// minDiffWindowBytes is the smallest window that can still hold one
+	// structural record, below which the request is a configuration error
+	// rather than a small window.
+	minDiffWindowBytes = 16
 )
+
+// DefaultDiffWindow is the window a caller gets by asking for nothing.
+func DefaultDiffWindow() DiffWindowRequest {
+	return DiffWindowRequest{StartLine: 0, MaxLines: DefaultDiffWindowLines, MaxBytes: DefaultDiffWindowBytes}
+}
+
+// NormalizeDiffWindow fills in the defaults and rejects a window that cannot
+// work. The app and the adapter each had their own copy of this, character for
+// character; one copy is what makes them agree by construction rather than by
+// coincidence.
+func NormalizeDiffWindow(window DiffWindowRequest) (DiffWindowRequest, *InspectorError) {
+	if window.StartLine < 0 || window.MaxLines < 0 || window.MaxBytes < 0 ||
+		window.MaxLines > MaxDiffWindowLines || window.MaxBytes > MaxDiffWindowBytes {
+		return window, &InspectorError{Kind: "configuration", Message: "invalid inspector diff window"}
+	}
+	if window.MaxLines == 0 {
+		window.MaxLines = DefaultDiffWindowLines
+	}
+	if window.MaxBytes == 0 {
+		window.MaxBytes = DefaultDiffWindowBytes
+	}
+	if window.MaxLines < 1 || window.MaxBytes < minDiffWindowBytes {
+		return window, &InspectorError{Kind: "configuration", Message: "inspector diff window cannot fit a structural record"}
+	}
+	return window, nil
+}
 
 type DiffWindowRequest struct {
 	StartLine int

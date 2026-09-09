@@ -13,13 +13,6 @@ import (
 	"hrllk/graphkeeper/internal/git"
 )
 
-const (
-	defaultInspectorMaxLines = 2000
-	defaultInspectorMaxBytes = 1 << 20
-	maxInspectorMaxLines     = 10000
-	maxInspectorMaxBytes     = 16 << 20
-)
-
 type gitCommitInspectorReader struct{ repo *git.Repo }
 
 func New(repo *git.Repo) commitinspector.CommitInspectorReader {
@@ -98,24 +91,8 @@ func inspectorLogicalLineCount(lines []string) int {
 	return count
 }
 
-func normalizeInspectorWindow(window commitinspector.DiffWindowRequest) (commitinspector.DiffWindowRequest, *commitinspector.InspectorError) {
-	if window.StartLine < 0 || window.MaxLines < 0 || window.MaxBytes < 0 || window.MaxLines > maxInspectorMaxLines || window.MaxBytes > maxInspectorMaxBytes {
-		return window, &commitinspector.InspectorError{Kind: "configuration", Message: "invalid inspector diff window"}
-	}
-	if window.MaxLines == 0 {
-		window.MaxLines = defaultInspectorMaxLines
-	}
-	if window.MaxBytes == 0 {
-		window.MaxBytes = defaultInspectorMaxBytes
-	}
-	if window.MaxLines < 1 || window.MaxBytes < 16 {
-		return window, &commitinspector.InspectorError{Kind: "configuration", Message: "inspector diff window cannot fit a structural record"}
-	}
-	return window, nil
-}
-
 func (r *gitCommitInspectorReader) LoadDiff(ctx context.Context, req commitinspector.DiffRequest) commitinspector.InspectorResult[commitinspector.DiffWindow] {
-	normalized, configErr := normalizeInspectorWindow(req.Window)
+	normalized, configErr := commitinspector.NormalizeDiffWindow(req.Window)
 	if configErr != nil {
 		return commitinspector.InspectorResult[commitinspector.DiffWindow]{State: commitinspector.PaneError, Error: configErr, Commit: req.Commit, Parent: req.Parent, FileID: req.FileID, RequestID: req.RequestID, RepositoryEpoch: req.RepositoryEpoch, Window: req.Window}
 	}

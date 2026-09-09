@@ -1,23 +1,14 @@
 package app
 
 import (
+	ci "hrllk/graphkeeper/internal/commitinspector"
 	"hrllk/graphkeeper/internal/git"
 )
 
+// normalizeInspectorWindow is the contract's clamp. The app used to carry its
+// own character-for-character copy.
 func normalizeInspectorWindow(window DiffWindowRequest) (DiffWindowRequest, *InspectorError) {
-	if window.StartLine < 0 || window.MaxLines < 0 || window.MaxBytes < 0 || window.MaxLines > maxInspectorMaxLines || window.MaxBytes > maxInspectorMaxBytes {
-		return window, &InspectorError{Kind: "configuration", Message: "invalid inspector diff window"}
-	}
-	if window.MaxLines == 0 {
-		window.MaxLines = defaultInspectorMaxLines
-	}
-	if window.MaxBytes == 0 {
-		window.MaxBytes = defaultInspectorMaxBytes
-	}
-	if window.MaxLines < 1 || window.MaxBytes < 16 {
-		return window, &InspectorError{Kind: "configuration", Message: "inspector diff window cannot fit a structural record"}
-	}
-	return window, nil
+	return ci.NormalizeDiffWindow(window)
 }
 
 func inspectorLogicalLineCount(lines []string) int {

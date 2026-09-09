@@ -41,8 +41,11 @@ const (
 )
 
 const (
-	defaultInspectorMaxLines = 2000
-	defaultInspectorMaxBytes = 1 << 20
-	maxInspectorMaxLines     = 10000
-	maxInspectorMaxBytes     = 16 << 20
+	// Aliases, not copies. These used to be declared again here with the same
+	// numbers, so the contract package's own constants went unused while this
+	// copy decided what the app did.
+	defaultInspectorMaxLines = ci.DefaultDiffWindowLines
+	defaultInspectorMaxBytes = ci.DefaultDiffWindowBytes
+	maxInspectorMaxLines     = ci.MaxDiffWindowLines
+	maxInspectorMaxBytes     = ci.MaxDiffWindowBytes
 )
