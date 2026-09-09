@@ -23,9 +23,9 @@ func buildGraphActionConfirmStatus(action state.Action, rs git.Status, target st
 	}
 	detailMsg := ""
 	if action == state.ActionMerge {
-		detailMsg = "This will merge commit " + shorten(target, 7) + " into " + rs.Branch + ".\nA merge commit will be created if histories have diverged.\n\nContinue? (y: yes  •  n: no)"
+		detailMsg = "This will merge commit " + shorten(target, 7) + " into " + rs.Branch + ".\nA merge commit will be created if histories have diverged.\n\nContinue? (y: yes · n: no)"
 	} else {
-		detailMsg = "This will rebase " + rs.Branch + " onto commit " + shorten(target, 7) + ".\nLocal commits will be replayed on top of the target.\n\n⚠️ Conflicts may occur during rebase.\n\nContinue? (y: yes  •  n: no)"
+		detailMsg = "This will rebase " + rs.Branch + " onto commit " + shorten(target, 7) + ".\nLocal commits will be replayed on top of the target.\n\n⚠️ Conflicts may occur during rebase.\n\nContinue? (y: yes · n: no)"
 	}
 	status := state.New().WithConfirm(action, titleMsg, detailMsg)
 	status.Title = titleMsg
@@ -62,7 +62,7 @@ func buildGraphActionReviewDetail(action state.Action, rs git.Status, target, ba
 		"",
 		buildGraphActionReviewDiagram(rs, target, base, currentOnly, targetOnly),
 		"",
-		centerReviewLine("y: continue  •  n: cancel"),
+		centerReviewLine("y: continue · n: cancel"),
 	}, "\n")
 }
 

@@ -22,7 +22,7 @@ func TestTask215BinaryProjectionRendererClassifierAgreement(t *testing.T) {
 		"x":     {Decision: decisionNoop},
 	}
 	popup := ansi.Strip(renderConfirmPopup(m, 80))
-	if !strings.Contains(popup, "Continue with the local cleanup?") || !strings.Contains(popup, "y: stash  •  n: cancel") {
+	if !strings.Contains(popup, "Continue with the local cleanup?") || !strings.Contains(popup, "y: stash · n: cancel") {
 		t.Fatalf("binary renderer lost independent projection values: %q", popup)
 	}
 	for key, expected := range want {

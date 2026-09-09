@@ -258,7 +258,7 @@ func renderResetModePopup(bodyWidth int) string {
 		"Reset mode",
 		strings.Join([]string{
 			bodyStyle.Render("Choose a reset mode."),
-			bodyStyle.Render("s: soft  •  m: mixed  •  h: hard"),
+			bodyStyle.Render("s: soft · m: mixed · h: hard"),
 		}, "\n\n"),
 		popupWidthForBody(bodyWidth, 32, 50),
 	)
@@ -359,7 +359,7 @@ func renderGraphSearchPopup(m model, bodyWidth int) string {
 	lines := []string{
 		descStyle.Render("query: " + query),
 		"",
-		helpStyle.Render("enter: jump  •  n/N: next/prev"),
+		helpStyle.Render("enter: jump · n/N: next/prev"),
 	}
 	if m.graphSearchError != "" {
 		lines = append(lines, "")

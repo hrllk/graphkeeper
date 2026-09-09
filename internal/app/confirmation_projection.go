@@ -49,7 +49,7 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 		Detail:       m.status.Detail,
 		ApprovalKey:  "y",
 		ApprovalText: "yes",
-		FooterText:   "y: yes  •  n: no",
+		FooterText:   "y: yes · n: no",
 		ChoiceKeys:   nil,
 		CancelKeys:   []string{"n", "esc"},
 		Disabled:     false,
@@ -85,16 +85,16 @@ func buildConfirmationProjection(m model) (confirmationProjection, bool) {
 		p.ApprovalText = "fast-forward"
 		p.FooterText = "f: fast-forward · esc: cancel"
 	} else if p.Action == state.ActionDeleteBranch || p.Action == state.ActionDeleteTag {
-		p.FooterText = "y: delete  •  n: cancel"
+		p.FooterText = "y: delete · n: cancel"
 	} else if p.Action == state.ActionStash {
-		p.FooterText = "y: stash  •  n: cancel"
+		p.FooterText = "y: stash · n: cancel"
 	} else if p.Action == state.ActionCleanWorkingTree {
-		p.FooterText = "y: clean  •  n: cancel"
+		p.FooterText = "y: clean · n: cancel"
 	}
 	if m.pullConfirmStale && p.Action == state.ActionPull {
 		p.Disabled = true
 		p.DisabledText = "Preview is stale. Refresh before continuing."
-		p.FooterText = "n: close  •  esc: close"
+		p.FooterText = "n: close · esc: close"
 	}
 	p.ChoiceKeys = append([]confirmChoice(nil), p.ChoiceKeys...)
 	p.CancelKeys = append([]string(nil), p.CancelKeys...)

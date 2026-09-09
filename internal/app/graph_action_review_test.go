@@ -32,7 +32,7 @@ func TestBuildGraphActionReviewDetailUsesCurrentTargetBaseRows(t *testing.T) {
 		"*    abc1234 CURRENT +12 (main)",
 		"| *  def5678 TARGET +5 (feature-x)",
 		"*    9ab0cde BASE",
-		"y: continue  •  n: cancel",
+		"y: continue · n: cancel",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected review detail to contain %q, got %q", want, got)

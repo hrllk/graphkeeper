@@ -321,8 +321,8 @@ func (m model) renderDetailContent(width, height int) string {
 	lines = append(lines, "")
 
 	lines = append(lines, title.Render("Repo"))
-	lines = append(lines, fmt.Sprintf("branch: %-12s • head: %s", truncateText(m.repoStatus.Branch, 10), shorten(m.repoStatus.Head, 7)))
-	lines = append(lines, fmt.Sprintf("upstream: %-10s • remote: %s", truncateText(emptyDash(m.repoStatus.Upstream), 10), truncateText(emptyDash(m.repoStatus.Remote), 10)))
+	lines = append(lines, fmt.Sprintf("branch: %-12s · head: %s", truncateText(m.repoStatus.Branch, 10), shorten(m.repoStatus.Head, 7)))
+	lines = append(lines, fmt.Sprintf("upstream: %-10s · remote: %s", truncateText(emptyDash(m.repoStatus.Upstream), 10), truncateText(emptyDash(m.repoStatus.Remote), 10)))
 
 	focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 	if focus.Hash != "" {

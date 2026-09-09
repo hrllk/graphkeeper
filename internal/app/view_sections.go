@@ -318,12 +318,12 @@ func renderActionHelpLines(m model) []string {
 		}
 		return []string{"• enter: preview", "• esc: back"}
 	case state.ModeResetModePick:
-		return []string{"• s: soft  •  m: mixed  •  h: hard", "• esc: back"}
+		return []string{"• s: soft · m: mixed · h: hard", "• esc: back"}
 	case state.ModeReview:
-		return []string{"• y: continue                    • n: cancel"}
+		return []string{"• y: continue · n: cancel"}
 	case state.ModeOutcomePreview:
 		if m.status.CanExecute {
-			return []string{"• enter: execute                    • esc: back"}
+			return []string{"• enter: execute · esc: back"}
 		}
 		return []string{"• esc: back"}
 	case state.ModeOperationResult:

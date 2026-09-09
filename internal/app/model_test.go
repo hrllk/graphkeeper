@@ -3394,10 +3394,10 @@ func TestRenderConfirmPopupCentersHotkeys(t *testing.T) {
 		status: state.New().WithConfirm(state.ActionStash, "Stash changes?", "Continue?"),
 	}
 	got := renderConfirmPopup(m, 60)
-	if !strings.Contains(got, "y: stash  •  n: cancel") {
+	if !strings.Contains(got, "y: stash · n: cancel") {
 		t.Fatalf("expected stash confirm help, got %q", got)
 	}
-	if strings.Contains(got, "\ny: stash  •  n: cancel") {
+	if strings.Contains(got, "\ny: stash · n: cancel") {
 		t.Fatalf("expected hotkeys line to be centered, got %q", got)
 	}
 }
@@ -3408,7 +3408,7 @@ func TestRenderConfirmPopupCentersPushYesNoFooter(t *testing.T) {
 	}
 	got := ansi.Strip(renderConfirmPopup(m, 60))
 	lines := strings.Split(got, "\n")
-	const want = "y: yes  •  n: no"
+	const want = "y: yes · n: no"
 	found := false
 	for _, line := range lines {
 		if !strings.Contains(line, want) {
