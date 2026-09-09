@@ -819,12 +819,22 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 		pullState: pullState{},
 		status:    state.New().WithBrowse()}
 	got := m.renderGraphContent(88, 6)
-	if strings.Contains(got, "date") {
-		t.Fatalf("expected graph header to omit date label, got %q", got)
-	}
+	// 397b2ea removed the date column and this asserted it stayed gone. 11.9
+	// brings it back, on the condition 6.4 established: a column appears only
+	// where the row can spare it. At 88 columns of graph content the title keeps
+	// more than its minimum after the date, so the column is here.
 	header := strings.Split(got, "\n")[1]
-	if strings.Index(header, "state") > strings.Index(header, "graph") {
-		t.Fatalf("expected state column between branches and graph, got %q", header)
+	if !strings.Contains(header, "date") {
+		t.Fatalf("expected the date column at a width that can hold it, got %q", header)
+	}
+	if strings.Index(header, "graph") > strings.Index(header, "date") {
+		t.Fatalf("expected date after the graph cell, got %q", header)
+	}
+	// The state column is gone in this fixture because nothing carries a stash
+	// or a tag; TestRenderGraphContentShowsStatusLegendWhenItFits covers the
+	// case where it is present.
+	if strings.Contains(header, "state") {
+		t.Fatalf("expected no state column without a stash or tag, got %q", header)
 	}
 	if !strings.Contains(got, "author") {
 		t.Fatalf("expected medium graph width to restore author, got %q", got)
@@ -832,13 +842,16 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 	if !strings.Contains(got, "Merge branch") {
 		t.Fatalf("expected graph row to prioritize the subject, got %q", got)
 	}
-	// The ellipsis is gone because the title now fits. 6.4 gave the state and
-	// topology columns their measured width instead of their worst case, and
-	// this fixture carries no tag and one lane, so 14 columns came back to the
-	// title. An assertion that the title must be truncated would now be pinning
-	// the waste rather than the behaviour.
-	if !strings.Contains(got, "Merge branch 'main' into develop with a longer title") {
-		t.Fatalf("expected the whole title once the reclaimed columns fit it, got %q", got)
+	// This is the trade the date column makes, stated rather than hidden. 6.4
+	// reclaimed 14 columns and this 51-character title fitted whole; 11.9 spends
+	// 7 of them on the date and the tail goes back to an ellipsis. The title
+	// still gets the remainder, which is the contract - it just has a smaller
+	// remainder to get.
+	if !strings.Contains(got, "Merge branch 'main' into develop") {
+		t.Fatalf("expected the title to keep the width left after the date, got %q", got)
+	}
+	if !strings.Contains(got, "...") {
+		t.Fatalf("expected the date column to cost this long title its tail, got %q", got)
 	}
 }
 

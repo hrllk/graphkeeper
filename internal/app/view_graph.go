@@ -103,6 +103,9 @@ func renderGraphHeader(width int, cols graphColumnWidths) string {
 		prefix += fmt.Sprintf("%-*s ", cols.Status, "state")
 	}
 	prefix += fmt.Sprintf("%-*s ", cols.Topology, "graph")
+	if cols.Date > 0 {
+		prefix += fmt.Sprintf("%-*s ", cols.Date, "date")
+	}
 	if available < graphAuthorWidthTarget+graphTitlePreferredWidth {
 		return prefix + fmt.Sprintf("%-*s", available, "title")
 	}

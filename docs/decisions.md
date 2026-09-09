@@ -1,5 +1,34 @@
 # Decisions
 
+## 2026-09-10: The graph row budgets its columns, and the date column returns where it fits
+
+Reverses two earlier decisions, in part. Recorded here because the code and the
+decision log would otherwise disagree.
+
+- 2026-08-01 said the graph title takes "the remaining width after the five-character
+  hash, branches, state, narrower `graph` topology, and restored author metadata".
+  The title still takes the remainder; the list it comes after now includes a date.
+- 2026-07-10 said to keep state "as a compact marker, not a separate column". That
+  still holds for stash and tag markers. The date is not a marker - there is no
+  glyph that carries a date - so it takes a column or it is not shown.
+
+What changed to allow it: the state and topology columns were budgeted for their
+worst case and spent 14 columns on nothing in a linear graph with no tags. Sizing
+them from what the graph actually contains moved the title budget at an 80-column
+terminal from -2 to +14, which is what made a date column arithmetically possible
+at all.
+
+- Size the state and topology columns from the whole graph, not the visible window.
+  A window-adaptive budget reclaims a few more columns but reflows the layout while
+  the user scrolls.
+- Drop the state column, and the `S stash · T tag` legend with it, when nothing in
+  the graph carries a stash or a tag.
+- Show the `yymmdd` date column only when the title keeps at least
+  `graphTitleMinimumWidth` after it. That is from 100 columns up; below that the
+  Details panel carries the date instead.
+- Leave the branches column alone. Its widest decoration measures exactly its
+  14-column budget, so shrinking it truncates content rather than reclaiming padding.
+
 ## 2026-08-01: Main and overlay q semantics are context-sensitive
 
 - Keep `q: quit` in the main footer and let `q` quit only from the main Browse view.

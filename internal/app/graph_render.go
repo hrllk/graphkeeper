@@ -153,7 +153,11 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 	} else {
 		title = renderGraphTitleWithAuthor(row.Commit.Author, row.Commit.Subject, searchQuery, rowWidth, cols, selected && graphActive)
 	}
-	line := hash + " " + refs + " " + status + graphCell + " " + title
+	when := ""
+	if cols.Date > 0 {
+		when = padRight(graphDateText(row.Commit.CommitDate), cols.Date) + " "
+	}
+	line := hash + " " + refs + " " + status + graphCell + " " + when + title
 	return fitVisibleWidth(line, rowWidth)
 }
 
@@ -229,7 +233,11 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		}
 		status += " "
 	}
-	line := hash + " " + refs + " " + status + graphCell + " " + title
+	when := ""
+	if cols.Date > 0 {
+		when = padRight(graphDateText(row.Commit.CommitDate), cols.Date) + " "
+	}
+	line := hash + " " + refs + " " + status + graphCell + " " + when + title
 	return fitVisibleWidth(line, rowWidth)
 }
 

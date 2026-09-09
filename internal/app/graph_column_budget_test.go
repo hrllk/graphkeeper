@@ -92,3 +92,82 @@ func TestHeaderAndRowsShareTheSameColumnWidths(t *testing.T) {
 		t.Fatalf("row is %d wide at 80: %q", lipgloss.Width(rendered), rendered)
 	}
 }
+
+// 11.9. The date column returns, on the terms 6.4 set: a column appears only
+// where the row can spare it. Measured against graphTitleMinimumWidth, the
+// repository's own floor, rather than a threshold invented for this feature.
+func TestDateColumnAppearsOnlyWhereTheTitleCanSpareIt(t *testing.T) {
+	rows := linearRows(10)
+	for _, tt := range []struct {
+		name    string
+		content int
+		want    bool
+	}{
+		{"60-column terminal", 27, false},
+		{"80-column terminal", 39, false},
+		{"100-column terminal", 50, true},
+		{"120-column terminal", 62, true},
+		{"180-column terminal", 96, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cols := measureGraphColumns(rows, tt.content, nil)
+			if got := cols.Date > 0; got != tt.want {
+				t.Fatalf("date column present = %v, want %v (content %d, title %d)",
+					got, tt.want, tt.content, tt.content-graphRowFixedWidth(cols))
+			}
+			if cols.Date > 0 {
+				if left := tt.content - graphRowFixedWidth(cols); left < graphTitleMinimumWidth {
+					t.Fatalf("date column left the title %d, below the %d floor", left, graphTitleMinimumWidth)
+				}
+			}
+		})
+	}
+}
+
+// yymmdd, six columns, fixed. A date that changed width row to row would break
+// the alignment the columns exist for, so an unreadable stamp becomes dashes
+// rather than blanks or a shorter string.
+func TestGraphDateTextIsAlwaysSixColumns(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"2026-09-08T23:15:16+09:00", "260908"},
+		{"2026-01-02T00:00:00Z", "260102"},
+		{"1999-12-31T23:59:59-08:00", "991231"},
+		{"", "------"},
+		{"not a date", "------"},
+		{"20xx-09-08T00:00:00Z", "------"},
+		{"2026-09", "------"},
+	} {
+		if got := graphDateText(tt.in); got != tt.want {
+			t.Fatalf("graphDateText(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+		if len(graphDateText(tt.in)) != graphDateWidth {
+			t.Fatalf("graphDateText(%q) is %d columns, want %d", tt.in, len(graphDateText(tt.in)), graphDateWidth)
+		}
+	}
+}
+
+// Both render paths and the header carry the date, or the columns disagree.
+// Only checking the compact path is how the raw path, which is what a real
+// repository takes, gets left behind.
+func TestDateColumnReachesBothRenderPathsAndTheHeader(t *testing.T) {
+	const content = 100
+	rows := linearRows(2)
+	rows[0].Commit.CommitDate = "2026-09-08T23:15:16+09:00"
+	raw := rows[0]
+	raw.Graph = "* "
+	compact := rows[0]
+	compact.Graph = ""
+	cols := measureGraphColumns(rows, content, nil)
+	if cols.Date == 0 {
+		t.Fatal("fixture width should hold a date column")
+	}
+	if header := renderGraphHeader(content, cols); !strings.Contains(header, "date") {
+		t.Fatalf("header lost the date column: %q", header)
+	}
+	for name, row := range map[string]graphRow{"raw path": raw, "compact path": compact} {
+		got := renderGraphLineWithSearch(row, false, true, 0, nil, cols, content, graphRowMarks{}, "")
+		if !strings.Contains(got, "260908") {
+			t.Fatalf("%s did not render the date: %q", name, got)
+		}
+	}
+}

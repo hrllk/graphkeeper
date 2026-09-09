@@ -32,7 +32,12 @@ const (
 type graphColumnWidths struct {
 	Topology int
 	Status   int // 0 when nothing in the graph carries a stash or a tag
+	Date     int // 0 when the row cannot spare the columns; see graphDateWidth
 }
+
+// graphDateWidth is yymmdd. Six columns, fixed, because a date that changes
+// width row to row would break the alignment the columns exist for.
+const graphDateWidth = 6
 
 // graphCols builds a layout from a topology width alone, keeping the status
 // column at its full budget. Callers that have measured the graph should use
@@ -46,6 +51,9 @@ func graphRowFixedWidth(cols graphColumnWidths) int {
 	fixed := graphCommitWidth + 1 + graphBranchFieldWidth + 1 + cols.Topology + 1
 	if cols.Status > 0 {
 		fixed += cols.Status + 1
+	}
+	if cols.Date > 0 {
+		fixed += cols.Date + 1
 	}
 	return fixed
 }
@@ -74,7 +82,51 @@ func measureGraphColumns(rows []graphRow, width int, stashCounts map[string]int)
 	if ceiling := graphTopologyCeiling(width); cols.Topology > ceiling {
 		cols.Topology = ceiling
 	}
+	cols.Date = graphDateColumnWidth(width, cols)
 	return cols
+}
+
+// graphDateColumnWidth gives the date its own column only where the row can
+// spare it, on the same terms as the state column: a column earns its space or
+// it is not there.
+//
+// Measured against graphTitleMinimumWidth, the repository's own floor, rather
+// than a number picked for this feature. After 6.4 the title has 2 columns at a
+// 60-column terminal, 14 at 80, 25 at 100. Spending 7 on a date leaves -5, 7 and
+// 18, so the column appears from 100 up and stays away below that, where the
+// Details panel carries the date instead.
+func graphDateColumnWidth(width int, cols graphColumnWidths) int {
+	without := cols
+	without.Date = 0
+	available := width - graphRowFixedWidth(without)
+	if available-(graphDateWidth+1) < graphTitleMinimumWidth {
+		return 0
+	}
+	return graphDateWidth
+}
+
+// graphDateText renders a strict ISO 8601 stamp as yymmdd. An unreadable or
+// missing stamp becomes dashes rather than blanks so the column still reads as
+// a column and the row stays aligned.
+func graphDateText(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) < 10 {
+		return strings.Repeat("-", graphDateWidth)
+	}
+	y, m, d := value[2:4], value[5:7], value[8:10]
+	if !isAllDigits(y) || !isAllDigits(m) || !isAllDigits(d) {
+		return strings.Repeat("-", graphDateWidth)
+	}
+	return y + m + d
+}
+
+func isAllDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 // graphTopologyCeiling keeps the old proportional formula as an upper bound, so
