@@ -305,9 +305,11 @@ func fitBranchField(value string, width int) string {
 	if lipgloss.Width(value) <= width {
 		return padRight(value, width)
 	}
+	// Reserve exactly what the marker costs. This used to subtract 3 for "...",
+	// and when the marker became one cell the field came out two columns short.
 	budget := width
-	if width >= 3 {
-		budget -= 3
+	if marker := lipgloss.Width(ellipsis); width >= marker {
+		budget -= marker
 	}
 	var b strings.Builder
 	visible := 0
@@ -319,8 +321,8 @@ func fitBranchField(value string, width int) string {
 		b.WriteRune(r)
 		visible += rw
 	}
-	if width >= 3 {
-		return b.String() + "..."
+	if width >= lipgloss.Width(ellipsis) {
+		return b.String() + ellipsis
 	}
 	return b.String()
 }
@@ -362,7 +364,7 @@ func compactWhenText(relative string) string {
 	}
 	parts := strings.Fields(relative)
 	if len(parts) < 2 {
-		return shorten(relative, 7)
+		return truncateText(relative, 7)
 	}
 	n := parts[0]
 	unit := parts[1]
@@ -382,7 +384,7 @@ func compactWhenText(relative string) string {
 	case strings.HasPrefix(unit, "week"):
 		return n + "w"
 	default:
-		return shorten(relative, 7)
+		return truncateText(relative, 7)
 	}
 }
 
@@ -391,11 +393,7 @@ func compactTitleText(subject string) string {
 	if subject == "" {
 		return "-"
 	}
-	runes := []rune(subject)
-	if len(runes) <= 20 {
-		return subject
-	}
-	return string(runes[:17]) + "..."
+	return truncateText(subject, 20)
 }
 
 func fitGraphTitle(value string, width int) string {
@@ -403,10 +401,7 @@ func fitGraphTitle(value string, width int) string {
 		return ""
 	}
 	if lipgloss.Width(value) > width {
-		if width <= 3 {
-			return fitVisibleWidth(value, width)
-		}
-		return fitVisibleWidth(value, width-3) + "..."
+		return truncateText(value, width)
 	}
 	return padRight(value, width)
 }

@@ -12,7 +12,10 @@ import (
 const (
 	tagHashColumnWidth = 7
 	tagNameColumnWidth = 10
-	tagAgeColumnWidth  = 3
+	// The compact tag title is its own field, sized independently of the tag
+	// list column above.
+	compactTagTitleWidth = 10
+	tagAgeColumnWidth    = 3
 )
 
 func (m model) renderSectionContent(section graphSection, width, height int) string {
@@ -94,7 +97,7 @@ func renderSectionProjection(p SectionProjection, section graphSection, tagSyncA
 }
 
 func renderStatusCompact(s state.Status) string {
-	msg := shorten(s.Message, 30)
+	msg := truncateText(s.Message, 30)
 	switch s.Mode {
 	case state.ModeBrowse:
 		return ok.Render("Browse") + " | " + msg
@@ -201,7 +204,7 @@ func formatTargetItem(t state.TargetItem) string {
 			source := renderTagProvenanceStateLabel(t.ProvenanceLoaded, t.OriginKnown, t.OnOrigin)
 			parts := []string{
 				padRight(shorten(t.CommitHash, 7), tagHashColumnWidth),
-				padRight(shorten(t.Name, 8), tagNameColumnWidth),
+				padRight(truncateText(t.Name, 8), tagNameColumnWidth),
 				padRight(compactWhenText(t.RelativeAge), tagAgeColumnWidth),
 				source,
 			}
@@ -263,20 +266,12 @@ func formatSectionTargetItem(t state.TargetItem, width int) string {
 
 func compactTagTitleText(name string) string {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return strings.Repeat(" ", 10)
-	}
-	if len(name) > 7 {
-		return shorten(name, 7) + "..."
-	}
-	if len(name) < 10 {
-		return name + strings.Repeat(" ", 10-len(name))
-	}
-	return name
+	// Width, not len: a byte count pads a multibyte name into the next column.
+	return padRight(truncateText(name, compactTagTitleWidth), compactTagTitleWidth)
 }
 
 func formatSectionBranchTarget(prefix, name string, width int, current, dirty, needsPull, needsPush, noUpstream, conflicted bool) string {
-	base := prefix + shorten(name, max(width-lipgloss.Width(prefix), 4))
+	base := prefix + truncateText(name, max(width-lipgloss.Width(prefix), 4))
 	var label string
 	if current {
 		label = headMark.Render(base)

@@ -101,7 +101,7 @@ func renderCherryPickTargetRow(target state.TargetItem, selected bool, selectedS
 		padRight(shorten(target.CommitHash, 7), 8),
 		padRight(compactAuthorText(target.Author), 7),
 		padRight(compactWhenText(target.RelativeAge), 7),
-		shorten(target.Subject, max(width-40, 12)),
+		truncateText(target.Subject, max(width-40, 12)),
 	}
 	return strings.Join(parts, "  ")
 }

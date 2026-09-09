@@ -16,7 +16,7 @@ func stashSummaryLines(entries []git.StashEntry, width int) []string {
 		if entry.Subject != "" {
 			label = fmt.Sprintf("%s - %s", entry.Ref, entry.Subject)
 		}
-		lines = append(lines, "  - "+shorten(label, max(width-4, 0)))
+		lines = append(lines, "  - "+truncateText(label, max(width-4, 0)))
 	}
 	return lines
 }

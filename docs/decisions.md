@@ -326,3 +326,26 @@ Superseded on 2026-08-01 by the topology/status-column decision above.
   사용하지 않는다.
 - Diff의 context/일반 코드는 기본 foreground를 사용해 과도하게 어두워지지 않게
   하고, added/removed semantic color는 유지한다.
+
+## 2026-09-10 — 축약 마커는 하나다 (task 6.6, D-007)
+
+앱에는 축약 방식이 네 가지 있었다. `fitVisibleWidth`(마커 없이 하드컷),
+`shorten`(마커 없이 **바이트** 슬라이스), `truncateInspector`(`…`), 그리고
+네 곳에 흩어진 리터럴 `"..."`. 같은 화면 안에서 세 가지가 동시에 보였다.
+
+**결정.** 마커는 `…` 하나다(`helpers.go`의 `ellipsis`). 넘칠 수 있는 텍스트는
+전부 `truncateText`를 통과한다. `shorten`은 **커밋 해시 축약 전용**으로 좁힌다.
+7자 해시가 더 긴 것의 앞부분이라는 건 독자가 이미 아는 관습이므로 마커가 필요
+없지만, 브랜치 이름을 말없이 자르면 짧아진 이름이 아니라 *다른* 이름으로 읽힌다.
+
+**같이 고친 것:**
+
+- `shorten`이 바이트를 잘랐다. `shorten("한글제목입니다", 8)`는
+  `"한글\xec\xa0"`을 돌려줬다 — 깨진 UTF-8. 이제 rune을 센다.
+- `fitBranchField`가 `"..."` 몫으로 3칸을 예약했다. 마커가 1칸이 되면서 필드가
+  2칸 짧게 렌더됐다. 예약량을 마커 폭에서 파생시킨다.
+- `compactTagTitleText`가 필드는 10칸인데 7자에서 잘랐다. 마커가 1칸이므로
+  이제 9자가 들어간다. 패딩도 `len`(바이트)에서 `padRight`(폭)로 바꿨다.
+- 팝업의 세로 "더 있음" 표시도 같은 글리프를 쓴다.
+
+DESIGN.md "Truncation uses a visible marker"의 구현이다.

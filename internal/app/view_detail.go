@@ -86,7 +86,7 @@ func (m model) renderContextInfoLines(width int) []string {
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("target"), shorten(entry.CommitHash, 8)))
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("age"), compactWhenText(entry.RelativeAge)))
 				if message := strings.TrimSpace(entry.Message); message != "" {
-					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("message"), shorten(message, max(width-9, 0))))
+					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("message"), truncateText(message, max(width-9, 0))))
 				} else {
 					lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("message"), "-"))
 				}
@@ -321,8 +321,8 @@ func (m model) renderDetailContent(width, height int) string {
 	lines = append(lines, "")
 
 	lines = append(lines, title.Render("Repo"))
-	lines = append(lines, fmt.Sprintf("branch: %-12s • head: %s", shorten(m.repoStatus.Branch, 10), shorten(m.repoStatus.Head, 7)))
-	lines = append(lines, fmt.Sprintf("upstream: %-10s • remote: %s", shorten(emptyDash(m.repoStatus.Upstream), 10), shorten(emptyDash(m.repoStatus.Remote), 10)))
+	lines = append(lines, fmt.Sprintf("branch: %-12s • head: %s", truncateText(m.repoStatus.Branch, 10), shorten(m.repoStatus.Head, 7)))
+	lines = append(lines, fmt.Sprintf("upstream: %-10s • remote: %s", truncateText(emptyDash(m.repoStatus.Upstream), 10), truncateText(emptyDash(m.repoStatus.Remote), 10)))
 
 	focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 	if focus.Hash != "" {
@@ -342,7 +342,7 @@ func (m model) renderDetailContent(width, height int) string {
 	}
 	lines = append(lines, fmt.Sprintf("active: %s", sectionName(m.activeSection)))
 	if m.status.Selected != "" {
-		lines = append(lines, fmt.Sprintf("select: %s", shorten(m.status.Selected, width-2)))
+		lines = append(lines, fmt.Sprintf("select: %s", truncateText(m.status.Selected, width-2)))
 	}
 	if m.branchOpen {
 		lines = append(lines, fmt.Sprintf("new br: %s (base: %s)", m.branchDraft, shorten(m.branchBase, 7)))

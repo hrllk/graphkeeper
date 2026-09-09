@@ -753,7 +753,7 @@
             "title": "축약·footer·선 문자 어휘 통일",
             "description": "화면마다 세 갈래로 갈린 truncation, footer, line 문자 관습을 하나로 모은다.",
             "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-007: 축약이 세 가지다. graph 제목은 '...'(chore(ta...), Details와 Inspector는 '…'(… +2 hidden, …/tasks.json), rail은 마커 없는 하드 컷이다(o->main (default, No local tags fo, Press F to sync tag pr). 하드 컷은 닫는 괄호를 소리 없이 떨어뜨려 짧아진 게 아니라 깨진 것처럼 읽힌다. 공통 truncate helper 하나로 '…' 단일 관습을 적용한다. D-008: footer도 세 가지다. 메인은 'tab: switch · k/j: updown · q: quit · ?: hotkeys'(한 줄, 가운뎃점 구분), Inspector는 'Esc back   ? help'(공백 구분, 콜론 없음), 팝업은 'enter: create'와 'esc: close'를 두 줄 가운데 정렬한다. task 1.5(공통 overlay footer와 q/esc 키 계약), 1.6(Main hotkey footer와 shared registry), 1.23/1.24(modal footer 계약)가 전부 done인데 어휘가 통일되지 않았다. 기존 shared registry를 실제 단일 출처로 만들고 세 화면이 같은 렌더러를 쓰게 한다. D-011: 박스 테두리는 유니코드 box-drawing(│ ╭ ╰ ─)이고 graph lane은 ASCII(|, |\\)다. 머지 구간에서 얇은 ASCII lane이 굵은 유니코드 테두리 옆에 놓이면 디자인 선택이 아니라 렌더링 오류처럼 읽힌다. DESIGN.md의 'Precise'와 어긋난다. 한쪽 어휘로 통일하되 ASCII fallback 조건을 명시한다. 완료 기준: 세 화면의 footer가 같은 렌더러를 거치고, 축약이 전부 '…'이며, 선 문자 어휘가 단일하고 focused/full test, vet, build, gofmt/diff-check CLEAN. [2026-09-09 추가] Details 패널의 date:(graph 섹션, task 11.2)와 age:(tags 섹션, view_detail.go:78) 이원화도 이 어휘 통일 범위에 든다. task 11 은 두 라벨만 쓰고 세 번째 변종을 만들지 않는 선까지만 지킨다.",
-            "status": "pending",
+            "status": "in-progress",
             "dependencies": [
               "6.2"
             ],

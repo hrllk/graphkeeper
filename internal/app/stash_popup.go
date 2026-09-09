@@ -216,7 +216,7 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	}
 
 	if start > 0 {
-		lines = append(lines, muted.Render("..."))
+		lines = append(lines, muted.Render(ellipsis))
 	}
 
 	for _, row := range rows[start:end] {
@@ -224,7 +224,7 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 	}
 
 	if end < len(rows) {
-		lines = append(lines, muted.Render("..."))
+		lines = append(lines, muted.Render(ellipsis))
 	}
 	lines = append(lines, "")
 	lines = append(lines, helpStyle.Render("enter: jump"), renderPopupFooter(popupWidth-4))
@@ -302,14 +302,15 @@ func renderGraphStashPopPopup(m model, bodyWidth, bodyHeight int) string {
 				start = 0
 			}
 		}
+		// Same marker as a truncated string: content continues past this edge.
 		if start > 0 {
-			lines = append(lines, muted.Render("..."))
+			lines = append(lines, muted.Render(ellipsis))
 		}
 		for i := start; i < end; i++ {
 			lines = append(lines, renderStashPopupEntry(m.graphStashPopEntries[i], i == m.graphStashPopCursor, popupWidth-4))
 		}
 		if end < len(m.graphStashPopEntries) {
-			lines = append(lines, muted.Render("..."))
+			lines = append(lines, muted.Render(ellipsis))
 		}
 		lines = append(lines, "")
 		lines = append(lines, helpStyle.Render("enter: choose"))
@@ -349,7 +350,7 @@ func renderStashPopupEntry(entry git.StashEntry, selected bool, width int) strin
 		muted.Render(entry.Ref),
 	}
 	if entry.Subject != "" {
-		parts = append(parts, shorten(entry.Subject, 20))
+		parts = append(parts, truncateText(entry.Subject, 20))
 	}
 	label := strings.Join(parts, "  ")
 	label = fitVisibleWidth(label, width-2)

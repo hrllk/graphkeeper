@@ -850,7 +850,7 @@ func TestRenderGraphContentUsesDateAndLongTitle(t *testing.T) {
 	if !strings.Contains(got, "Merge branch 'main' into develop") {
 		t.Fatalf("expected the title to keep the width left after the date, got %q", got)
 	}
-	if !strings.Contains(got, "...") {
+	if !strings.Contains(got, ellipsis) {
 		t.Fatalf("expected the date column to cost this long title its tail, got %q", got)
 	}
 }
@@ -3048,8 +3048,10 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if compactWhenText("1 second ago") != "1s" {
 		t.Fatalf("expected second unit to compact to 1s")
 	}
-	if compactTitleText("Merge branch 'main' into develop") != "Merge branch 'mai..." {
-		t.Fatalf("expected title to compact to 20 chars")
+	// One marker across the app now: "…", not "...". compactTitleText clamps to
+	// 20 cells, so 19 of the subject plus the marker.
+	if got := compactTitleText("Merge branch 'main' into develop"); got != "Merge branch 'main'…" {
+		t.Fatalf("expected the title compacted to 20 cells with the shared marker, got %q", got)
 	}
 	if !strings.Contains(formatTargetItem(state.TargetItem{Kind: state.TargetKindRemote, Name: "origin/HEAD", Ref: "origin/HEAD", Default: true}), "origin/HEAD") {
 		t.Fatalf("expected origin/HEAD to stay visible in the remote section")
@@ -3218,8 +3220,17 @@ func TestCompactTagTitleText(t *testing.T) {
 	if got := compactTagTitleText("abcdefg"); got != "abcdefg   " {
 		t.Fatalf("expected 7-char tag names to pad to 10 chars, got %q", got)
 	}
-	if got := compactTagTitleText("abcdefgh"); got != "abcdefg..." {
-		t.Fatalf("expected long tag names to truncate to 7 chars plus ellipsis, got %q", got)
+	// The field is 10 wide. The old code cut at 7 because "..." cost three
+	// cells; the shared marker costs one, so nine characters now fit.
+	if got := compactTagTitleText("abcdefgh"); got != "abcdefgh  " {
+		t.Fatalf("expected an 8-char tag name to fit the 10-wide field, got %q", got)
+	}
+	if got := compactTagTitleText("abcdefghijkl"); got != "abcdefghi"+ellipsis {
+		t.Fatalf("expected an overlong tag name to keep 9 chars and mark the cut, got %q", got)
+	}
+	// Byte-length padding put a multibyte name one column into the next field.
+	if got := compactTagTitleText("한글태그"); lipgloss.Width(got) != compactTagTitleWidth {
+		t.Fatalf("expected a multibyte tag name to pad to %d cells, got %q at %d", compactTagTitleWidth, got, lipgloss.Width(got))
 	}
 }
 

@@ -328,7 +328,7 @@ func renderBranchInputPopup(m model, bodyWidth int) string {
 		descStyle.Render("Enter a branch name."),
 		"",
 		descStyle.Render("name: " + draft),
-		descStyle.Render("base: " + shorten(base, 24)),
+		descStyle.Render("base: " + truncateText(base, 24)),
 	}
 	if m.branchError != "" {
 		lines = append(lines, "")
