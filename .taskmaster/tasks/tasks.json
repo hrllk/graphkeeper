@@ -680,7 +680,7 @@
         "description": "디자인 감사에서 확인된 레이아웃·색·상호작용 계약 결함을 정리한다.",
         "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md. 2026-08-28 commit 4d8fcbc 기준으로 실제 바이너리를 tmux에서 40/60/72/74/76/78/80/100/120/180 컬럼과 NO_COLOR=1로 렌더해 수집한 21개 발견(high 6, medium 7, polish 5, design-system 3)을 담는다. Design Score D+, AI Slop Score A-. 핵심 구도: Commit Inspector(task 1.20-1.26)는 40/60/80 전 폭에서 정상 렌더되지만 메인 Graph 화면(task 1.2-1.3)은 80컬럼 미만에서 넘치고 잘린다. 두 화면의 수준 차이를 메우는 것이 이 task의 목표다. 잘 되고 있는 것은 건드리지 않는다: 72:28 graph/rail 분할은 DESIGN.md와 일치하고, truecolor/256색 출현이 0건이며, (dirty)/o->/HEAD green/hash yellow는 컬러맵과 맞고, diff 행번호는 tabular pair로 정확하다. AI slop 패턴은 없다. 전역 layout 재설계와 새로운 UI framework 도입은 범위 밖이다.",
         "testStrategy": "",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -780,8 +780,8 @@
             "id": 8,
             "title": "카피·정보 우선순위 polish",
             "description": "내부 어휘 노출, 좁은 폭에서의 우선순위 역전, FROM 라벨 비대칭을 정리한다.",
-            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-014: Hidden Hotkeys가 'Visible:'과 'Conditional:'을 사용자 대면 카테고리 라벨로 노출한다. 무엇에 대한 conditional인지 알 수 없어 사용자가 행동할 수 없다. 조건을 명시하거나(needs upstream, needs a remote) 구분을 제거한다. '•' bullet은 의미를 담지 않으면서 매 행 2칸을 쓰므로 DESIGN.md의 'Decoration level: Minimal'에 맞춰 재검토한다. D-016: Commit Inspector가 40컬럼에서 첫 행을 'COMMIT 4d8fcbcc16d09a9d81…'에 쓴다. 34자로 잘린 해시는 identity로 쓸 수 없다. 세 번째 행은 'author: hrllk <heykia3@protonmail.c…'로 이메일 도메인이 잘린다. 정작 커밋 메시지는 그 아래에서 잘린다. decisions.md 2026-08-03 결정('저높이 화면은 commit identity·selected path·FROM/TO·최소 diff·복귀 키를 우선')의 취지에 맞게 좁은 폭에서는 short hash를 쓰고 이메일을 뺀다. D-018: commit_inspector_screen.go:64가 author 행 뒤에 '  FROM ' + snapshot.Parent를 덧붙인다. 대응하는 TO가 없고, author와 이메일이 이미 있는 행에 얹혀서 가장 먼저 잘린다(FROM 26d88da2e637d357253d8f67fec873…). commit_inspector.go:142-144도 같은 구조다. TO와 짝을 맞추거나 parent: 라벨로 바꿔 다른 header 행과 같은 key/value 처리를 준다. header가 COMMIT만 대문자 표제이고 message:/author:/path:는 소문자 key/value인 것도 함께 정리한다. 완료 기준: 40컬럼에서 커밋 메시지가 해시·이메일보다 먼저 확보되고, hotkey help에 내부 어휘가 없으며 focused/full test, vet, build, gofmt/diff-check CLEAN. [2026-09-09 / ceo-review C-1,C-2] 범위 이전과 순서 선호. (1) 범위 이전: D-018 이 소유하던 'author 행의 FROM 꼬리 제거'를 task 11.5 가 가져간다. 헤더가 이미 넘치는 상태에서 date: 행을 얹으려면 꼬리를 먼저 떼야 하기 때문이다. 따라서 6.8 에 남는 것은 parent: 행을 만들지 말지의 결정, COMMIT 대문자 표제와 소문자 key/value 통일, 40컬럼 카피 우선순위다. 6.8 을 집을 때 FROM 꼬리가 이미 사라져 있으면 잘못 읽은 것이 아니라 11.5 가 처리한 것이다. (2) 순서 선호(의존 아님): 11.5 뒤에 가는 것이 싸다 — 11.5 가 꼬리 제거와 inspectorBodyRows chrome 파생을 이미 해두므로 6.8 은 카피 정리만 남는다. 다만 6.8 은 11.5 없이도 시작할 수 있으므로 dependencies 에는 넣지 않는다. 하드 의존으로 걸면 11.5 가 미뤄질 때 디자인 백로그가 이유 없이 막힌다.",
-            "status": "in-progress",
+            "details": "감사 리포트: ~/.gstack/projects/hrllk-graphkeeper/designs/design-audit-20260828/design-audit-graphkeeper.md (2026-08-28, commit 4d8fcbc, tmux 40/60/72/74/76/78/80/100/120/180 컬럼 + NO_COLOR=1 실측). D-014: Hidden Hotkeys가 'Visible:'과 'Conditional:'을 사용자 대면 카테고리 라벨로 노출한다. 무엇에 대한 conditional인지 알 수 없어 사용자가 행동할 수 없다. 조건을 명시하거나(needs upstream, needs a remote) 구분을 제거한다. '•' bullet은 의미를 담지 않으면서 매 행 2칸을 쓰므로 DESIGN.md의 'Decoration level: Minimal'에 맞춰 재검토한다. D-016: Commit Inspector가 40컬럼에서 첫 행을 'COMMIT 4d8fcbcc16d09a9d81…'에 쓴다. 34자로 잘린 해시는 identity로 쓸 수 없다. 세 번째 행은 'author: hrllk <heykia3@protonmail.c…'로 이메일 도메인이 잘린다. 정작 커밋 메시지는 그 아래에서 잘린다. decisions.md 2026-08-03 결정('저높이 화면은 commit identity·selected path·FROM/TO·최소 diff·복귀 키를 우선')의 취지에 맞게 좁은 폭에서는 short hash를 쓰고 이메일을 뺀다. D-018: commit_inspector_screen.go:64가 author 행 뒤에 '  FROM ' + snapshot.Parent를 덧붙인다. 대응하는 TO가 없고, author와 이메일이 이미 있는 행에 얹혀서 가장 먼저 잘린다(FROM 26d88da2e637d357253d8f67fec873…). commit_inspector.go:142-144도 같은 구조다. TO와 짝을 맞추거나 parent: 라벨로 바꿔 다른 header 행과 같은 key/value 처리를 준다. header가 COMMIT만 대문자 표제이고 message:/author:/path:는 소문자 key/value인 것도 함께 정리한다. 완료 기준: 40컬럼에서 커밋 메시지가 해시·이메일보다 먼저 확보되고, hotkey help에 내부 어휘가 없으며 focused/full test, vet, build, gofmt/diff-check CLEAN. [2026-09-09 / ceo-review C-1,C-2] 범위 이전과 순서 선호. (1) 범위 이전: D-018 이 소유하던 'author 행의 FROM 꼬리 제거'를 task 11.5 가 가져간다. 헤더가 이미 넘치는 상태에서 date: 행을 얹으려면 꼬리를 먼저 떼야 하기 때문이다. 따라서 6.8 에 남는 것은 parent: 행을 만들지 말지의 결정, COMMIT 대문자 표제와 소문자 key/value 통일, 40컬럼 카피 우선순위다. 6.8 을 집을 때 FROM 꼬리가 이미 사라져 있으면 잘못 읽은 것이 아니라 11.5 가 처리한 것이다. (2) 순서 선호(의존 아님): 11.5 뒤에 가는 것이 싸다 — 11.5 가 꼬리 제거와 inspectorBodyRows chrome 파생을 이미 해두므로 6.8 은 카피 정리만 남는다. 다만 6.8 은 11.5 없이도 시작할 수 있으므로 dependencies 에는 넣지 않는다. 하드 의존으로 걸면 11.5 가 미뤄질 때 디자인 백로그가 이유 없이 막힌다.\n\n2026-09-10 done. 감사 수치를 재측정했더니 더 나빴다 - parent 해시가 40컬럼이 아니라 80컬럼에서도 잘렸다. D-016/D-018: inspector_header.go 가 카피 결정을 소유하고 screen·popup 두 경로가 각자 fitting 만 한다(둘이 이미 서로 달랐다 - screen 은 'COMMIT <40자>'+이메일+FROM 꼬리, popup 은 'commit: <hash>'). 해시는 통째로 아니면 짧게, 절대 잘라서 쓰지 않는다(screenStampText 와 같은 계단: 전체/12/7/생략). 이메일은 이름보다 먼저 빠진다 - 잘린 도메인은 짧아진 주소가 아니라 틀린 주소. parent 는 자기 행을 갖고 root 는 'parent: (root commit)' 로 말한다. withDates boolean 대신 우선순위 사다리 - committed -> date -> parent 까지만 버리고 멈춘다. diff 가 한 행 얻는 즉시 멈추므로 높이 11 에서 parent 가 남는다(이전 all-or-none 은 감당 가능한 행을 버렸다). D-014: Visible/Conditional/Common/Moved out 라벨 넷이 전부 내부 어휘였다. 앱이 키를 누른 순간 이유를 이미 말하므로 분류는 그룹당 한 행짜리 장식이었다. 섹션당 평평한 목록으로 바꿔 팝업 52->40컬럼. 불릿은 D-008 의 공용 마커이므로 남긴다. 부수 결함 셋 - (1) renderCommitInspectorScreen 이 크기를 인자와 m.width 두 곳에서 받아, 어긋나면 스크롤 클램프와 렌더러가 행 수를 다르게 세어 마지막 diff 줄에 닿을 수 없었다(T8 회귀와 같은 부류). 인자를 없앴다. (2) 'M' assertion 이 수정파일 마커가 아니라 'FROM' 의 M 을 매칭하고 있었다. (3) Graph 목록이 그 섹션에서 아무 핸들러에도 닿지 않는 p/a 를 광고했다. 커밋 bddfca8, 4b53f90.",
+            "status": "done",
             "dependencies": [
               "6.7"
             ],
@@ -1447,7 +1447,7 @@
         "title": "디자인 리뷰 파생 (5.x / 6.x)",
         "description": "외부 디자인 리뷰가 도출한 항목. 2026-08-29 에 우선순위와 함께 공유됨. taskmaster 에 없던 것을 등록한다 — 5.4 와 6.3 은 추적 없이 진행됐다. 6.6~6.8 은 의존 그래프에만 있고 내용이 공유되지 않았다.",
         "details": "의존: 5.4 -> (6.2 -> 6.4, 6.3, 6.1 -> 6.5) -> 6.6 -> 6.7 -> 6.8. 5.3 은 6.x 와 독립.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": [
@@ -1552,8 +1552,8 @@
             "taskId": "6.8",
             "title": "6.8 (내용 미공유)",
             "description": "6.6 과 동일.",
-            "details": "",
-            "status": "in-progress",
+            "details": "\n\n2026-09-10 done. 감사 수치를 재측정했더니 더 나빴다 - parent 해시가 40컬럼이 아니라 80컬럼에서도 잘렸다. D-016/D-018: inspector_header.go 가 카피 결정을 소유하고 screen·popup 두 경로가 각자 fitting 만 한다(둘이 이미 서로 달랐다 - screen 은 'COMMIT <40자>'+이메일+FROM 꼬리, popup 은 'commit: <hash>'). 해시는 통째로 아니면 짧게, 절대 잘라서 쓰지 않는다(screenStampText 와 같은 계단: 전체/12/7/생략). 이메일은 이름보다 먼저 빠진다 - 잘린 도메인은 짧아진 주소가 아니라 틀린 주소. parent 는 자기 행을 갖고 root 는 'parent: (root commit)' 로 말한다. withDates boolean 대신 우선순위 사다리 - committed -> date -> parent 까지만 버리고 멈춘다. diff 가 한 행 얻는 즉시 멈추므로 높이 11 에서 parent 가 남는다(이전 all-or-none 은 감당 가능한 행을 버렸다). D-014: Visible/Conditional/Common/Moved out 라벨 넷이 전부 내부 어휘였다. 앱이 키를 누른 순간 이유를 이미 말하므로 분류는 그룹당 한 행짜리 장식이었다. 섹션당 평평한 목록으로 바꿔 팝업 52->40컬럼. 불릿은 D-008 의 공용 마커이므로 남긴다. 부수 결함 셋 - (1) renderCommitInspectorScreen 이 크기를 인자와 m.width 두 곳에서 받아, 어긋나면 스크롤 클램프와 렌더러가 행 수를 다르게 세어 마지막 diff 줄에 닿을 수 없었다(T8 회귀와 같은 부류). 인자를 없앴다. (2) 'M' assertion 이 수정파일 마커가 아니라 'FROM' 의 M 을 매칭하고 있었다. (3) Graph 목록이 그 섹션에서 아무 핸들러에도 닿지 않는 p/a 를 광고했다. 커밋 bddfca8, 4b53f90.",
+            "status": "done",
             "priority": "P3",
             "dependencies": [],
             "parentTaskId": "10",
@@ -1764,6 +1764,38 @@
             "parentTaskId": "11",
             "parentId": "undefined",
             "updatedAt": "2026-09-08"
+          }
+        ]
+      },
+      {
+        "id": "12",
+        "title": "6.6~6.8 작업 중 드러난 발견",
+        "status": "pending",
+        "priority": "medium",
+        "description": "어휘·팝업·Inspector 정리 과정에서 증명됐지만 그 task 의 범위가 아니었던 항목들.",
+        "dependencies": [],
+        "details": "각 항목은 재현 근거와 함께 서브태스크에 기록한다.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "renderCommitInspectorPopup 은 프로덕션 호출부가 없다",
+            "status": "pending",
+            "dependencies": [],
+            "details": "grep 결과 view_shell.go 는 renderCommitInspectorScreen 만 호출한다. renderCommitInspectorPopup 은 자기 테스트로만 살아 있다. renderRawGraphLine 선례(발견 즉시 삭제)에 따라 지우는 것이 맞아 보이나, 그 테스트가 inspectorStatus·truncateInspector 등 살아 있는 헬퍼를 함께 덮고 있어 삭제 전에 커버리지 이전이 필요하다. 6.8 에서 카피 정합만 맞춰두고 삭제는 미뤘다."
+          },
+          {
+            "id": 2,
+            "title": "Inspector 파일 트리가 단일 파일의 상태 글리프를 '?' 로 그린다",
+            "status": "pending",
+            "dependencies": [],
+            "details": "TestCommitInspectorRendersBorderedTreeAndUnifiedRows 픽스처는 Status \"M\" 파일 하나를 주는데 트리는 '>   ? ../../main.go' 를 그린다. inspectorStatus(\"M\") 은 \"M\" 을 돌려주므로, 트리가 잎이 아니라 접힌 조상 노드를 그리는 것으로 보인다. 이 결함이 여태 안 잡힌 이유는 테스트가 검사하던 \"M\" 이 실은 'FROM' 의 M 이었기 때문이다(6.8 에서 꼬리가 사라지며 드러남). 12.1 이 렌더러를 지우기로 하면 함께 사라진다."
+          },
+          {
+            "id": 3,
+            "title": "screenHeaderFor 의 행 수가 폭에 의존한다",
+            "status": "pending",
+            "dependencies": [],
+            "details": "screenStampText 와 screenHashText 는 예산이 부족하면 빈 문자열을 돌려주고, 그러면 그 행이 사라진다. 즉 헤더 행 수가 innerWidth 에 따라 달라진다. 6.8 에서 renderCommitInspectorScreen 의 크기 인자를 없애 렌더러와 클램프가 같은 폭을 보게 했으므로 지금은 안전하지만, 폭을 따로 넘기는 호출자가 다시 생기면 같은 부류의 어긋남이 돌아온다. 행 수를 폭과 무관하게 만들지, 아니면 폭을 인자로 받는 inspectorBodyRowCount(width) 로 갈지 결정이 필요하다."
           }
         ]
       }
