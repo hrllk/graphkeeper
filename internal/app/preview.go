@@ -52,7 +52,7 @@ func buildRebasePreview(target string, currentOnly, targetOnly int) state.Status
 	case targetOnly == 0:
 		return state.New().WithOutcome(state.ActionRebase, "Target is already in this history.", "Replaying onto "+target+" would rewrite commits this branch already contains. "+countDetail(currentOnly, targetOnly), false)
 	default:
-		return state.New().WithOutcome(state.ActionRebase, "Rebase onto target.", countDetail(currentOnly, targetOnly)+"  |  target: "+target, true)
+		return state.New().WithOutcome(state.ActionRebase, "Rebase onto target.", countDetail(currentOnly, targetOnly)+" · target: "+target, true)
 	}
 }
 

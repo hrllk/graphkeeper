@@ -37,7 +37,11 @@ func TestSeparatorGlyphsKeepTheirPositions(t *testing.T) {
 		case strings.TrimSpace(value) == "·":
 			// A literal that is only the joiner is a strings.Join separator. By
 			// construction it never starts a line.
-		case strings.HasPrefix(strings.TrimLeft(value, " \n"), "·"):
+		case strings.HasPrefix(value, " "):
+			// A leading space means the literal is a fragment concatenated onto
+			// what sits to its left, so it joins by construction. Line-leading
+			// indentation carries a bullet, never a join.
+		case strings.HasPrefix(value, "·"):
 			t.Errorf("%s: \"·\" joins within a line and cannot start one -- use \"•\": %q", lit.where, value)
 		}
 	}
@@ -55,6 +59,27 @@ func TestTruncationMarkerIsNotSpelledOut(t *testing.T) {
 	for _, lit := range appStringLiterals(t) {
 		if lit.value == "..." {
 			t.Errorf("%s: append the shared ellipsis constant, not a literal \"...\"", lit.where)
+		}
+	}
+}
+
+// The app draws with two line vocabularies on purpose. Box-drawing characters
+// frame the app -- rounded borders, the "│" pane split, the "─" rule -- and
+// ASCII draws repository history, because "*", "|", "/" and "\\" are git's own
+// topology notation and the diagonal box-drawing characters are not reliably
+// monospaced anyway.
+//
+// The rule is that neither vocabulary takes the other's job. An ASCII "|" used
+// as a field separator is the case that broke it: the status line spelled the
+// same "join these on one line" idea a third way, next to a real "│" pane split
+// and a real graph lane. Graph lanes arrive from git at runtime, never as a
+// literal here, so this check cannot reach them.
+//
+// See docs/decisions.md 2026-09-10 (task 6.6, D-011).
+func TestAsciiPipeIsNotAFieldSeparator(t *testing.T) {
+	for _, lit := range appStringLiterals(t) {
+		if strings.Contains(lit.value, " | ") {
+			t.Errorf("%s: separators within a line are \"·\"; box drawing frames, ASCII draws history: %q", lit.where, lit.value)
 		}
 	}
 }

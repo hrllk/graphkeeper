@@ -75,10 +75,30 @@ implementation, used by both the graph and the right rail.
 ## Density and spacing
 
 - Compact, not cramped. A cell earns its columns or it is not drawn.
-- Truncation uses a visible marker. A silently hard-cut string reads as broken
-  rather than shortened.
-- One separator convention per surface. Popups name their own keys; `esc` closes
-  everything and is not advertised on a second row.
+- Truncation uses a visible marker, and there is exactly one: `…`. A silently
+  hard-cut string reads as broken rather than shortened. The single exception is
+  a commit hash, which a reader already reads as an abbreviation.
+- Popups name their own keys; `esc` closes everything and is not advertised on a
+  second row.
+
+## Line vocabulary
+
+Two glyphs, told apart by position:
+
+| Glyph | Position | Meaning |
+|---|---|---|
+| `•` | starts a line (indentation allowed) | one list item |
+| `·` | within a line | joins peers on that line |
+
+And two drawing vocabularies, which never take each other's job:
+
+| Vocabulary | Draws |
+|---|---|
+| box drawing (`╭─│╰`) | the app's frame -- borders, pane splits, rules |
+| ASCII (`* \| / \\`) | repository history, because that is git's own topology notation |
+
+`internal/app/vocabulary_test.go` enforces both by walking the package's string
+literals. See `docs/decisions.md` 2026-09-10.
 
 ## Motion
 
@@ -127,4 +147,5 @@ app emits, and code that uses them is a defect.
 | 2026-07-06 | Initial design system created | Based on stash-graph inspection goals, Git TUI research, and the shell layout at the time. |
 | 2026-08-01 | alpha.5/alpha.6 shell redesign | The `3:7 top split for global/context` this file used to describe was removed. Graph became the full-height primary surface with a stacked right rail; the `Global` and `Context Actions` panels moved into the `?` overlay. See `docs/decisions.md` 2026-08-01. |
 | 2026-09-10 | Terminal and preview sections separated; Color rewritten as the ANSI contract | This file specified a hex palette while the code emits ANSI 0-15 only, and `CLAUDE.md` directs the agent here before every visual decision. Measured: the rendered shell emits zero `38;2` and zero `38;5` sequences. Typography, radius and easing moved under preview because a terminal cannot honour them. Task 6.1. |
+| 2026-09-10 | One truncation marker, and one job per line glyph | The app had four truncation conventions and two glyphs doing four separator jobs; three could appear on one screen. Now `…` marks every cut, `•` starts a line, `·` joins within one, box drawing frames and ASCII draws history. Enforced by a test, not a convention. Task 6.6. |
 | 2026-09-10 | Graph row columns are measured, not budgeted for the worst case | State, graph and date size from the graph's actual content; the title takes the remainder. See `docs/decisions.md` 2026-09-10. Task 6.4, 11.9. |

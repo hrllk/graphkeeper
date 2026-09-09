@@ -100,17 +100,17 @@ func renderStatusCompact(s state.Status) string {
 	msg := truncateText(s.Message, 30)
 	switch s.Mode {
 	case state.ModeBrowse:
-		return ok.Render("Browse") + " | " + msg
+		return ok.Render("Browse") + " · " + msg
 	case state.ModeLoading:
-		return accent.Render("Loading") + " | " + msg
+		return accent.Render("Loading") + " · " + msg
 	case state.ModeCherryPickPick:
-		return ok.Render("Cherry-pick") + " | " + msg
+		return ok.Render("Cherry-pick") + " · " + msg
 	case state.ModeResetModePick:
 		return ok.Render("Reset")
 	case state.ModeBlocked:
-		return warn.Render("Blocked") + " | " + msg
+		return warn.Render("Blocked") + " · " + msg
 	case state.ModeOperationResult:
-		return ok.Render("Result") + " | " + msg
+		return ok.Render("Result") + " · " + msg
 	default:
 		return msg
 	}
