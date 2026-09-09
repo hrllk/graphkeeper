@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-
 	"hrllk/graphkeeper/internal/git"
 	"hrllk/graphkeeper/internal/state"
 )
@@ -13,9 +11,7 @@ import (
 func renderCherryPickPopup(m model, bodyWidth int) string {
 	graphWidth := graphBoxWidthForBodyWidth(bodyWidth)
 	graphHeight := graphBoxHeightForModel(&m)
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(0, 1).
 		Width(graphWidth).
 		Height(graphHeight)

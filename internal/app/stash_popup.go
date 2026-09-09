@@ -163,12 +163,10 @@ func stashEmptyStateLines(m model) []string {
 }
 
 func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	descStyle := popupBody
+	helpStyle := popupHelp
 	popupWidth := popupWidthForBody(bodyWidth, 44, 76)
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidth).
 		Align(lipgloss.Left)
@@ -237,13 +235,11 @@ func renderStashPopup(m model, bodyWidth, bodyHeight int) string {
 }
 
 func renderStashMessagePopup(m model, bodyWidth int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	descStyle := popupBody
+	helpStyle := popupHelp
+	errStyle := errorStyle
 	popupWidth := popupWidthForBody(bodyWidth, 40, 60)
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidth).
 		Align(lipgloss.Center)
@@ -263,13 +259,11 @@ func renderStashMessagePopup(m model, bodyWidth int) string {
 }
 
 func renderGraphStashPopPopup(m model, bodyWidth, bodyHeight int) string {
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	descStyle := popupBody
+	helpStyle := popupHelp
+	warnStyle := warn
 	popupWidth := popupWidthForBody(bodyWidth, 44, 76)
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(popupWidth).
 		Align(lipgloss.Left)

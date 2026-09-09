@@ -135,9 +135,7 @@ func (m model) handleTagCreatedMsg(msg tagCreatedMsg) (model, tea.Cmd) {
 
 func renderTagPopup(m model, bodyWidth, bodyHeight int) string {
 	width := popupWidthForBody(bodyWidth, 36, 56)
-	popupBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
+	popupBox := popupBorder.
 		Padding(1, 2).
 		Width(width).
 		Align(lipgloss.Center)

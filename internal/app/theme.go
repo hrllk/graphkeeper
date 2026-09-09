@@ -58,13 +58,25 @@ var (
 	reviewBase      = ansiBoldStyle(ansiBrightBlack)
 	reviewHash      = lipgloss.NewStyle().Bold(true)
 	reviewBranch    = lipgloss.NewStyle()
-	reviewMark      = lipgloss.NewStyle()
 	reviewCount     = lipgloss.NewStyle().Bold(true)
 	reviewFooter    = lipgloss.NewStyle()
 
 	popupBorder = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.ANSIColor(ansiMagenta))
+	// popupBody, popupHelp, muted, disabled, reviewBranch and reviewFooter are
+	// deliberately empty, and deliberately separate names for the same
+	// rendering: the terminal's default foreground.
+	//
+	// highlighting-color-map.md's Policy is the reason they are empty. Secondary
+	// and help text used to be ANSI bright black, which is close to unreadable on
+	// a white or beige background, so it gives them the default foreground
+	// instead. There is no colour to assign.
+	//
+	// They stay separate because the name records intent at the call site, and
+	// because they are the seams where a distinction would be introduced if one
+	// is ever wanted. Anyone giving one of them a colour should expect the others
+	// to keep the default rather than assume they move together.
 	popupBody     = lipgloss.NewStyle()
 	popupHelp     = lipgloss.NewStyle()
 	popupHeader   = lipgloss.NewStyle().Bold(true)
