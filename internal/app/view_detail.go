@@ -28,6 +28,12 @@ func (m model) renderContextInfoLines(width int) []string {
 			if when := compactWhenISO(focus.CommitDate, width-len("date: ")); when != "" {
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("date"), when))
 			}
+			// road sits above the parent and branch rows because it is the
+			// interaction in progress, and a short rail folds everything below
+			// the first few lines out of sight.
+			if road := m.graphRange.summaryText(width - len("road: ")); road != "" {
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("road"), road))
+			}
 			lines = append(lines, focusParentLines(focus, width)...)
 			if branchLines := focusBranchSummaryLines(focus, width, LocalBranchInventory{Names: m.repoStatus.LocalBranches, Known: m.repoStatus.LocalBranchesKnown, Fresh: m.repoStatus.LocalBranchesFresh, Error: m.repoStatus.LocalBranchesError, Epoch: m.repositoryEpoch}); len(branchLines) > 0 {
 				lines = append(lines, fmt.Sprintf("%s:", renderContextKey("branches")))

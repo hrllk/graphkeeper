@@ -16,9 +16,14 @@ import (
 // active kind representable, and that combination would call AncestryPath with
 // a blank ref.
 type graphRange struct {
-	Anchor  string          // never "". Never a synthetic hash.
-	Kind    graphRangeKind  //
-	To      string          // the endpoint the path runs toward, for the summary
+	Anchor string         // never "". Never a synthetic hash.
+	Kind   graphRangeKind //
+	// From and To always describe the path as it actually runs, so the summary
+	// never has to know which direction was picked. On a forward pick From is
+	// the anchor; on a reversed one it is the cursor, and From != Anchor is what
+	// makes the reversal detectable.
+	From    string
+	To      string
 	Members map[string]bool // nil unless Kind is rangeForward or rangeBackward
 	Count   int
 	Epoch   uint64 // repositoryEpoch when the anchor was set
@@ -73,14 +78,14 @@ func resolveGraphRange(anchor, cursor string, epoch uint64, forward, backward []
 	}
 	if len(forward) > 0 {
 		base.Kind = rangeForward
-		base.To = cursor
+		base.From, base.To = anchor, cursor
 		base.Members = hashSet(forward)
 		base.Count = len(forward)
 		return base
 	}
 	if len(backward) > 0 {
 		base.Kind = rangeBackward
-		base.To = anchor
+		base.From, base.To = cursor, anchor
 		base.Members = hashSet(backward)
 		base.Count = len(backward)
 		return base
@@ -177,4 +182,53 @@ func applyGraphRangeMsg(m model, msg graphRangeMsg) model {
 	}
 	m.graphRange = resolveGraphRange(msg.anchor, msg.cursor, msg.epoch, msg.forward, msg.backward, msg.err)
 	return m
+}
+
+// summaryText renders the selection for the Details panel. The direction is
+// part of the answer, not decoration: showing only a count leaves the user
+// unable to tell which commit is the ancestor, and telling them that is the
+// point of the feature.
+//
+// A reversed pick says so rather than quietly swapping the endpoints. Once the
+// interaction asks for FROM and then TO, the user has declared a direction, and
+// silently showing the other one is still showing something they did not ask
+// for - better than the "diverged" lie, but not the whole way there.
+//
+// Returns "" when there is no selection, so the caller drops the row.
+func (r *graphRange) summaryText(width int) string {
+	if r == nil {
+		return ""
+	}
+	short := func(hash string) string { return shorten(hash, 8) }
+	switch r.Kind {
+	case rangeAnchorOnly:
+		return fitRangeSummary(fmt.Sprintf("from %s · pick a second commit", short(r.Anchor)),
+			fmt.Sprintf("from %s", short(r.Anchor)), width)
+	case rangeSame:
+		return "same commit"
+	case rangeForward:
+		return fitRangeSummary(fmt.Sprintf("%d commits (%s → %s)", r.Count, short(r.From), short(r.To)),
+			fmt.Sprintf("%d commits", r.Count), width)
+	case rangeBackward:
+		return fitRangeSummary(fmt.Sprintf("%d commits (reversed: %s → %s)", r.Count, short(r.From), short(r.To)),
+			fmt.Sprintf("%d commits reversed", r.Count), width)
+	case rangeDiverged:
+		return fitRangeSummary("diverged (no ancestry path)", "diverged", width)
+	case rangeUnavailable:
+		return "unavailable"
+	}
+	return ""
+}
+
+// fitRangeSummary prefers the full phrasing and falls back to the short one
+// rather than letting the Details viewport clip a sentence mid-word. The rail is
+// 13 columns wide at an 80-column terminal, so the long form rarely fits.
+func fitRangeSummary(full, short string, width int) string {
+	if width >= len(full) {
+		return full
+	}
+	if width >= len(short) {
+		return short
+	}
+	return ""
 }
