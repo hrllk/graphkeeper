@@ -1,6 +1,6 @@
 # Task 11 의존 사슬 해소
 
-상태: DRAFT — ceo-review 대기
+상태: REVIEWED — ceo-review 1회 (HOLD SCOPE), 3건 반영
 목적: task 11(날짜·road)이 pending design task와 얽힌 사슬을 풀어, 어느 subtask가
 **진짜로 막혀 있고** 어느 것이 **제약만 물려받는지** 구분한다.
 기준 커밋: `eaff738`
@@ -71,8 +71,37 @@ taskmaster에 기록된 의존을 그대로 따르면 task 11의 절반이 4단 
 사라져 있고 chrome 계산이 이미 파생식으로 바뀌어 있으므로, 6.8은 카피만 정리하면
 된다. 11.5를 6.8 뒤로 두면 6.8이 `FROM` 꼬리 문제를 먼저 만나 같은 일을 두 번 한다.
 
-**결론:** `11.5 deps = ['11.3']` 유지. 6.8 의존 **추가하지 않는다.**
-**6.8에 `dependencies: ['11.5']`를 추가한다** (역방향).
+**정정 (ceo-review C-1, C-2). 위 표에 두 가지 오류가 있었다.**
+
+**C-1 — 역방향 의존을 걸면 이 문서가 자기 정의를 위반한다.** 초안은 "6.8에
+`dependencies: ['11.5']`를 추가한다"로 끝났고 근거는 "11.5가 먼저 가면 6.8이 쉬워진다"
+였다. 그건 **효율 선호**이고 시작 차단이 아니다. 이 문서가 위에서 스스로 정의했다 —
+"의존: A가 끝나야 B를 **시작**할 수 있다". 6.8은 11.5 없이 시작할 수 있고, 다만
+`FROM` 꼬리 작업을 다시 하게 된다.
+
+하드 의존으로 기록하면 **디자인 백로그가 기능 배포에 묶인다.** 11.5가 미뤄지거나
+취소되면 6.8이 이유 없이 막힌다. 그래서 `dependencies`에서 뺀다. 순서 선호는
+6.8의 `details`에 문장으로 남긴다 — 이 문서가 정한 표기 규칙 그대로다.
+
+**C-2 — `FROM` 꼬리 제거는 6.8에서 11.5로 옮기는 것이며, 이건 범위 이전이다.**
+초안의 소유권 표는 그것을 11.5 몫으로 적었지만, 6.8의 기록(D-018)이 이미 소유하고
+있다.
+
+> D-018: commit_inspector_screen.go:64가 author 행 뒤에 '  FROM ' + snapshot.Parent를
+> 덧붙인다. 대응하는 TO가 없고 (...) **TO와 짝을 맞추거나 parent: 라벨로 바꿔** 다른
+> header 행과 같은 key/value 처리를 준다.
+
+즉 깔끔한 분할이 아니라 **6.8의 헌장 일부를 11.5가 가져가는 것**이다. 11.5가 가져가야
+하는 이유는 있다 — 헤더가 이미 넘치는 상태에서 `date:` 행을 얹으려면 꼬리를 먼저
+떼야 한다. 하지만 그걸 명시하지 않으면 나중에 6.8을 집는 사람이 자기 헌장의 일부가
+이미 처리된 것을 발견하고 자기가 잘못 읽었는지 의심한다.
+
+따라서 **6.8의 details에 이전 사실을 적는다.** 6.8에 남는 것: `parent:` 행을 만들지
+말지의 결정, `COMMIT` 대문자 표제와 소문자 key/value 통일, 40컬럼 카피 우선순위.
+
+**결론:** `11.5 deps = ['11.3']` 유지. 6.8에 하드 의존을 **걸지 않는다.**
+6.8 `details`에 (a) 11.5 뒤에 가는 것이 싸다는 순서 선호와 (b) `FROM` 꼬리 제거가
+11.5로 이전됐다는 사실을 적는다.
 제약 상속: 11.5는 6.8이 지목한 문제를 악화시키지 않는다 — 헤더에 잘릴 것을 더 얹지
 않고, `FROM` 꼬리를 뺀다.
 
@@ -114,9 +143,18 @@ spec C-10 참조.
 
 > `? 오버레이`: 활성 섹션 하나만 렌더. Global 섹션은 존재하지만 절대 안 보임.
 
+**코드로 확인했다 (ceo-review).** `hiddenHotkeySections`(`hidden_hotkeys.go:205-223`)의
+Global 섹션은 `active:` 필드가 **아예 없어** 항상 `false`이고,
+`visibleHiddenHotkeySections`(`:137-146`)가 `section.active`만 통과시키므로 **영구히
+필터링된다.** 그게 task 8의 증상이다. 반면 Graph 섹션(`:224-226`)은
+`active: m.activeSection == sectionGraph`이므로 graph가 활성일 때 렌더된다.
+
 즉 **섹션 로컬 키는 `?`에서 정상으로 보인다.** 안 보이는 것은 Global 그룹이다.
 `w`는 graph 섹션 전용 액션이므로 `hidden_hotkeys.go:231-249`의 graph 그룹에
 넣으면 그 자리에서 보인다. task 8의 미결(Global을 어디에 노출할지)과 무관하다.
+
+한 가지 한계: `w`는 graph가 활성 섹션일 때만 `?`에 보인다. Tags 섹션에서 `?`를 눌러도
+안 보인다. 그건 섹션 인식 오버레이의 기존 설계이며 이 작업이 만드는 공백이 아니다.
 
 **초안이 여기서 틀렸다가 고쳐졌다.** spec 초안은 `w`를 메인 footer에도 등록하라고
 적었고, 그러면 `decisions.md:8-9`의 "footer에는 Global core 키만" 정책을 깨면서
@@ -138,7 +176,7 @@ task 8의 미결 영역으로 들어갔다. eng-review E-5/코덱스가 잡아 f
 
 **결론:** 의존 추가하지 않는다. 제약 상속: `date:`와 `range:` 두 라벨만 쓰고
 `when:` / `time:` / `path:` 같은 변종을 만들지 않는다.
-**6.6에 `date:`/`age:` 이원화를 정리 대상으로 명시**한다 (지금은 6.6 details에 없다).
+**6.6에 `date:`/`age:` 이원화를 정리 대상으로 명시했다** (초안 시점에는 6.6 details에 없었다).
 
 ### R-5. 11.9 (yymmdd 컬럼) — 6.4에 **진짜로** 의존한다. 그리고 6.4는 6.2에 의존한다
 
@@ -165,8 +203,8 @@ task 8의 미결 영역으로 들어갔다. eng-review E-5/코덱스가 잡아 f
          ├──▶ 11.3 ──▶ 11.5            └─▶ 6.6 ─▶ 6.7 ─▶ 6.8
          └──▶ (11.9 는 6.4 대기)              ▲              ▲
                                               │              │
-  11.4 ──┬──▶ 11.6                     (11.7이 어휘   (11.5가 먼저 가면
-         ├──▶ 11.7                      예약만 함)     6.8이 쉬워진다)
+  11.4 ──┬──▶ 11.6                     (11.7이 어휘   (11.5 뒤가 싸다.
+         ├──▶ 11.7                      예약만 함)     의존은 아님 — C-1)
          └──▶ 11.8
                                         6.2 ─▶ 6.4 ─▶ 11.9 (보류)
 ```
@@ -201,7 +239,7 @@ task 8의 미결 영역으로 들어갔다. eng-review E-5/코덱스가 잡아 f
 | 11.8 | `deps=['11.4']` | 유지 | R-3 — task 8 의존 아님 |
 | 11.7 | `deps=['11.4']` | `['11.4','11.2']` 추가 | 병렬 절 — `view_detail.go` 같은 함수 머지 충돌 회피 |
 | 11.9 | `deps=['11.1']` | `['11.1','6.4']` | R-5 — 진짜 의존 |
-| 6.8 | `deps=[7]` | `[7, '11.5']` 추가 | R-1 역방향 — 11.5가 먼저 가면 6.8이 쉬워진다 |
+| 6.8 | `deps=[7]` | `['6.7']` 로만 정규화 (11.5 추가 **안 함**) | C-1 — 순서 선호는 의존이 아니다. details 에 문장으로 |
 | 6.6 | `deps=[2]` | 유지, details에 `date:`/`age:` 이원화 추가 | R-4 |
 | 6.x 전체 | `deps=[2]`, `[1]`, `[7]`, `[6]` | 점 표기(`6.2`)로 정규화 | 11.x는 `'11.1'` 점 표기인데 6.x는 벌거벗은 숫자다. 두 관습이 섞여 의존을 기계로 읽을 수 없다 |
 
@@ -230,3 +268,27 @@ task 8의 미결 영역으로 들어갔다. eng-review E-5/코덱스가 잡아 f
 4. **6.2 계획** — 6.4/11.9 사슬의 뿌리. 측정값(-25/-14/-2)이 이미 있다.
 5. **6.3 계획** — `df7ed32`가 커서 부분을 이미 했으므로 남은 범위를 재산정해야 한다.
 6. **6.4 계획** — 6.2 이후. 11.9의 날짜 컬럼을 포함해 산정.
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR | mode: HOLD_SCOPE, 3 findings, 0 critical gaps, 0 unresolved |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | not run on this document; ran on the plan it derives from |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | ran against the spec, not this document; no code contract here to review |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | not applicable — this document holds no UI decisions |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | not run |
+
+**CEO FINDINGS (all applied):**
+
+- **C-1 (P1, confidence 10/10)** The document violated its own definition. It defines a dependency as "A가 끝나야 B를 시작할 수 있다", then concluded with `6.8 dependencies += ['11.5']` on the rationale that 11.5 going first makes 6.8 cheaper. That is an ordering preference, not a start-blocking relation: 6.8 can start without 11.5 and would merely redo the FROM-tail work. Recording it as a hard dependency couples the design backlog to feature delivery, so a slip in 11.5 blocks 6.8 for no real reason. Removed from `dependencies`; the preference now lives in 6.8's `details`, which is exactly the split this document prescribes.
+- **C-2 (P1, confidence 10/10)** `.taskmaster/tasks/tasks.json` task 6.8, D-018 — the ownership table presented a clean split while actually moving work out of 6.8. D-018 already owns the FROM-tail fix verbatim: "TO와 짝을 맞추거나 parent: 라벨로 바꿔 다른 header 행과 같은 key/value 처리를 준다." 11.5 does need it first, because the header already overflows before a date row is added, but an unannounced transfer means whoever picks up 6.8 finds part of their charter done and cannot tell whether they misread it. Now recorded as an explicit transfer, with 6.8's remainder named: the `parent:` row decision, the case-convention cleanup, and the 40-column copy priority.
+- **C-3 (P3, confidence 10/10)** R-4 said the 6.6 vocabulary note "지금은 6.6 details에 없다" while the same commit added it. Corrected to past tense.
+
+**VERIFICATION (R-3 promoted from assertion to evidence):** the R-3 claim that section-local keys are visible in the `?` overlay was asserted from task 8's prose. Confirmed in code: `hiddenHotkeySections` (`internal/app/hidden_hotkeys.go:205-223`) gives the Global section no `active:` field at all, so it is permanently false, and `visibleHiddenHotkeySections` (`:137-146`) passes only `section.active` — which is precisely task 8's symptom. The Graph section (`:224-226`) sets `active: m.activeSection == sectionGraph` and renders normally. One limit now stated in the document: `w` appears in `?` only while graph is the active section, which is the existing section-aware design rather than a gap this work introduces.
+
+**VERDICT:** CEO CLEARED — the five resolutions stand, with R-1's conclusion corrected from a hard reverse dependency to a details-level ordering preference plus an explicit scope transfer. Net effect on the graph is unchanged: only 11.9 is blocked, and 11.1 through 11.8 can all start now. The dependency fields are now internally consistent with the document's own definition, which was the one thing this review had to check and initially failed.
+
+NO UNRESOLVED DECISIONS
