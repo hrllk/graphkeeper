@@ -24,11 +24,27 @@ func deriveStatus(rs git.Status) state.Status {
 		return applyRepoMetadata(state.New().WithBlocked(state.BlockDetached, "Detached HEAD.", "Pick a branch before running pull, merge, or rebase."), rs)
 	case rs.EmptyRepo:
 		return applyRepoMetadata(state.New().WithEmpty("No commits yet."), rs)
-	case rs.NoRemote && rs.NoUpstream:
-		return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRemote, "No remote or upstream.", "Set a remote target first."), rs)
+	// A missing remote is NOT a resting state. It used to be, and because
+	// key_handling.go dispatches to handleBrowseKey only in ModeBrowse, a repo
+	// with no remote had every browse key dead - merge and rebase included,
+	// which are local operations that never needed a remote. The requirement
+	// belongs to the actions that cannot work without one: actionPull already
+	// carries its own NoRemote and NoUpstream gates, and remoteMissingStatus
+	// covers fetch and push. repository_state_hint.go still surfaces
+	// "No remote" so the state stays visible without being blocking.
 	default:
 		return applyRepoMetadata(state.New().WithBrowse(), rs)
 	}
+}
+
+// remoteMissingStatus blocks an action that genuinely cannot run without a
+// remote and names which action it was, so the message is actionable instead of
+// the old global "Set a remote target first."
+func remoteMissingStatus(rs git.Status, action string) (state.Status, bool) {
+	if !rs.NoRemote {
+		return state.Status{}, false
+	}
+	return applyRepoMetadata(state.New().WithBlocked(state.BlockNoRemote, "No remote.", action+" needs a remote."), rs), true
 }
 
 func actionPull(rs git.Status) state.Status {

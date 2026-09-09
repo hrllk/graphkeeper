@@ -847,8 +847,8 @@
             "id": 5,
             "title": "[미결] remote 없는 로컬 리포에서 merge/rebase 가 막힌다",
             "description": "deriveStatus (actions.go:27) 가 NoRemote && NoUpstream 을 앱 기본 상태로 blocked 처리해서, remote 를 붙이지 않은 순수 로컬 리포에서는 m/r 이 'No remote or upstream. / Set a remote target first.' 만 띄운다. 로컬 브랜치끼리의 merge 는 remote 를 요구할 이유가 없다. 게이트 작업 라이브 검증 중 픽스처에 remote 가 없어 발견.",
-            "details": "재현: remote 없는 git init 리포에서 graph 진입 후 임의 행에 m. 판단 필요 — 앱이 remote 중심 도구라 이 기본 상태가 의도된 것인지, 아니면 pull 계열에만 걸려야 할 게이트가 전역 기본 상태로 올라간 것인지.",
-            "status": "pending",
+            "details": "재현: remote 없는 git init 리포에서 graph 진입 후 임의 행에 m. 판단 필요 — 앱이 remote 중심 도구라 이 기본 상태가 의도된 것인지, 아니면 pull 계열에만 걸려야 할 게이트가 전역 기본 상태로 올라간 것인지. [해소 2026-09-10] 미결 질문의 답: pull 계열에만 걸려야 할 게이트가 전역 기본 상태로 올라간 것이다. 증거는 actionPull(actions.go:47,48)이 자체 NoRemote/NoUpstream 게이트를 이미 갖고 있다는 점 — 전역 게이트가 pull 가드로 의도된 것이라면 actionPull 에 중복이 필요 없다. 조치: deriveStatus 의 NoRemote && NoUpstream case 제거. remote 가 실제로 필요한 f/F/P/tag-push 에는 remoteMissingStatus(rs, action) 액션별 게이트를 추가해 어떤 동작이 remote 를 요구하는지 문구로 밝힌다. 정보는 사라지지 않는다 — repository_state_hint.go:26-30 이 'No remote or upstream' 을 힌트로 계속 표시한다. 실 픽스처 검증: remote 없는 git init 리포에서 NoRemote=true, NoUpstream=true 인데 mode=browse 로 안착. 테스트: TestDeriveStatusCases 계약 반전 2건, TestRemoteMissingStatusGatesOnlyRemoteActions, TestActionPullStillRequiresARemote, TestLocalOnlyRepoReachesBrowseKeys.",
+            "status": "done",
             "dependencies": [],
             "parentTaskId": "7",
             "parentId": "undefined"
@@ -1770,7 +1770,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-09-09T23:40:00Z",
+      "lastModified": "2026-09-10T00:25:00Z",
       "taskCount": 11,
       "completedCount": 2,
       "tags": [

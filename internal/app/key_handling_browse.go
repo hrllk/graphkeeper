@@ -71,9 +71,17 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 		m = switchBrowseSection(m, sectionTags)
 		return true, m, nil
 	case "f":
+		if blocked, ok := remoteMissingStatus(m.repoStatus, "Fetch"); ok {
+			m.status = blocked
+			return true, m, nil
+		}
 		m.status = operationLoadingStatusFor(progressFetchSources, "Fetching sources...", state.ActionNone)
 		return true, m, fetchRepoState(m.repo, m.commitLimit)
 	case "F":
+		if blocked, ok := remoteMissingStatus(m.repoStatus, "Fetching tags"); ok {
+			m.status = blocked
+			return true, m, nil
+		}
 		m.status = operationLoadingStatusFor(progressFetchTags, "Fetching tags...", state.ActionNone)
 		return true, m, fetchTagsRepoState(m.repo, m.commitLimit, m.tagProvenance)
 	case "P":
@@ -83,10 +91,18 @@ func (m model) handleBrowseGlobalKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) 
 				m.status = state.New().WithBlocked(state.BlockTargetEmpty, "No tag selected.", "Choose a tag row.")
 				return true, m, nil
 			}
+			if blocked, ok := remoteMissingStatus(m.repoStatus, "Pushing a tag"); ok {
+				m.status = blocked
+				return true, m, nil
+			}
 			m.status = operationLoadingStatusFor(progressPushTag, "Pushing tag...", state.ActionPushTag)
 			return true, m, executePushTag(m.repo, item.Ref, m.commitLimit, m.tagProvenance)
 		}
 		if m.repoStatus.Root == "" || m.repoStatus.Detached || m.repoStatus.EmptyRepo {
+			return true, m, nil
+		}
+		if blocked, ok := remoteMissingStatus(m.repoStatus, "Push"); ok {
+			m.status = blocked
 			return true, m, nil
 		}
 		m.status = operationLoadingStatusFor(progressFetch, "Fetching for push...", state.ActionPush)

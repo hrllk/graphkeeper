@@ -21,7 +21,13 @@ func TestDeriveStatusCases(t *testing.T) {
 		{name: "cherry-pick in progress", rs: git.Status{Root: "/repo", CherryPickInProgress: true}, want: state.ModeBrowse, wantMsg: "Cherry-pick in progress."},
 		{name: "detached", rs: git.Status{Root: "/repo", Detached: true}, want: state.ModeBlocked, wantBlk: state.BlockDetached, wantMsg: "Detached HEAD."},
 		{name: "empty repo", rs: git.Status{Root: "/repo", EmptyRepo: true}, want: state.ModeEmpty, wantMsg: "No commits yet."},
-		{name: "no remote no upstream", rs: git.Status{Root: "/repo", NoRemote: true, NoUpstream: true}, want: state.ModeBlocked, wantBlk: state.BlockNoRemote, wantMsg: "No remote or upstream."},
+		// A missing remote is not a resting state any more. It used to return
+		// ModeBlocked, and because key_handling.go only dispatches browse keys in
+		// ModeBrowse, that left every browse key dead in a local-only repo -
+		// merge and rebase included, neither of which needs a remote. The
+		// requirement moved to the actions that cannot run without one.
+		{name: "no remote no upstream browses", rs: git.Status{Root: "/repo", NoRemote: true, NoUpstream: true}, want: state.ModeBrowse},
+		{name: "no remote alone browses", rs: git.Status{Root: "/repo", NoRemote: true}, want: state.ModeBrowse},
 		{name: "browse", rs: git.Status{Root: "/repo"}, want: state.ModeBrowse},
 	}
 
@@ -298,5 +304,59 @@ func TestSelectedTarget(t *testing.T) {
 				t.Fatalf("selectedTarget() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// The remote requirement moved out of the resting state and onto the actions
+// that genuinely need one. Each names itself so the message is actionable,
+// unlike the old global "Set a remote target first."
+func TestRemoteMissingStatusGatesOnlyRemoteActions(t *testing.T) {
+	withRemote := git.Status{Root: "/repo"}
+	if _, blocked := remoteMissingStatus(withRemote, "Fetch"); blocked {
+		t.Fatal("a repo with a remote must not be gated")
+	}
+
+	noRemote := git.Status{Root: "/repo", NoRemote: true}
+	for _, action := range []string{"Fetch", "Push", "Fetching tags", "Pushing a tag"} {
+		got, blocked := remoteMissingStatus(noRemote, action)
+		if !blocked {
+			t.Fatalf("%s needs a remote and must be gated", action)
+		}
+		if got.Mode != state.ModeBlocked || got.Block != state.BlockNoRemote {
+			t.Fatalf("%s: mode = %s block = %s, want blocked/no_remote", action, got.Mode, got.Block)
+		}
+		if want := action + " needs a remote."; got.Detail != want {
+			t.Fatalf("%s: detail = %q, want %q", action, got.Detail, want)
+		}
+	}
+}
+
+// Pull keeps its own gates. They are the reason the global one was redundant:
+// if the resting state were the pull guard, actionPull would not need these.
+func TestActionPullStillRequiresARemote(t *testing.T) {
+	got := actionPull(git.Status{Root: "/repo", NoRemote: true, NoUpstream: true})
+	if got.Mode != state.ModeBlocked || got.Block != state.BlockNoRemote {
+		t.Fatalf("pull without a remote: mode = %s block = %s, want blocked/no_remote", got.Mode, got.Block)
+	}
+	if got.Detail != "Pull needs a remote." {
+		t.Fatalf("pull detail = %q", got.Detail)
+	}
+	upstreamOnly := actionPull(git.Status{Root: "/repo", NoUpstream: true})
+	if upstreamOnly.Mode != state.ModeBlocked || upstreamOnly.Block != state.BlockNoUpstream {
+		t.Fatalf("pull without an upstream: mode = %s block = %s", upstreamOnly.Mode, upstreamOnly.Block)
+	}
+}
+
+// The whole point of 7.5: merge and rebase are local operations, so a repo with
+// no remote must reach them. Before the fix the resting state was ModeBlocked
+// and handleBrowseKey never ran at all.
+func TestLocalOnlyRepoReachesBrowseKeys(t *testing.T) {
+	rs := git.Status{Root: "/repo", NoRemote: true, NoUpstream: true, Branch: "main", Head: "abc"}
+	if got := deriveStatus(rs); got.Mode != state.ModeBrowse {
+		t.Fatalf("a local-only repo rests in %s, so no browse key can fire", got.Mode)
+	}
+	// The state stays visible; it just is not blocking.
+	if hint := repositoryStateHint(rs, false, nil); hint != "No remote or upstream" {
+		t.Fatalf("expected the missing remote to stay visible as a hint, got %q", hint)
 	}
 }
