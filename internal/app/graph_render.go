@@ -23,8 +23,24 @@ func renderInventory(value any) LocalBranchInventory {
 	}
 }
 
-func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
-	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, isHandshake, stashCount, "")
+// graphRowMarks carries the per-row signals the row renderers need.
+//
+// It exists so the render call does not grow a third and fourth same-typed
+// positional argument that a caller can transpose silently. view_graph.go's call
+// already passed ten positionals with graphColWidth/rowWidth adjacent ints and
+// isHandshake/stashCount an adjacent bool/int; adding RangeMember and
+// RangeAnchor as bare bools would have made three consecutive same-typed pairs,
+// and anchor and member render as similar marks, so a swap would compile and
+// look plausible on screen.
+type graphRowMarks struct {
+	Handshake   bool
+	StashCount  int
+	RangeMember bool
+	RangeAnchor bool
+}
+
+func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, marks graphRowMarks) string {
+	return renderGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, marks, "")
 }
 
 // renderGraphHashField owns the commit-hash cell for both the compact and the
@@ -41,20 +57,60 @@ func renderGraphLine(row graphRow, selected bool, graphActive bool, laneCursor i
 // handles NO_COLOR itself (commit_inspector.go:352, :441, :466). no-color.org
 // governs colour; reverse is an attribute. A "> " gutter is not an option:
 // 094ca87 (2026-07-07) removed exactly that and locked it with a test.
-func renderGraphHashField(hash, searchQuery string, focused bool) string {
+// Marker priority, highest wins. A row can carry several of these at once, so
+// the order is fixed here rather than left to whichever branch runs last:
+//
+//	1  search focus   reverse+bold, owned by renderSearchField
+//	2  cursor         reverse            (\x1b[7m)
+//	3  road anchor    underline+bold     (\x1b[4m\x1b[1m)
+//	4  road member    underline          (\x1b[4m)
+//	5  HEAD           headMark, on the branches cell
+//	6  stash/tag      S/T characters, in the state column
+//
+// Attributes compose, so an anchor that is also the cursor gets reverse and
+// underline and bold together, and one reset clears them.
+//
+// These are written as escapes rather than lipgloss styles on purpose. Under
+// NO_COLOR lipgloss selects the Ascii profile and emits nothing at all,
+// attributes included, so searchMatchMark (theme.go:74, a lipgloss underline)
+// would vanish exactly where the signal matters most. The Inspector already
+// writes escapes directly for the same reason (commit_inspector.go:352, :441).
+// no-color.org governs colour; reverse and underline are attributes.
+//
+// A gutter glyph is not an option either: 094ca87 removed the graph selection
+// arrow and locked it with TestRenderGraphContentOmitsSelectionArrow and
+// TestRenderGraphContentStartsAtLeftEdge.
+func renderGraphHashField(hash, searchQuery string, focused bool, marks graphRowMarks) string {
 	field := renderSearchField(hash, searchQuery, graphCommitWidth, focused)
-	if !focused || strings.TrimSpace(searchQuery) != "" {
+	// Priority 1: an active search owns the cell, so nothing else marks it.
+	if strings.TrimSpace(searchQuery) != "" {
 		return field
 	}
-	if noColorEnabled() {
-		return "\x1b[7m" + field + "\x1b[0m"
+	attrs := ""
+	if focused {
+		attrs += "\x1b[7m"
 	}
-	return field
+	switch {
+	case marks.RangeAnchor:
+		attrs += "\x1b[4m\x1b[1m"
+	case marks.RangeMember:
+		attrs += "\x1b[4m"
+	}
+	if attrs == "" {
+		return field
+	}
+	// The cursor alone was previously drawn only under NO_COLOR, because with
+	// colour available the surrounding styles already conveyed it. The road
+	// marks have no such fallback, so they are always drawn.
+	if focused && !marks.RangeAnchor && !marks.RangeMember && !noColorEnabled() {
+		return field
+	}
+	return attrs + field + "\x1b[0m"
 }
 
-func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
+func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, marks graphRowMarks, searchQuery string) string {
 	if row.Graph != "" {
-		return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, isHandshake, stashCount, searchQuery)
+		return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, marks, searchQuery)
 	}
 	var hash, refs string
 	var refInfo decorationInfo
@@ -63,7 +119,7 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 		refs = "          "
 	} else {
 		refInfo = compactDecorationInfo(row.Commit.Decorations, renderInventory(inventory))
-		hash = renderGraphHashField(shorten(row.Commit.Hash, 5), searchQuery, selected && graphActive)
+		hash = renderGraphHashField(shorten(row.Commit.Hash, 5), searchQuery, selected && graphActive, marks)
 		refs = renderSearchField(refInfo.Text, searchQuery, graphBranchFieldWidth, selected && graphActive)
 		isHead := hasHeadDecoration(row.Commit.Decorations)
 		pointerFocused := graphActive && selected
@@ -73,19 +129,19 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 			refs = branchMark.Render(refs)
 		}
 	}
-	graphCell := graphLineCell(row, graphActive, selected, laneCursor, graphColWidth, stashCount)
+	graphCell := graphLineCell(row, graphActive, selected, laneCursor, graphColWidth, marks.StashCount)
 	graphCell = padRight(graphCell, graphColWidth)
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
 		graphCell = strings.ReplaceAll(graphCell, "*", conflictMark.Render("*"))
 		graphCell = strings.ReplaceAll(graphCell, "|", conflictColor.Render("|"))
 		graphCell = strings.ReplaceAll(graphCell, "/", conflictColor.Render("/"))
 		graphCell = strings.ReplaceAll(graphCell, "\\", conflictColor.Render("\\"))
-	} else if isHandshake {
-		graphCell = applyHandshakePoint(graphCell, stashCount, len(row.Commit.Tags))
+	} else if marks.Handshake {
+		graphCell = applyHandshakePoint(graphCell, marks.StashCount, len(row.Commit.Tags))
 	}
 	status := strings.Repeat(" ", graphStatusWidth)
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
-		status = renderGraphStatus(stashCount, len(row.Commit.Tags))
+		status = renderGraphStatus(marks.StashCount, len(row.Commit.Tags))
 	}
 	var title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
@@ -97,15 +153,11 @@ func renderGraphLineWithSearch(row graphRow, selected bool, graphActive bool, la
 	return fitVisibleWidth(line, rowWidth)
 }
 
-func renderRawGraphLine(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int) string {
-	return renderRawGraphLineWithSearch(row, selected, graphActive, laneCursor, inventory, graphColWidth, rowWidth, isHandshake, stashCount, "")
-}
-
-func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, isHandshake bool, stashCount int, searchQuery string) string {
+func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool, laneCursor int, inventory any, graphColWidth int, rowWidth int, marks graphRowMarks, searchQuery string) string {
 	if row.Commit.Hash == "" && row.Commit.Subject == "" && len(row.Commit.Decorations) == 0 && len(row.Commit.Parents) == 0 {
 		graphCell := padRight(row.Graph, graphColWidth)
-		if isHandshake {
-			graphCell = applyHandshakePoint(graphCell, stashCount, 0)
+		if marks.Handshake {
+			graphCell = applyHandshakePoint(graphCell, marks.StashCount, 0)
 		}
 		line := fmt.Sprintf("%-*s %-*s %-*s %-*s %s", graphCommitWidth, "", graphBranchFieldWidth, "", graphStatusWidth, "", graphColWidth, graphCell, "")
 		return fitVisibleWidth(line, rowWidth)
@@ -125,7 +177,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 			cursorLane = width - 1
 		}
 		pointerFocused = graphActive && selected && cursorLane == lane
-		hash = renderGraphHashField(shorten(row.Commit.Hash, 5), searchQuery, selected && graphActive)
+		hash = renderGraphHashField(shorten(row.Commit.Hash, 5), searchQuery, selected && graphActive, marks)
 		if searchQuery == "" && pointerFocused {
 			hash = pointerMark.Render(hash)
 		}
@@ -153,11 +205,11 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 		graphCell = b.String()
 	} else {
 		lane := graph.PointerLane(row)
-		graphCell = highlightRawGraphPrefix(row.Graph, lane, pointerFocused, refInfo.HasLocalHead, stashCount, len(row.Commit.Tags))
+		graphCell = highlightRawGraphPrefix(row.Graph, lane, pointerFocused, refInfo.HasLocalHead, marks.StashCount, len(row.Commit.Tags))
 	}
 	graphCell = padRight(graphCell, graphColWidth)
-	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" && isHandshake {
-		graphCell = applyHandshakePoint(graphCell, stashCount, len(row.Commit.Tags))
+	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" && marks.Handshake {
+		graphCell = applyHandshakePoint(graphCell, marks.StashCount, len(row.Commit.Tags))
 	}
 	var title string
 	if row.Commit.Hash == "VIRTUAL_CONFLICT_HASH" {
@@ -167,7 +219,7 @@ func renderRawGraphLineWithSearch(row graphRow, selected bool, graphActive bool,
 	}
 	status := "   "
 	if row.Commit.Hash != "VIRTUAL_CONFLICT_HASH" {
-		status = renderGraphStatus(stashCount, len(row.Commit.Tags))
+		status = renderGraphStatus(marks.StashCount, len(row.Commit.Tags))
 	}
 	line := hash + " " + refs + " " + status + " " + graphCell + " " + title
 	return fitVisibleWidth(line, rowWidth)

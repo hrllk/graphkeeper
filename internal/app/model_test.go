@@ -56,7 +56,7 @@ func TestGraphStatusColumnKeepsTopologyPointer(t *testing.T) {
 	if len(rows) != 1 {
 		t.Fatalf("expected one graph row, got %d", len(rows))
 	}
-	line := ansi.Strip(renderGraphLine(rows[0], false, false, 0, nil, 18, 80, false, 1))
+	line := ansi.Strip(renderGraphLine(rows[0], false, false, 0, nil, 18, 80, graphRowMarks{StashCount: 1}))
 	if !strings.Contains(line, "*") || !strings.Contains(line, "S·T") {
 		t.Fatalf("expected topology pointer and combined status, got %q", line)
 	}
@@ -183,12 +183,12 @@ func TestHotkeyUsesANSIColorWithoutUnderline(t *testing.T) {
 func TestHandshakePreservesStashAndTagPointColors(t *testing.T) {
 	forceTrueColorProfile(t)
 	row := graphRow{Commit: graphNode{Hash: "abc1234", Tags: []string{"v1.0.0"}}, Graph: "*"}
-	got := renderGraphLine(row, false, false, 0, nil, 12, 80, true, 1)
+	got := renderGraphLine(row, false, false, 0, nil, 12, 80, graphRowMarks{Handshake: true, StashCount: 1})
 	if !strings.Contains(got, handshakeMark.Render(tagOverlapColor.Render("*"))) {
 		t.Fatalf("expected handshake marker to preserve stash/tag point color, got %q", got)
 	}
 	raw := graphRow{Commit: graphNode{Hash: "abc1234", Tags: []string{"v1.0.0"}}, Graph: "*   "}
-	got = renderGraphLine(raw, false, false, 0, nil, 12, 80, true, 1)
+	got = renderGraphLine(raw, false, false, 0, nil, 12, 80, graphRowMarks{Handshake: true, StashCount: 1})
 	if !strings.Contains(got, handshakeMark.Render(tagOverlapColor.Render("*"))) {
 		t.Fatalf("expected raw handshake marker to preserve stash/tag point color, got %q", got)
 	}
@@ -2829,7 +2829,7 @@ func TestGraphRowsExpandOnMerge(t *testing.T) {
 	if graph.RowWidth(rows[0]) < 2 {
 		t.Fatalf("expected merge row to expand lanes, got %d", graph.RowWidth(rows[0]))
 	}
-	got := renderGraphLine(rows[0], true, true, 1, nil, 24, 80, false, 0)
+	got := renderGraphLine(rows[0], true, true, 1, nil, 24, 80, graphRowMarks{})
 	if !strings.Contains(got, "*") || !strings.Contains(got, "|") {
 		t.Fatalf("unexpected rendered graph row: %q", got)
 	}
@@ -2974,7 +2974,7 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if !strings.HasPrefix(rows[0].Graph, "*") || rows[1].Commit.Hash != "" || !strings.HasPrefix(rows[2].Graph, "| *") {
 		t.Fatalf("expected raw graph prefixes to be preserved, got %q, %q, %q", rows[0].Graph, rows[1].Graph, rows[2].Graph)
 	}
-	line := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 88, false, 0)
+	line := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 88, graphRowMarks{})
 	if strings.Index(line, "head") < 0 || strings.Index(line, "o/l->") < 0 || strings.Index(line, "*") < 0 || strings.Index(line, "Merge branch") < 0 {
 		t.Fatalf("expected graph line to include hash, local branch, title and graph, got %q", line)
 	}
@@ -2990,18 +2990,18 @@ func TestGraphRowsUsesRawGraphPrefixWhenAvailable(t *testing.T) {
 	if strings.Contains(line, "Merge branch 'main' into develop") || strings.Contains(line, "origin/") {
 		t.Fatalf("expected title and extra branch decorations to be hidden, got %q", line)
 	}
-	narrow := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 70, false, 0)
+	narrow := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 70, graphRowMarks{})
 	if strings.Contains(narrow, "alexa..") {
 		t.Fatalf("expected author to shrink away before title on narrow rows, got %q", narrow)
 	}
 	if !strings.Contains(narrow, "Merge branch '") {
 		t.Fatalf("expected title to stay visible with a narrow-width ellipsis, got %q", narrow)
 	}
-	connector := renderGraphLine(rows[1], false, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, false, 0)
+	connector := renderGraphLine(rows[1], false, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, graphRowMarks{})
 	if !strings.Contains(connector, "|\\") {
 		t.Fatalf("expected connector graph line to stay visible, got %q", connector)
 	}
-	focused := renderGraphLine(rows[2], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, false, 0)
+	focused := renderGraphLine(rows[2], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, graphRowMarks{})
 	if !strings.Contains(focused, pointerMark.Render("*")) {
 		t.Fatalf("expected branch row graph pointer to be highlighted, got %q", focused)
 	}
@@ -3054,8 +3054,8 @@ func TestGraphFocusedRowStashHighlightChangesRendering(t *testing.T) {
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 row, got %d", len(rows))
 	}
-	withoutStash := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, false, 0)
-	withStash := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, false, 1)
+	withoutStash := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, graphRowMarks{})
+	withStash := renderGraphLine(rows[0], true, true, 0, LocalBranchInventory{Names: []string{"main"}, Known: true, Fresh: true}, 24, 80, graphRowMarks{StashCount: 1})
 	if withStash == withoutStash {
 		t.Fatalf("expected stash highlight to change focused graph row rendering\nwithout: %q\nwith:    %q", withoutStash, withStash)
 	}
@@ -3434,7 +3434,7 @@ func TestGraphRowsPreservesSiblingBranchDecorationsOnSameCommit(t *testing.T) {
 	if graph.RowWidth(rows[1]) != 1 {
 		t.Fatalf("expected linear child commit to stay in one lane, got %d", graph.RowWidth(rows[1]))
 	}
-	if got := renderGraphLine(rows[1], false, false, 0, nil, 24, 80, false, 0); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
+	if got := renderGraphLine(rows[1], false, false, 0, nil, 24, 80, graphRowMarks{}); !strings.Contains(got, "*") || strings.Contains(got, "| *") {
 		t.Fatalf("expected single-lane render for linear DAG, got %q", got)
 	}
 }
@@ -3468,10 +3468,10 @@ func TestGraphRowsKeepsLocalAndOriginDivergedFamiliesSeparate(t *testing.T) {
 	if rows[2].Lane != 0 {
 		t.Fatalf("expected checkout branch family lane to stay leftmost, got lane %d", rows[2].Lane)
 	}
-	if got := renderGraphLine(rows[0], false, false, 0, nil, 24, 80, false, 0); !strings.Contains(got, "| *") {
+	if got := renderGraphLine(rows[0], false, false, 0, nil, 24, 80, graphRowMarks{}); !strings.Contains(got, "| *") {
 		t.Fatalf("expected top remote row to render as split branch, got %q", got)
 	}
-	if got := renderGraphLine(rows[2], false, false, 0, nil, 24, 80, false, 0); !strings.Contains(got, "* |") {
+	if got := renderGraphLine(rows[2], false, false, 0, nil, 24, 80, graphRowMarks{}); !strings.Contains(got, "* |") {
 		t.Fatalf("expected local head row to render as split branch, got %q", got)
 	}
 }
@@ -3585,7 +3585,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 	if parentIdx < 0 || parentIdx+1 >= len(rows) || rows[parentIdx+1].Commit.Hash != "efb164e" {
 		t.Fatalf("expected efb164e immediately after 37f0954, got index=%d rows=%v", parentIdx, rows)
 	}
-	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil, 24, 80, false, 0)
+	parentLine := renderGraphLine(rows[parentIdx+1], false, false, 0, nil, 24, 80, graphRowMarks{})
 	if !strings.Contains(parentLine, "efb16") {
 		t.Fatalf("expected efb164e row to render, got %q", parentLine)
 	}
@@ -3594,7 +3594,7 @@ func TestGraphRowsRenderTmp1CheckoutParentAndRootConvergence(t *testing.T) {
 	if rootIdx < 0 || rootIdx+1 >= len(rows) || rows[rootIdx+1].Commit.Hash != "5525707" {
 		t.Fatalf("expected 5525707 immediately after 4ba1faf, got index=%d rows=%v", rootIdx, rows)
 	}
-	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil, 24, 80, false, 0)
+	rootLine := renderGraphLine(rows[rootIdx+1], false, false, 0, nil, 24, 80, graphRowMarks{})
 	if !strings.Contains(rootLine, "55257") {
 		t.Fatalf("expected common root row to render, got %q", rootLine)
 	}
@@ -3607,7 +3607,7 @@ func TestRenderGraphLineKeepsCollapsedCommitMarker(t *testing.T) {
 		After:  []laneRef{{Hash: "base"}},
 		Lane:   2,
 	}
-	got := renderGraphLine(row, false, false, 0, nil, 24, 80, false, 0)
+	got := renderGraphLine(row, false, false, 0, nil, 24, 80, graphRowMarks{})
 	if !strings.Contains(got, "*") {
 		t.Fatalf("expected collapsed commit line to keep marker, got %q", got)
 	}
@@ -3637,7 +3637,7 @@ func TestRenderGraphLineNeverWraps(t *testing.T) {
 		},
 		Graph: "*|||\\\\|||*",
 	}
-	got := renderGraphLine(row, true, true, 0, []string{"feature/with-a-very-long-name"}, 18, 40, false, 0)
+	got := renderGraphLine(row, true, true, 0, []string{"feature/with-a-very-long-name"}, 18, 40, graphRowMarks{})
 	if width := lipgloss.Width(got); width > 40 {
 		t.Fatalf("expected graph row to stay within width, got width=%d row=%q", width, got)
 	}

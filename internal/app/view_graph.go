@@ -53,9 +53,14 @@ func renderGraphProjection(p GraphProjection, width, height int) string {
 		if len(lines) >= height {
 			break
 		}
-		isHandshake := rows[i].Commit.Hash != "" && p.Handshake[rows[i].Commit.Hash]
-		stashCount := p.StashCounts[rows[i].Commit.Hash]
-		lineStr := renderGraphLineWithSearch(rows[i], graphActive && i == p.Cursor, graphActive, p.LaneCursor, p.LocalBranchInventory, graphColWidth, width, isHandshake, stashCount, p.SearchQuery)
+		hash := rows[i].Commit.Hash
+		marks := graphRowMarks{
+			Handshake:   hash != "" && p.Handshake[hash],
+			StashCount:  p.StashCounts[hash],
+			RangeMember: hash != "" && p.RangeMembers[hash],
+			RangeAnchor: hash != "" && hash == p.RangeAnchor,
+		}
+		lineStr := renderGraphLineWithSearch(rows[i], graphActive && i == p.Cursor, graphActive, p.LaneCursor, p.LocalBranchInventory, graphColWidth, width, marks, p.SearchQuery)
 		lines = append(lines, lineStr)
 		if !rawGraph && i+1 < len(rows) {
 			isConnectorHandshake := rows[i].Commit.Hash != "" && p.Handshake[rows[i].Commit.Hash] && rows[i+1].Commit.Hash != "" && p.Handshake[rows[i+1].Commit.Hash]
