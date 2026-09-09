@@ -69,18 +69,35 @@ func scrollFixture(diffRows, files int) model {
 	}}
 }
 
+// inspectorBodyLines picks the diff pane's rows out of a rendered frame.
+//
+// It finds them by position, not by text. Looking for the words "Changed
+// files" and "Diff" only works while the frame is wide enough to print them:
+// at 40 columns the pane header truncates and the search silently reported
+// zero body rows, which reads as the renderer drawing nothing.
+//
+// The anchor is the rule line under the header -- a row whose content is
+// nothing but "─" -- which is present at every width. The pane header is the
+// row after it, and the footer ends the body.
 func inspectorBodyLines(rendered string) []string {
 	lines := strings.Split(rendered, "\n")
-	body := make([]string, 0, len(lines))
-	seenPaneHeader := false
-	for _, line := range lines {
-		if !seenPaneHeader {
-			if strings.Contains(line, "Changed files") && strings.Contains(line, "Diff") {
-				seenPaneHeader = true
-			}
-			continue
+	rule := -1
+	for i, line := range lines {
+		content := strings.Trim(ansi.Strip(line), "│ ")
+		if content != "" && strings.Trim(content, "─") == "" && !strings.ContainsAny(line, "╭╰") {
+			rule = i
+			break
 		}
-		if strings.Contains(line, "Esc back") {
+	}
+	if rule < 0 || rule+2 > len(lines) {
+		return nil
+	}
+	body := make([]string, 0, len(lines))
+	for _, line := range lines[rule+2:] {
+		if strings.Contains(line, "Esc back") || strings.Contains(line, "Esc close") {
+			break
+		}
+		if strings.ContainsAny(line, "╰") {
 			break
 		}
 		body = append(body, line)

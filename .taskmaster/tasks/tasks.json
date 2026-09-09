@@ -1779,23 +1779,23 @@
           {
             "id": 1,
             "title": "renderCommitInspectorPopup 은 프로덕션 호출부가 없다",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
-            "details": "grep 결과 view_shell.go 는 renderCommitInspectorScreen 만 호출한다. renderCommitInspectorPopup 은 자기 테스트로만 살아 있다. renderRawGraphLine 선례(발견 즉시 삭제)에 따라 지우는 것이 맞아 보이나, 그 테스트가 inspectorStatus·truncateInspector 등 살아 있는 헬퍼를 함께 덮고 있어 삭제 전에 커버리지 이전이 필요하다. 6.8 에서 카피 정합만 맞춰두고 삭제는 미뤘다."
+            "details": "grep 결과 view_shell.go 는 renderCommitInspectorScreen 만 호출한다. renderCommitInspectorPopup 은 자기 테스트로만 살아 있다. renderRawGraphLine 선례(발견 즉시 삭제)에 따라 지우는 것이 맞아 보이나, 그 테스트가 inspectorStatus·truncateInspector 등 살아 있는 헬퍼를 함께 덮고 있어 삭제 전에 커버리지 이전이 필요하다. 6.8 에서 카피 정합만 맞춰두고 삭제는 미뤘다.\n\n2026-09-10 done. 지우기 전에 커버리지를 옮겼다 - popup 테스트 둘 중 TestCommitInspectorDiffDoesNotWrapLongCode 는 screen 경로에 대응물이 없었다(긴 diff 줄이 접히면 두 pane 정렬이 깨지고 diff 행 수가 조용히 달라진다). 40/60/80 폭으로 프로덕션 렌더러에 다시 썼다. 삭제로 새로 죽은 것은 commitInspectorSelectedPath 하나뿐이라 함께 지웠다. 커밋 0c69508."
           },
           {
             "id": 2,
             "title": "Inspector 파일 트리가 단일 파일의 상태 글리프를 '?' 로 그린다",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
-            "details": "TestCommitInspectorRendersBorderedTreeAndUnifiedRows 픽스처는 Status \"M\" 파일 하나를 주는데 트리는 '>   ? ../../main.go' 를 그린다. inspectorStatus(\"M\") 은 \"M\" 을 돌려주므로, 트리가 잎이 아니라 접힌 조상 노드를 그리는 것으로 보인다. 이 결함이 여태 안 잡힌 이유는 테스트가 검사하던 \"M\" 이 실은 'FROM' 의 M 이었기 때문이다(6.8 에서 꼬리가 사라지며 드러남). 12.1 이 렌더러를 지우기로 하면 함께 사라진다."
+            "details": "TestCommitInspectorRendersBorderedTreeAndUnifiedRows 픽스처는 Status \"M\" 파일 하나를 주는데 트리는 '>   ? ../../main.go' 를 그린다. inspectorStatus(\"M\") 은 \"M\" 을 돌려주므로, 트리가 잎이 아니라 접힌 조상 노드를 그리는 것으로 보인다. 이 결함이 여태 안 잡힌 이유는 테스트가 검사하던 \"M\" 이 실은 'FROM' 의 M 이었기 때문이다(6.8 에서 꼬리가 사라지며 드러남). 12.1 이 렌더러를 지우기로 하면 함께 사라진다.\n\n2026-09-10 진단이 틀렸음이 밝혀져 종료. inspectorStatus 는 popup 삭제 *이전에도* 이미 unused 였다 - 즉 popup 트리는 그 함수를 거치지 않았고 '?' 의 원인이 아니었다. popup 렌더러 자체가 12.1 에서 사라졌으므로 항목이 사라진다. 살아있는 screen 경로는 자체 상태 렌더링을 갖고 있고 'A'/'M' 을 정상 표시한다."
           },
           {
             "id": 3,
             "title": "screenHeaderFor 의 행 수가 폭에 의존한다",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
-            "details": "screenStampText 와 screenHashText 는 예산이 부족하면 빈 문자열을 돌려주고, 그러면 그 행이 사라진다. 즉 헤더 행 수가 innerWidth 에 따라 달라진다. 6.8 에서 renderCommitInspectorScreen 의 크기 인자를 없애 렌더러와 클램프가 같은 폭을 보게 했으므로 지금은 안전하지만, 폭을 따로 넘기는 호출자가 다시 생기면 같은 부류의 어긋남이 돌아온다. 행 수를 폭과 무관하게 만들지, 아니면 폭을 인자로 받는 inspectorBodyRowCount(width) 로 갈지 결정이 필요하다."
+            "details": "screenStampText 와 screenHashText 는 예산이 부족하면 빈 문자열을 돌려주고, 그러면 그 행이 사라진다. 즉 헤더 행 수가 innerWidth 에 따라 달라진다. 6.8 에서 renderCommitInspectorScreen 의 크기 인자를 없애 렌더러와 클램프가 같은 폭을 보게 했으므로 지금은 안전하지만, 폭을 따로 넘기는 호출자가 다시 생기면 같은 부류의 어긋남이 돌아온다. 행 수를 폭과 무관하게 만들지, 아니면 폭을 인자로 받는 inspectorBodyRowCount(width) 로 갈지 결정이 필요하다.\n\n2026-09-10 done. 잔여 위험은 폭 산술이 두 곳에 적혀 있던 것이었다 - 렌더러의 max(width-4,1) 과 inspectorBodyRowCount 의 max(m.width-4,1). inspectorInnerWidth 로 한 번만 유도한다. 행 수를 폭과 무관하게 만드는 쪽은 택하지 않았다 - 자리가 없을 때 date 행을 버리는 것은 옳은 동작이고, 문제는 폭이 두 곳에서 유도되던 것이지 폭에 의존하는 것 자체가 아니었다. TestInspectorBodyRowsAgreeWithTheFrameAcrossWidths 가 20~180 폭 x 12/20/40 높이에서 렌더러와 스크롤 예산의 일치를, TestInspectorLastDiffLineIsReachableAcrossWidths 가 마지막 줄 도달을 고정한다. 그 과정에서 테스트 헬퍼 결함도 하나 나왔다 - inspectorBodyLines 가 'Changed files'/'Diff' 텍스트로 본문을 찾아, 40컬럼에서 pane 헤더가 잘리면 본문 0행으로 보고했다(렌더러가 아무것도 안 그린 것처럼). 모든 폭에 존재하는 rule 라인 기준 위치 탐색으로 바꿨다."
           },
           {
             "id": 4,

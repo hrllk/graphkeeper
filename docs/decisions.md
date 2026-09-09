@@ -599,3 +599,21 @@ macOS 에서 컨테이너로 같은 검증을 돌린다. **debian stable-slim am
 삭제로 새로 죽은 것은 `commitInspectorSelectedPath` 하나뿐이라 같이 지웠다.
 `inspectorStatus`·`screenPath` 등은 2026-08-28 lint 베이스라인이 이미 안고 있던
 빚이고, 이 작업의 범위가 아니다.
+
+## 2026-09-10 — 프레임 폭은 한 번만 유도한다 (task 12.3)
+
+`renderCommitInspectorScreen` 의 크기 인자를 없앤 뒤에도 잔여 위험이 남아 있었다.
+폭 산술이 두 곳에 적혀 있었다 — 렌더러의 `max(width-4, 1)` 과
+`inspectorBodyRowCount` 의 `max(m.width-4, 1)`. 같은 수를 두 곳에서 유도하는 것이
+마지막 diff 줄에 닿을 수 없게 만든 결함의 **모양**이므로, `inspectorInnerWidth`
+하나로 모았다.
+
+**행 수를 폭과 무관하게 만드는 쪽은 택하지 않았다.** 자리가 없을 때 date 행을
+버리는 것은 옳은 동작이다. 문제는 폭에 의존하는 것이 아니라 폭이 두 곳에서
+유도되던 것이었다.
+
+**테스트 헬퍼에도 같은 종류의 결함이 있었다.** `inspectorBodyLines` 가
+`"Changed files"` 와 `"Diff"` 텍스트로 본문을 찾았는데, 40컬럼에서는 pane 헤더가
+잘려 그 검색이 실패하고 **본문 0행**을 보고했다 — 렌더러가 아무것도 그리지 않은
+것처럼 읽힌다. 기존 테스트가 폭 120 에서만 이 헬퍼를 써서 드러나지 않았다.
+모든 폭에 존재하는 rule 라인을 기준으로 위치 탐색하게 바꿨다.

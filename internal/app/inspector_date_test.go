@@ -199,3 +199,37 @@ func TestHeaderKeepsDatesOnlyWhenTheFrameCanAffordThem(t *testing.T) {
 		t.Fatalf("the floor is commit, message, author and path, got %d rows: %q", len(floor), floor)
 	}
 }
+
+// The renderer and the scroll budget have to agree about how many body rows
+// exist at every size, not only at every height. The header's row count moves
+// with width -- a narrow frame cannot hold a date row or a hash -- so a budget
+// derived from a different width than the render silently hides the last diff
+// lines. That is exactly what happened before the frame size was made to come
+// from the model alone.
+func TestInspectorBodyRowsAgreeWithTheFrameAcrossWidths(t *testing.T) {
+	for _, width := range []int{20, 40, 60, 80, 120, 180} {
+		for _, height := range []int{12, 20, 40} {
+			m := scrollFixture(500, 3)
+			m.commitInspectorSnapshot.AuthorDate = "2026-09-08T23:15:16+09:00"
+			m.commitInspectorSnapshot.CommitDate = "2026-09-09T01:02:03+09:00"
+			m.width, m.height = width, height
+
+			drawn := len(inspectorBodyLines(renderCommitInspectorScreen(m)))
+			if want := m.inspectorBodyRowCount(); drawn != want {
+				t.Errorf("%dx%d drew %d body rows, the scroll budget says %d", width, height, drawn, want)
+			}
+		}
+	}
+}
+
+// And the last diff line has to be reachable at each of those sizes.
+func TestInspectorLastDiffLineIsReachableAcrossWidths(t *testing.T) {
+	for _, width := range []int{60, 80, 120, 180} {
+		m := scrollFixture(500, 1)
+		m.width, m.height = width, 40
+		m.commitInspectorScroll = m.maxInspectorDiffScroll()
+		if got := renderCommitInspectorScreen(m); !strings.Contains(got, "line 500") {
+			t.Errorf("width %d: max scroll did not reveal the last line", width)
+		}
+	}
+}

@@ -22,7 +22,7 @@ func renderCommitInspectorScreen(m model) string {
 	if height < 1 {
 		height = 1
 	}
-	innerWidth := max(width-4, 1)
+	innerWidth := inspectorInnerWidth(width)
 	contentHeight := max(height-2, 1)
 	snapshot := m.commitInspectorSnapshot
 	if snapshot.FullHash == "" {
@@ -237,8 +237,19 @@ func inspectorBodyRowsFor(height, headerRows int) int {
 // rows ahead of what the frame kept and the last lines of a scrolled diff could
 // not be reached. Counting the real header is slightly wasteful and the only
 // version that cannot drift.
+// inspectorInnerWidth is what the frame leaves for content: the border and the
+// horizontal padding on both sides.
+//
+// The renderer and the scroll budget both need it, and they used to spell the
+// arithmetic out separately. That is the shape of the defect that made the last
+// diff lines unreachable -- two places deriving the same number, free to
+// disagree -- so it is derived once.
+func inspectorInnerWidth(width int) int {
+	return max(width-4, 1)
+}
+
 func (m model) inspectorBodyRowCount() int {
-	innerWidth := max(m.width-4, 1)
+	innerWidth := inspectorInnerWidth(m.width)
 	header := screenHeaderFor(m.commitInspectorSnapshot, ChangedFile{}, innerWidth, m.height)
 	return inspectorBodyRowsFor(m.height, len(header))
 }
