@@ -24,15 +24,19 @@ func (m model) renderContextInfoLines(width int) []string {
 	case sectionGraph:
 		focus := currentGraphFocus(m.repoStatus, m.sectionCursor[sectionGraph])
 		if focus.Hash != "" {
+			// road goes first. It used to sit third, under focus and date, on
+			// the reasoning that a short rail folds everything below the first
+			// few lines away -- and at a 22-row terminal the Details panel gets
+			// three rows, so third was still folded away. It is the
+			// interaction in progress, and the two rows above it are the least
+			// urgent things on the panel: the focused commit is already under
+			// the cursor in the graph, and its date is in the row.
+			if road := m.graphRange.summaryText(width - len("road: ")); road != "" {
+				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("road"), road))
+			}
 			lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("focus"), shorten(focus.Hash, 8)))
 			if when := compactWhenISO(focus.CommitDate, width-len("date: ")); when != "" {
 				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("date"), when))
-			}
-			// road sits above the parent and branch rows because it is the
-			// interaction in progress, and a short rail folds everything below
-			// the first few lines out of sight.
-			if road := m.graphRange.summaryText(width - len("road: ")); road != "" {
-				lines = append(lines, fmt.Sprintf("%s: %s", renderContextKey("road"), road))
 			}
 			lines = append(lines, focusParentLines(focus, width)...)
 			if branchLines := focusBranchSummaryLines(focus, width, LocalBranchInventory{Names: m.repoStatus.LocalBranches, Known: m.repoStatus.LocalBranchesKnown, Fresh: m.repoStatus.LocalBranchesFresh, Error: m.repoStatus.LocalBranchesError, Epoch: m.repositoryEpoch}); len(branchLines) > 0 {

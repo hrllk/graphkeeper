@@ -768,3 +768,15 @@ legacy 호출부를 건드리지 않는다.
 `TestNeutralStartupLoadsStashAndTagState` 가 따로 덮는다.
 T15 는 이중 경로가 사라진 뒤(T13) 이 가드를 지운다 —
 `docs/20260910-0004` 와 `-0005` 참조.
+
+### 시각 검증 5회차 — road 요약이 여전히 접혀 있었다
+
+`004f5f6` 은 "stop hiding its state" 를 표방하며 road 요약을 Details 패널의
+**세 번째** 줄에 놓았다. 근거로 "짧은 rail 은 첫 몇 줄 아래를 접는다"고 적었다.
+**22행 터미널에서 Details 패널이 받는 줄은 셋이다.** 세 번째는 여전히 접힌다.
+
+road 를 맨 위로 올렸다. 그 위에 있던 두 줄은 패널에서 가장 덜 급한 것들이다 —
+focus 커밋은 그래프에서 커서가 이미 가리키고 있고, 날짜는 그 행에 있다.
+road 는 **진행 중인 상호작용**이다.
+
+`TestRoadSummarySurvivesAShortRail` 이 18/22/30/40 행에서 고정한다.

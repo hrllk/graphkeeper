@@ -1,7 +1,10 @@
 package app
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 
 	"hrllk/graphkeeper/internal/git"
 )
@@ -47,6 +50,34 @@ func TestLocalPointerJudgementSplitsOnTheRawGraphPrefix(t *testing.T) {
 	for row := 1; row < 3; row++ {
 		if isLocalGraphPointer(raw, row, graphRows(raw)[row].Lane) {
 			t.Errorf("row %d: a raw-prefix row is judged on its decorations alone, and it has none", row)
+		}
+	}
+}
+
+// The road summary is the interaction in progress, so it survives a short rail.
+//
+// It used to be the third line of the Details panel, under focus and date, on
+// the reasoning that a short rail folds away everything below the first few
+// lines. At a 22-row terminal that panel gets three rows, so third was still
+// folded away -- the commit that named the feature promised to stop hiding its
+// state, and it was still hidden.
+func TestRoadSummarySurvivesAShortRail(t *testing.T) {
+	status := git.Status{
+		Root: "/repo", Branch: "main", Head: "a39d548",
+		LocalBranches: []string{"main"}, LocalBranchesKnown: true, LocalBranchesFresh: true,
+		GraphCommits: []git.GraphCommit{
+			{Hash: "a39d548", Subject: "newest", Decorations: []string{"HEAD -> main"}, Parents: []string{"b47e659"}, CommitDate: "2026-09-10T04:15:16+09:00"},
+			{Hash: "b47e659", Subject: "middle", Parents: []string{"c58f76a"}, CommitDate: "2026-09-09T23:15:16+09:00"},
+			{Hash: "c58f76a", Subject: "oldest", CommitDate: "2026-09-07T10:00:00+09:00"},
+		},
+	}
+	for _, height := range []int{18, 22, 30, 40} {
+		m := model{repositoryState: repositoryState{repoStatus: status}}
+		m.width, m.height = 110, height
+		m.graphRange = resolveGraphRange("a39d548", "c58f76a", 1, []string{"c58f76a", "b47e659"}, nil, nil)
+
+		if !strings.Contains(ansi.Strip(renderAppView(m)), "road:") {
+			t.Errorf("height %d folded the road summary out of sight", height)
 		}
 	}
 }
