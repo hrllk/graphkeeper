@@ -1,6 +1,9 @@
 package app
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestHiddenHotkeySectionContractForLocalAndRemote(t *testing.T) {
 	local := sectionHotkeyItems(t, sectionCurrent)
@@ -53,4 +56,23 @@ func hotkeyKeyListed(items []hiddenHotkeyItem, key string) bool {
 		}
 	}
 	return false
+}
+
+// No key may be listed twice in a section. The overlay's global list is
+// globalHotkeyItems plus what the footer has no room for, and flattening the
+// groups put "ctrl+u/d" in both halves under two spellings, so the same key
+// occupied two rows of a popup whose whole purpose is to be scannable.
+func TestHotkeySectionsListEachKeyOnce(t *testing.T) {
+	normalise := func(key string) string { return strings.ReplaceAll(key, " ", "") }
+	for _, section := range hiddenHotkeySections(model{}) {
+		seen := map[string]string{}
+		for _, item := range section.items {
+			key := normalise(item.key)
+			if first, ok := seen[key]; ok {
+				t.Errorf("%s lists %q twice, as %q and %q", section.title, key, first, item.key)
+				continue
+			}
+			seen[key] = item.key
+		}
+	}
 }

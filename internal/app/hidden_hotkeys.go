@@ -228,10 +228,13 @@ func hiddenHotkeySections(m model) []hiddenHotkeySection {
 	return []hiddenHotkeySection{
 		{
 			title: "Global",
+			// globalHotkeyItems is also the footer, so the overlay adds only what
+			// the footer has no room for. "ctrl+u/d" was listed here as well
+			// when the groups were flattened, which put the same key on two
+			// rows under two spellings.
 			items: append(globalHotkeyItems(),
 				hiddenHotkeyItem{key: "gg", desc: "top"},
 				hiddenHotkeyItem{key: "G", desc: "bottom"},
-				hiddenHotkeyItem{key: "ctrl+u/d", desc: "scroll"},
 			),
 		},
 		{
