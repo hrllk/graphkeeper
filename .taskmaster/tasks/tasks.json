@@ -1810,6 +1810,13 @@
             "status": "pending",
             "dependencies": [],
             "details": "C3(9.36) 측정에서 나왔다. 한 번의 Status() 가 git 서브프로세스 13개를 띄우고 그중 rev-parse 가 5번이다. 호출당 약 14ms 이므로 기준선 185ms 의 대부분이 여기서 온다. tag/stash 규모와 무관한 고정 비용이라 모든 저장소에 동일하게 효과가 있다. rev-parse 5회를 한 번으로 합치는 것이 가장 명확한 후보. cadence(1초) 변경은 반응성과의 맞바꿈이므로 별개 결정. 근거: docs/20260910-0003-c3-refresh-tick-cost.md"
+          },
+          {
+            "id": 6,
+            "title": "선택 표시가 그래프는 reverse, Inspector 는 '>' 거터 글리프",
+            "status": "pending",
+            "dependencies": [],
+            "details": "2026-09-10 NO_COLOR 시각 검증에서 나왔다. NO_COLOR 로 렌더하면 graph/rail/폼 팝업은 reverse+underline 이 나오지만 Inspector 는 attribute 가 하나도 없다(reverse=0 underline=0). 대신 '> M main.go' 처럼 거터 글리프로 선택을 표시하고, 이건 NO_COLOR 에서 정상 동작한다. 즉 결함이 아니라 두 번째 규약이다. 그래프는 094ca87 에서 거터 화살표를 **의도적으로 제거**하고 reverse 로 갔으며 TestRenderGraphContentOmitsSelectionArrow 가 그걸 고정한다. DESIGN.md 는 'focus and selection: reverse, or underline, written as attributes' 라고 적는다. 파일 목록에서 거터 마커는 관습적이고 그 행에 이미 상태 컬럼이 있으므로 Inspector 쪽을 바꾸는 것이 자명하지는 않다 - 어느 쪽으로 통일할지(또는 '목록은 거터, 그래프는 attribute' 를 명시적 규칙으로 적을지)는 디자인 결정이라 자동결정하지 않았다."
           }
         ]
       }
