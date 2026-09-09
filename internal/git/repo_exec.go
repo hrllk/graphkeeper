@@ -220,26 +220,65 @@ func commitDiffTreeArgs(parent, commit string, mode ...string) []string {
 	return append(args, parent, commit)
 }
 
+// parseNumstatZ reads `git diff-tree --numstat -z` into counts per path.
+//
+// -z emits two record shapes and the old parser only understood one of them --
+// the rarer one. An ordinary record is "add\tdel\tpath\0". A rename or copy
+// puts an empty path in that slot and follows it with the old and new paths as
+// their own NUL-terminated fields, rather than mangling them into
+// "old => new".
+//
+// The old parser stepped three fields at a time and took the third as the path,
+// which is the rename shape. On an ordinary commit the fields are one per
+// record, so it mapped "" to the first file's counts and found nothing for any
+// real path. Every file came out with zero additions and zero deletions.
+//
+// That had two consequences beyond the counts, both filed as separate defects.
+// A binary file is the record "-\t-\tpath", so binary was never detected --
+// the Inspector's binary marker could not fire. And the --summary pass marks a
+// file ModeOnly when it has "mode change" and no line counts, so with the
+// counts always zero, any mode change outranked the file's real content.
+func parseNumstatZ(out string) map[string][2]string {
+	parts := strings.Split(out, "\x00")
+	byPath := make(map[string][2]string, len(parts))
+	for i := 0; i < len(parts); i++ {
+		fields := strings.SplitN(parts[i], "\t", 3)
+		if len(fields) < 3 {
+			continue
+		}
+		add, del, path := fields[0], fields[1], fields[2]
+		if path == "" {
+			// A rename or copy: the two records that follow are the old path
+			// and the new one. The new path is the file's identity.
+			if i+2 >= len(parts) {
+				break
+			}
+			path = parts[i+2]
+			i += 2
+		}
+		// The final NUL leaves an empty tail field, and a truncated rename
+		// record lands its "new path" on it. An empty key is the defect this
+		// parser replaced, so it does not get to come back through the door.
+		if path == "" {
+			continue
+		}
+		byPath[path] = [2]string{add, del}
+	}
+	return byPath
+}
+
 func (r *Repo) annotateCommitDiffFiles(ctx context.Context, files []CommitDiffFile, parent, commit string) {
-	out, err := r.gitRaw(ctx, commitDiffTreeArgs(parent, commit, "--numstat", "-z", "-r")...)
+	// -M -C so numstat agrees with the name-status listing about what is a
+	// rename. Without them a rename arrives as a delete plus an add, and the
+	// file list says "R" over a diff computed as if it were two files.
+	out, err := r.gitRaw(ctx, commitDiffTreeArgs(parent, commit, "--numstat", "-z", "-r", "-M", "-C")...)
 	if err != nil {
 		return
 	}
-	parts := strings.Split(out, "\x00")
-	byPath := make(map[string][2]string, len(files))
-	for i := 0; i+2 < len(parts); i += 3 {
-		fields := strings.Fields(parts[i])
-		if len(fields) < 2 {
-			continue
-		}
-		byPath[parts[i+2]] = [2]string{fields[0], fields[1]}
-	}
+	byPath := parseNumstatZ(out)
 	for i := range files {
 		stat, ok := byPath[files[i].Path]
 		if !ok {
-			// Rename/copy numstat records can retain the old path. The
-			// status listing remains authoritative for identity; leave counts
-			// at zero when Git does not emit a direct path record.
 			continue
 		}
 		if stat[0] == "-" && stat[1] == "-" {
@@ -249,7 +288,7 @@ func (r *Repo) annotateCommitDiffFiles(ctx context.Context, files []CommitDiffFi
 		files[i].Additions, _ = strconv.Atoi(stat[0])
 		files[i].Deletions, _ = strconv.Atoi(stat[1])
 	}
-	summaryArgs := commitDiffTreeArgs(parent, commit, "--summary", "-r")
+	summaryArgs := commitDiffTreeArgs(parent, commit, "--summary", "-r", "-M", "-C")
 	if summary, summaryErr := r.gitRaw(ctx, summaryArgs...); summaryErr == nil {
 		for i := range files {
 			for _, line := range strings.Split(summary, "\n") {
